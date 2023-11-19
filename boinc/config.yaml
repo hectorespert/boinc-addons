@@ -18,3 +18,4 @@ options:
 schema:
   message: "str?"
 image: "ghcr.io/hectorespert/{arch}-addon-boinc"
+apparmor: false
