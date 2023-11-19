@@ -1,6 +1,6 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
 name: Boinc add-on
-version: "0.0.2"
+version: "0.0.3"
 slug: boinc
 description: Boinc add-on
 url: "https://github.com/hectorespert/hassio-addons/tree/main/boinc"
@@ -11,8 +11,8 @@ arch:
   - amd64
   - i386
 init: false
-map:
-  - share:rw
+#map:
+#  - share:rw
 options:
   message: "Hello world..."
 schema:
