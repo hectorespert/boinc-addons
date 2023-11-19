@@ -10,7 +10,7 @@ RUN \
 
 
 # Install boinc client
-RUN apt update && apt install -y boinc-client && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y boinc-client && rm -rf /var/lib/apt/lists/*
 
 # Copy root filesystem
 COPY rootfs /

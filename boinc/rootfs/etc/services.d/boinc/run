@@ -4,20 +4,11 @@
 # s6-overlay docs: https://github.com/just-containers/s6-overlay
 # ==============================================================================
 
-# Add your code here
-
-# Declare variables
-declare message
-
-## Get the 'message' key from the user config options.
-message=$(bashio::config 'message')
-
-## Print the message the user supplied, defaults to "Hello World..."
 bashio::log.info "Starting boinc home assistant addon"
 
-## Run your program
-#exec /usr/bin/boinc --dir
+bashio::log.info "Creating boinc folders"
+mkdir -p /addons/boinc
+mkdir -p /addons/boinc/slots
 
-pwd
-
-ls
+bashio::log.info "Starting boinc client"
+exec /usr/bin/boinc --dir /addons/boinc
