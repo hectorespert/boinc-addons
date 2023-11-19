@@ -17,4 +17,4 @@ options:
   message: "Hello world..."
 schema:
   message: "str?"
-image: "ghcr.io/home-assistant/{arch}-addon-boinc"
+image: "ghcr.io/hectorespert/{arch}-addon-boinc"
