@@ -11,4 +11,5 @@ mkdir -p /addons/boinc
 mkdir -p /addons/boinc/slots
 
 bashio::log.info "Starting boinc client"
-exec /usr/bin/boinc --dir /addons/boinc
+
+exec /usr/bin/boinc --attach_project https://lhcathome.cern.ch/lhcathome 560074_279c286e0d53268057d1b76c3e3d7413
