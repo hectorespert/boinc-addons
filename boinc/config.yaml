@@ -1,9 +1,9 @@
 # https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
-name: Boinc add-on
-version: "0.0.5"
+name: Boinc
+version: "0.1.0"
 slug: boinc
-description: Boinc add-on
-url: "https://github.com/hectorespert/hassio-addons/tree/main/boinc"
+description: Downloads scientific computing jobs and runs them
+url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
 arch:
   - armhf
   - armv7
@@ -11,13 +11,13 @@ arch:
   - amd64
   - i386
 init: false
-#map:
-#  - addons:rw
+map:
+  - addons:rw
 options:
-  url: null
-  weak-password: null
+  project: null
+  key: null
 schema:
-  url: url
-  weak-password: password
+  project: url
+  key: password
 image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false

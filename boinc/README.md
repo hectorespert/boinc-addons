@@ -1,6 +1,8 @@
-# Home Assistant Add-on: Boinc add-on
+# Home Assistant Boinc Add-on
 
-_Example add-on to use as a blueprint for new add-ons._
+[BOINC](https://boinc.berkeley.edu) is an open-source software platform for computing using volunteered resources.
+
+The BOINC add-on, running on your Home Assistant, downloads scientific computing jobs and runs them invisibly in the background.
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
