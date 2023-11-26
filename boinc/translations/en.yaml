@@ -1,7 +1,7 @@
 configuration:
   project:
     name: Project Url
-    description: The Boinc project url.
+    description: A Boinc project url.
   key:
     name: Project Account Key
     description: The project account key.
