@@ -1,4 +1,5 @@
 #!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
 # ==============================================================================
 # Start the example service
 # s6-overlay docs: https://github.com/just-containers/s6-overlay
@@ -6,15 +7,26 @@
 
 bashio::log.info "Starting boinc home assistant addon"
 
-bashio::log.info "Creating boinc folders"
-mkdir -p /data
-mkdir -p /data/boinc
-mkdir -p /data/boinc/slots
+if ! bashio::fs.directory_exists "/data/boinc"; then
+    bashio::log.info "Creating boinc folders"
+    mkdir -p /data
+    mkdir -p /data/boinc
+    mkdir -p /data/boinc/slots
+fi
 
-bashio::log.info "Starting boinc client"
+HOSTNAME=$(bashio::info.hostname)
+
+if [ "$HOSTNAME" == 'null' ]; then
+    HOSTNAME="homeassistant"
+fi
+
+echo "{\"hostname\": \"$HOSTNAME\"}" | tempio \
+    -template /usr/share/tempio/cc_config.xml \
+    -out /data/boinc/cc_config.xml
 
 PROJECT="$(bashio::config 'project')"
 KEY="$(bashio::config 'key')"
 
+bashio::log.info "Starting boinc client"
 
 exec /usr/bin/boinc --dir /data/boinc --no_gui_rpc --attach_project "$PROJECT" "$KEY" --update_prefs "$PROJECT"

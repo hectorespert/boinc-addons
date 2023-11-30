@@ -10,5 +10,3 @@ labels:
   org.opencontainers.image.description: "Home Assistant Boinc add-on."
   org.opencontainers.image.source: "https://github.com/hectorespert/boinc-addons"
   org.opencontainers.image.licenses: "Apache License 2.0"
-args:
-  TEMPIO_VERSION: "2021.09.0"
