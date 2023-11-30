@@ -1,0 +1,7 @@
+<cc_config>
+    <options>
+        <device_name>{{ .hostname }}</device_name>
+    </options>
+    <log_flags>
+    </log_flags>
+</cc_config>
