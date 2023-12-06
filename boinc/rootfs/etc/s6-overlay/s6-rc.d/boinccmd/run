@@ -1,0 +1,4 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+
+bashio::log.info "TODO: Waiting boinc client start"

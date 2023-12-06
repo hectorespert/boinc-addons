@@ -17,5 +17,5 @@ options:
 schema:
   project: url
   key: password
-#image: "ghcr.io/hectorespert/{arch}-addon-boinc"
+image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false

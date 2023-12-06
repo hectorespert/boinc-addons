@@ -3,5 +3,8 @@
         <device_name>{{ .hostname }}</device_name>
     </options>
     <log_flags>
+        <task>1</task>
+        <file_xfer>1</file_xfer>
+        <sched_ops>1</sched_ops>
     </log_flags>
 </cc_config>
