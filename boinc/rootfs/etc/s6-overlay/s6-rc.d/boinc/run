@@ -2,8 +2,4 @@
 # shellcheck shell=bash
 
 bashio::log.info "Starting boinc client"
-
-PROJECT="$(bashio::config 'project')"
-KEY="$(bashio::config 'key')"
-
-exec /usr/bin/boinc --dir /data/boinc --no_gui_rpc --attach_project "$PROJECT" "$KEY" --update_prefs "$PROJECT"
+exec /usr/bin/boinc --dir /data/boinc

@@ -1,4 +1,36 @@
 #!/command/with-contenv bashio
 # shellcheck shell=bash
 
-bashio::log.info "TODO: Waiting boinc client start"
+bashio::log.info "Waiting boinc client start"
+
+sleep 1
+
+bashio::log.info "Boinc client started"
+
+cd /data/boinc || exit 1
+
+bashio::log.info "Start account manager configuration"
+
+ACCOUNT_MANAGER_URL="$(bashio::config 'account_manager_url')"
+ACCOUNT_MANAGER_USERNAME="$(bashio::config 'account_manager_username')"
+ACCOUNT_MANAGER_PASSWORD="$(bashio::config 'account_manager_password')"
+
+CURRENT_ACCOUNT_MANAGER_URL=$(boinccmd --acct_mgr info | grep 'URL:' | awk '{print $2}')
+
+if [ -z "$CURRENT_ACCOUNT_MANAGER_URL" ]; then
+    bashio::log.info "Attaching to $ACCOUNT_MANAGER_URL"
+    boinccmd --acct_mgr attach "$ACCOUNT_MANAGER_URL" "$ACCOUNT_MANAGER_USERNAME" "$ACCOUNT_MANAGER_PASSWORD"
+else
+    bashio::log.info "Attached to $CURRENT_ACCOUNT_MANAGER_URL"
+    if [ "${ACCOUNT_MANAGER_URL%/}" = "${CURRENT_ACCOUNT_MANAGER_URL%/}" ]; then
+        bashio::log.info "Syncronizing from $CURRENT_ACCOUNT_MANAGER_URL"
+        boinccmd --acct_mgr sync
+    else
+        bashio::log.info "Detachhing from $CURRENT_ACCOUNT_MANAGER_URL"
+        boinccmd --acct_mgr detach
+        bashio::log.info "Attaching to $ACCOUNT_MANAGER_URL"
+        boinccmd --acct_mgr attach "$ACCOUNT_MANAGER_URL" "$ACCOUNT_MANAGER_USERNAME" "$ACCOUNT_MANAGER_PASSWORD"
+    fi
+fi
+
+bashio::log.info "Account manager configured"
