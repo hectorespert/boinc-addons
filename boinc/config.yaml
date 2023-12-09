@@ -1,6 +1,5 @@
-# https://developers.home-assistant.io/docs/add-ons/configuration#add-on-config
 name: Boinc
-version: "1.0.0"
+version: "1.0.1"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
