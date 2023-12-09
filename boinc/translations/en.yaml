@@ -1,7 +1,10 @@
 configuration:
-  project:
-    name: Project Url
-    description: A Boinc project url.
-  key:
-    name: Project Account Key
-    description: The project account key.
+  account_manager_url:
+    name: Account Manager
+    description: "A Boinc Account Manager URL, for example: https://scienceunited.org"
+  account_manager_username:
+    name: Username
+    description: "An username for a user registered in the Boinc Account Manager"
+  account_manager_password:
+    name: Password
+    description: "Password for the configured user"
