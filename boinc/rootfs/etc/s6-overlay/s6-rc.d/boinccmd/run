@@ -3,7 +3,7 @@
 
 bashio::log.info "Waiting boinc client start"
 
-sleep 1
+sleep 10
 
 bashio::log.info "Boinc client started"
 
@@ -28,6 +28,7 @@ else
     else
         bashio::log.info "Detachhing from $CURRENT_ACCOUNT_MANAGER_URL"
         boinccmd --acct_mgr detach
+        sleep 10
         bashio::log.info "Attaching to $ACCOUNT_MANAGER_URL"
         boinccmd --acct_mgr attach "$ACCOUNT_MANAGER_URL" "$ACCOUNT_MANAGER_USERNAME" "$ACCOUNT_MANAGER_PASSWORD"
     fi
