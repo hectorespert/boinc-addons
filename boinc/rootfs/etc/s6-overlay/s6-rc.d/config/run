@@ -8,7 +8,17 @@ if ! bashio::fs.directory_exists "/data/boinc"; then
     mkdir -p /data
     mkdir -p /data/boinc
     mkdir -p /data/boinc/slots
+    mkdir -p /data/boinc/locale
 fi
+
+if bashio::config.has_value 'gui_rpc_password'; then
+    # shellcheck disable=SC2005
+    echo "$(bashio::config 'gui_rpc_password')" > /data/boinc/gui_rpc_auth.cfg
+else
+    rm -f /data/boinc/gui_rpc_auth.cfg
+fi
+
+touch /data/boinc/remote_hosts.cfg
 
 HOSTNAME=$(bashio::info.hostname)
 

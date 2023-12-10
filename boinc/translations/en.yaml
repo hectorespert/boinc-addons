@@ -1,10 +1,15 @@
 configuration:
+  gui_rpc_password:
+    name: "GUI RPC password"
+    description: "Define a GUI RPC password to connect remotely"
   account_manager_url:
-    name: Account Manager URL (Optinal)
+    name: Account Manager URL
     description: "An URL for a Boinc Account Manager, for example: https://scienceunited.org"
   account_manager_username:
-    name: Account Manager Username (Optinal)
+    name: Account Manager Username
     description: "An username for a user registered in the Boinc Account Manager"
   account_manager_password:
-    name: Account Manager Password (Optinal)
-    description: "Password for the configured user  in the Boinc Account Manager"
+    name: Account Manager Password
+    description: "Password for the configured user in the Boinc Account Manager"
+network:
+  31416/tcp: Boinc client rpc port (Default 31416)

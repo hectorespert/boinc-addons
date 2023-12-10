@@ -10,13 +10,16 @@ arch:
   - amd64
   - i386
 init: false
+ports:
+  31416/tcp: null
 options:
-  account_manager_url: ""
+  account_manager_url: "https://scienceunited.org"
   account_manager_username: ""
   account_manager_password: ""
 schema:
+  gui_rpc_password: "password?"
   account_manager_url: "str?"
   account_manager_username: "str?"
   account_manager_password: "password?"
-#image: "ghcr.io/hectorespert/{arch}-addon-boinc"
+image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false
