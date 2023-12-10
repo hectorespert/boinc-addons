@@ -1,5 +1,5 @@
 name: Boinc
-version: "1.0.1"
+version: "1.1.0"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
@@ -11,12 +11,12 @@ arch:
   - i386
 init: false
 options:
-  account_manager_url: "https://scienceunited.org"
-  account_manager_username: null
-  account_manager_password: null
+  account_manager_url: ""
+  account_manager_username: ""
+  account_manager_password: ""
 schema:
-  account_manager_url: str
-  account_manager_username: str
-  account_manager_password: password
-image: "ghcr.io/hectorespert/{arch}-addon-boinc"
+  account_manager_url: "str?"
+  account_manager_username: "str?"
+  account_manager_password: "password?"
+#image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false

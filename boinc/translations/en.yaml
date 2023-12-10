@@ -1,10 +1,10 @@
 configuration:
   account_manager_url:
-    name: Account Manager
-    description: "A Boinc Account Manager URL, for example: https://scienceunited.org"
+    name: Account Manager URL (Optinal)
+    description: "An URL for a Boinc Account Manager, for example: https://scienceunited.org"
   account_manager_username:
-    name: Username
+    name: Account Manager Username (Optinal)
     description: "An username for a user registered in the Boinc Account Manager"
   account_manager_password:
-    name: Password
-    description: "Password for the configured user"
+    name: Account Manager Password (Optinal)
+    description: "Password for the configured user  in the Boinc Account Manager"
