@@ -2,6 +2,9 @@ configuration:
   gui_rpc_password:
     name: "GUI RPC password"
     description: "Define a GUI RPC password to connect remotely"
+  remote_hosts:
+    name: Remote hosts
+    description: List of remote hosts to allow remote connection
   account_manager_url:
     name: Account Manager URL
     description: "An URL for a Boinc Account Manager, for example: https://scienceunited.org"

@@ -18,7 +18,15 @@ else
     rm -f /data/boinc/gui_rpc_auth.cfg
 fi
 
-touch /data/boinc/remote_hosts.cfg
+echo -n '' > /data/boinc/remote_hosts.cfg
+
+if bashio::config.exists 'remote_hosts'; then
+    # shellcheck disable=SC2005
+    remote_hosts=$(echo "$(bashio::config 'remote_hosts')" | tr ' ' '\n')
+    for remote_host in $remote_hosts; do
+        echo "$remote_host" >> /data/boinc/remote_hosts.cfg
+    done
+fi
 
 HOSTNAME=$(bashio::info.hostname)
 
