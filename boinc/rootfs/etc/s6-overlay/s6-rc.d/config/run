@@ -8,6 +8,24 @@ if ! bashio::fs.directory_exists "/data/boinc"; then
     mkdir -p /data
     mkdir -p /data/boinc
     mkdir -p /data/boinc/slots
+    mkdir -p /data/boinc/locale
+fi
+
+if bashio::config.has_value 'gui_rpc_password'; then
+    # shellcheck disable=SC2005
+    echo "$(bashio::config 'gui_rpc_password')" > /data/boinc/gui_rpc_auth.cfg
+else
+    rm -f /data/boinc/gui_rpc_auth.cfg
+fi
+
+echo -n '' > /data/boinc/remote_hosts.cfg
+
+if bashio::config.exists 'remote_hosts'; then
+    # shellcheck disable=SC2005
+    remote_hosts=$(echo "$(bashio::config 'remote_hosts')" | tr ' ' '\n')
+    for remote_host in $remote_hosts; do
+        echo "$remote_host" >> /data/boinc/remote_hosts.cfg
+    done
 fi
 
 HOSTNAME=$(bashio::info.hostname)
@@ -16,9 +34,12 @@ if [ "$HOSTNAME" == 'null' ]; then
     HOSTNAME="homeassistant"
 fi
 
-bashio::log.info "Hostname $HOSTNAME configured"
+allow_remote_gui_rpc=0
+if bashio::config.true 'allow_remote_gui_rpc'; then
+    allow_remote_gui_rpc=1
+fi
 
-echo "{\"hostname\": \"$HOSTNAME\"}" | tempio \
+echo "{\"hostname\": \"$HOSTNAME\",\"allow_remote_gui_rpc\": \"$allow_remote_gui_rpc\"}" | tempio \
     -template /usr/share/tempio/cc_config.xml \
     -out /data/boinc/cc_config.xml
 

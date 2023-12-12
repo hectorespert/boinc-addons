@@ -1,6 +1,7 @@
 <cc_config>
     <options>
         <device_name>{{ .hostname }}</device_name>
+        <allow_remote_gui_rpc>{{ .allow_remote_gui_rpc }}</allow_remote_gui_rpc>
     </options>
     <log_flags>
         <task>1</task>
