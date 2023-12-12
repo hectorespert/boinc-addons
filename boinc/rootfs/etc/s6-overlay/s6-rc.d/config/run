@@ -34,9 +34,12 @@ if [ "$HOSTNAME" == 'null' ]; then
     HOSTNAME="homeassistant"
 fi
 
-bashio::log.info "Hostname $HOSTNAME configured"
+allow_remote_gui_rpc=0
+if bashio::config.true 'allow_remote_gui_rpc'; then
+    allow_remote_gui_rpc=1
+fi
 
-echo "{\"hostname\": \"$HOSTNAME\"}" | tempio \
+echo "{\"hostname\": \"$HOSTNAME\",\"allow_remote_gui_rpc\": \"$allow_remote_gui_rpc\"}" | tempio \
     -template /usr/share/tempio/cc_config.xml \
     -out /data/boinc/cc_config.xml
 

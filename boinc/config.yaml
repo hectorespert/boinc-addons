@@ -12,14 +12,14 @@ arch:
 init: false
 ports:
   31416/tcp: null
-#options:
+options: {}
 schema:
   gui_rpc_password: "password?"
-  allow_remote_gui_rpc: "boolean?"
   remote_hosts:
     - "str?"
+  allow_remote_gui_rpc: "bool?"
   account_manager_url: "str?"
   account_manager_username: "str?"
   account_manager_password: "password?"
-#image: "ghcr.io/hectorespert/{arch}-addon-boinc"
+image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false

@@ -5,6 +5,9 @@ configuration:
   remote_hosts:
     name: Remote hosts
     description: List of remote hosts to allow remote connection
+  allow_remote_gui_rpc:
+    name: Allow remote gui rpc
+    description: Allow all remote gui rpc connections (Overrides remote hosts)
   account_manager_url:
     name: Account Manager URL
     description: "An URL for a Boinc Account Manager, for example: https://scienceunited.org"
@@ -15,4 +18,4 @@ configuration:
     name: Account Manager Password
     description: "Password for the configured user in the Boinc Account Manager"
 network:
-  31416/tcp: Boinc client rpc port (Default 31416)
+  31416/tcp: Boinc client gui rpc port (Default 31416)
