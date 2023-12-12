@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.0
+- Support remote connections
+
 ## 1.0.1
 
 - Fix Account Manager attach
