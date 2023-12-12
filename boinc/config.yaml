@@ -12,7 +12,6 @@ arch:
 init: false
 ports:
   31416/tcp: null
-options: {}
 schema:
   gui_rpc_password: "password?"
   remote_hosts:
