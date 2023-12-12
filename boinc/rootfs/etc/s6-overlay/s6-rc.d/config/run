@@ -8,6 +8,10 @@ if ! bashio::fs.directory_exists "/data/boinc"; then
     mkdir -p /data
     mkdir -p /data/boinc
     mkdir -p /data/boinc/slots
+fi
+
+# Fix locale folder
+if ! bashio::fs.directory_exists "/data/boinc/locale"; then
     mkdir -p /data/boinc/locale
 fi
 
