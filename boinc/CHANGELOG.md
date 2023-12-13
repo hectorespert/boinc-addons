@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1
+
+- Sign image
+
 ## 1.2.0
 
 - Cosing image configuration
