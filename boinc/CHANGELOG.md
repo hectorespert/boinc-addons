@@ -1,6 +1,17 @@
 # Changelog
 
+## 1.2.0
+
+- Cosing image configuration
+- Improve docs
+- Enable video support to detect GPUs
+
+## 1.1.1
+
+- Fix locale folder error
+
 ## 1.1.0
+
 - Support remote connections
 
 ## 1.0.1
