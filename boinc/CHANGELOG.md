@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.2
+
+- Cosing image configuration
+- Improve docs
+
 ## 1.1.1
 
 - Fix locale folder error
