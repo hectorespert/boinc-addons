@@ -1,5 +1,5 @@
 name: Boinc
-version: "1.1.2"
+version: "1.2.0"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
@@ -12,6 +12,7 @@ arch:
 init: false
 ports:
   31416/tcp: null
+video: true
 schema:
   gui_rpc_password: "password?"
   remote_hosts:

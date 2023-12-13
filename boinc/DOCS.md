@@ -6,7 +6,7 @@ The BOINC add-on, running on your Home Assistant, downloads scientific computing
 
 ## How to use
 
-### Boinc Account Manager (Easy)
+### Account Manager (Easy)
 
 The easy way to use this addon is to attach the boicn client to a [Boinc Account Manager](https://boinc.berkeley.edu/wiki/Account_managers).
 
@@ -24,4 +24,6 @@ account_manager_username: "youremail@email.com"
 account_manager_password: "yoursecretpassword"
 ```
 
-### Remote GUI Rpc
+### Remote GUI RPC
+
+[Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the addon configuration and use it to manage the boinc client remotely.

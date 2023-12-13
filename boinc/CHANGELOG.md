@@ -1,9 +1,10 @@
 # Changelog
 
-## 1.1.2
+## 1.2.0
 
 - Cosing image configuration
 - Improve docs
+- Enable video support to detect GPUs
 
 ## 1.1.1
 
