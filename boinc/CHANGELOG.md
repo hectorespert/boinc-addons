@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+- Fix preferences override
+
 ## 1.3.0
 
 - Support preferences override

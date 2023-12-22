@@ -34,13 +34,10 @@ fi
 
 # Preferences overrride
 if bashio::fs.file_exists "/config/global_prefs_override.xml"; then
-    bashio::log.info "Global preferences override file detected"
     ln -s /config/global_prefs_override.xml /data/boinc/global_prefs_override.xml
 else
     rm -f /data/boinc/global_prefs_override.xml
 fi
-
-ls -l /data/boinc
 
 HOSTNAME=$(bashio::info.hostname)
 

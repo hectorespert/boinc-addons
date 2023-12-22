@@ -1,5 +1,5 @@
 name: Boinc
-version: "1.3.2"
+version: "1.3.3"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
