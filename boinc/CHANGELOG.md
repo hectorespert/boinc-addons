@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+
+- Support preferences override
+
 ## 1.2.1
 
 - Sign image
