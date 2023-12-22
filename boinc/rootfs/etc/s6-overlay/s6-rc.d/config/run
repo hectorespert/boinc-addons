@@ -33,10 +33,9 @@ if bashio::config.exists 'remote_hosts'; then
 fi
 
 # Preferences overrride
+rm -f /data/boinc/global_prefs_override.xml
 if bashio::fs.file_exists "/config/global_prefs_override.xml"; then
-    ln -s -f /config/global_prefs_override.xml /data/boinc/global_prefs_override.xml
-else
-    rm -f /data/boinc/global_prefs_override.xml
+    ln -s /config/global_prefs_override.xml /data/boinc/global_prefs_override.xml
 fi
 
 HOSTNAME=$(bashio::info.hostname)
