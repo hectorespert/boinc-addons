@@ -7,10 +7,18 @@ on:
   pull_request:
     branches:
       - main
-  schedule:
-    - cron: "0 0 * * *"
 
 jobs:
+  yaml:
+    name: Lint YAML lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@v4.1.1
+
+      - name: 🚀 Run YAML lint
+        uses: frenck/action-yamllint@v1.4
+
   find:
     name: Find add-ons
     runs-on: ubuntu-latest
@@ -39,3 +47,15 @@ jobs:
         uses: frenck/action-addon-linter@v2.15
         with:
           path: "./${{ matrix.path }}"
+
+      - name: 🚀 Run Shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: "./${{ matrix.path }}"
+        env:
+          SHELLCHECK_OPTS: -s bash
+
+      - name: 🚀 Run Hadolint
+        uses: brpaz/hadolint-action@v1.5.0
+        with:
+          dockerfile: "./${{ matrix.path }}/Dockerfile"
