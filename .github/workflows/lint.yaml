@@ -9,15 +9,6 @@ on:
       - main
 
 jobs:
-  yaml:
-    name: Lint YAML files
-    runs-on: ubuntu-latest
-    steps:
-      - name: ⤵️ Check out code from GitHub
-        uses: actions/checkout@v4.1.1
-      - name: 🚀 Run YAMLLint
-        uses: frenck/action-yamllint@v1.4
-    
   find:
     name: Find add-ons
     runs-on: ubuntu-latest
@@ -30,6 +21,9 @@ jobs:
       - name: 🔍 Find add-on directories
         id: addons
         uses: home-assistant/actions/helpers/find-addons@master
+
+      - name: 🚀 Run YAML lint
+        uses: frenck/action-yamllint@v1.4
 
   lint:
     name: Lint add-on ${{ matrix.path }}
