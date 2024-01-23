@@ -53,3 +53,8 @@ jobs:
           scandir: "./${{ matrix.path }}"
         env:
           SHELLCHECK_OPTS: -s bash
+
+      - name: 🚀 Run Hadolint
+        uses: brpaz/hadolint-action@v1.5.0
+        with:
+          dockerfile: "./${{ matrix.path }}/Dockerfile"
