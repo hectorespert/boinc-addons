@@ -7,10 +7,17 @@ on:
   pull_request:
     branches:
       - main
-  schedule:
-    - cron: "0 0 * * *"
 
 jobs:
+  yaml:
+    name: Lint YAML files
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@v4.1.1
+      - name: 🚀 Run YAMLLint
+        uses: frenck/action-yamllint@v1.4
+    
   find:
     name: Find add-ons
     runs-on: ubuntu-latest
