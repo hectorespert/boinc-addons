@@ -17,7 +17,7 @@ jobs:
         uses: actions/checkout@v4.1.1
 
       - name: 🚀 Run YAML lint
-        uses: frenck/action-yamllint@v1.4
+        uses: frenck/action-yamllint@v1.5
 
   find:
     name: Find add-ons
