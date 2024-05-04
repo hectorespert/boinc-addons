@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.7
+
+- Fix Rosseta@Home libGL.so error
+
+## 1.3.6
+
+- Improve build using linters
+
 ## 1.3.5
 
 - Fix preferences override
