@@ -21,7 +21,7 @@ schema:
   account_manager_url: "str?"
   account_manager_username: "str?"
   account_manager_password: "password?"
-image: "ghcr.io/hectorespert/{arch}-addon-boinc"
+#image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false
 map:
   - addon_config
