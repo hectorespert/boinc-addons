@@ -12,7 +12,11 @@
   "mounts": ["type=volume,target=/var/lib/docker"],
   "customizations": {
     "vscode": {
-      "extensions": ["timonwong.shellcheck", "esbenp.prettier-vscode"]
+      "extensions": [
+        "timonwong.shellcheck",
+        "esbenp.prettier-vscode",
+        "ms-azuretools.vscode-docker"
+      ]
     },
     "settings": {
       "terminal.integrated.profiles.linux": {
