@@ -1,1 +1,1 @@
-/opt/operator/bin/operator
+/opt/operator/bin/operator /data/options.json
