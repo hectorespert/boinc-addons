@@ -1,1 +1,1 @@
-/opt/operator/bin/operator /data/options.json
+/etc/s6-overlay/s6-rc.d/operator/run

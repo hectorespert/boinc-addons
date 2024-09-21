@@ -1,0 +1,4 @@
+#!/usr/bin/with-contenv bashio
+# shellcheck shell=bash
+
+/opt/operator/bin/operator --options /data/options.json --data /data/boinc --log-level DEBUG

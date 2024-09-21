@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+
+Allow configure compute time
+
 ## 1.3.7
 
 - Fix Rosseta@Home libGL.so error

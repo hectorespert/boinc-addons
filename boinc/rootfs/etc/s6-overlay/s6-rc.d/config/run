@@ -3,18 +3,6 @@
 
 bashio::log.info "Configuring Boinc Addon"
 
-if ! bashio::fs.directory_exists "/data/boinc"; then
-    bashio::log.info "Creating boinc folders"
-    mkdir -p /data
-    mkdir -p /data/boinc
-    mkdir -p /data/boinc/slots
-fi
-
-# Fix locale folder
-if ! bashio::fs.directory_exists "/data/boinc/locale"; then
-    mkdir -p /data/boinc/locale
-fi
-
 if bashio::config.has_value 'gui_rpc_password'; then
     # shellcheck disable=SC2005
     echo "$(bashio::config 'gui_rpc_password')" > /data/boinc/gui_rpc_auth.cfg
