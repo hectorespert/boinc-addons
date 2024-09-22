@@ -1,4 +1,0 @@
-#!/usr/bin/with-contenv bashio
-# shellcheck shell=bash
-
-python3 /opt/operator/main.py --options /data/options.json --data /data/boinc --log-level DEBUG
