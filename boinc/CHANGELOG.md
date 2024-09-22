@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.4.0
+## 2.0.0
 
-Allow configure compute time
+TODO Explain the change
 
 ## 1.3.7
 
