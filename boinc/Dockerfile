@@ -11,7 +11,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy operator
-ADD operator/*.py /opt/operator/
+COPY operator/*.py /opt/operator/
 
 # Copy root filesystem
 COPY rootfs /
