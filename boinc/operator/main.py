@@ -2,8 +2,10 @@ import argparse
 import json
 import logging
 import os
+from time import sleep
 
 from folders import prepare_data_folders
+from gui_rpc_auth import prepare_gui_rpc_auth
 
 parser = argparse.ArgumentParser(prog='operator')
 
@@ -22,6 +24,14 @@ logging.debug(f'Current configuration\n{json.dumps(options, indent=2)}')
 
 data_folder = args.data
 logging.info(f'BOINC data folder {data_folder}')
+
 prepare_data_folders(data_folder)
+
+prepare_gui_rpc_auth(data_folder, options.get('gui_rpc_auth'))
+
+while True:
+    sleep(5)
+
+
 
 logging.info(f'BOINC Add-on Operator stopped')
