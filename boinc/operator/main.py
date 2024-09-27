@@ -2,6 +2,8 @@ import argparse
 import json
 import logging
 import os
+import signal
+import subprocess
 from time import sleep
 
 from folders import prepare_data_folders
@@ -29,9 +31,23 @@ prepare_data_folders(data_folder)
 
 prepare_gui_rpc_auth(data_folder, options.get('gui_rpc_auth'))
 
-while True:
-    sleep(5)
+boinc_process = subprocess.Popen(["boinc", "--dir", f'{data_folder}'])
+logging.debug(f'BOINC client started with pid {boinc_process.pid}')
 
+def signal_handler(number, frame):
+    logging.debug(f'Caught signal {number}')
+    if  number != signal.SIGINT and boinc_process.poll() is None:
+        logging.debug(f'Stopping BOINC client with signal {number}')
+        boinc_process.send_signal(number)
 
+logging.info(f'BOINC Add-on Operator started')
+signal.signal(signal.SIGHUP, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGQUIT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
+while boinc_process.poll() is None:
+    sleep(0.5)
+
+logging.debug(f'BOINC client stopped with code {boinc_process.returncode}')
 logging.info(f'BOINC Add-on Operator stopped')
