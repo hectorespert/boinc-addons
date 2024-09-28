@@ -10,9 +10,10 @@ arch:
   - amd64
   - i386
 init: false
-ports:
-  31416/tcp: null
+#ports:
+#  31416/tcp: null
 video: true
+host_network: true
 host_pid: true
 schema:
   gui_rpc_password: "password?"

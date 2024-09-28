@@ -7,6 +7,7 @@ FROM $BUILD_FROM
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install --no-install-recommends -y boinc-client \
+    python3-dict2xml \
     ocl-icd-libopencl1 \
     mesa-opencl-icd \
     libgl1 && \

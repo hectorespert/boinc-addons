@@ -1,5 +1,0 @@
-#!/usr/bin/with-contenv bashio
-# shellcheck shell=bash
-
-bashio::log.info "Starting boinc client"
-exec /usr/bin/boinc --dir /data/boinc

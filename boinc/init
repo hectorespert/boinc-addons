@@ -1,4 +1,4 @@
 #!/usr/bin/bash
 # shellcheck shell=bash
 
-exec python3 /opt/operator/main.py --options /data/options.json --data /data/boinc "$@"
+exec python3 /opt/operator/main.py --options /data/options.json --data /data/boinc --log-level DEBUG "$@"
