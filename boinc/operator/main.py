@@ -6,8 +6,11 @@ import signal
 import subprocess
 from time import sleep
 
+from cc_config import prepare_cc_config
 from folders import prepare_data_folders
+from global_prefs_override import link_global_prefs_override
 from gui_rpc_auth import prepare_gui_rpc_auth
+from remote_hosts import prepare_remote_hosts
 
 parser = argparse.ArgumentParser(prog='operator')
 
@@ -31,6 +34,12 @@ prepare_data_folders(data_folder)
 
 prepare_gui_rpc_auth(data_folder, options.get('gui_rpc_auth'))
 
+prepare_remote_hosts(data_folder, options.get('remote_hosts'))
+
+link_global_prefs_override(data_folder)
+
+prepare_cc_config(data_folder)
+
 boinc_process = subprocess.Popen(["boinc", "--dir", f'{data_folder}'])
 logging.debug(f'BOINC client started with pid {boinc_process.pid}')
 
@@ -45,6 +54,17 @@ signal.signal(signal.SIGHUP, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGQUIT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
+
+boinc_process_initialized = False
+while boinc_process.poll() is None and not boinc_process_initialized:
+    result = subprocess.run(["boinccmd", "--get_state"], capture_output=True, text=True)
+    if result.returncode == 0:
+        boinc_process_initialized = True
+        logging.debug(f'BOINC client initialized')
+    else:
+        logging.debug(f'Waiting for BOINC client to initialize')
+        sleep(0.5)
+
 
 while boinc_process.poll() is None:
     sleep(0.5)
