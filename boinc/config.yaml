@@ -13,8 +13,9 @@ init: false
 #ports:
 #  31416/tcp: null
 video: true
-host_network: true
+#host_network: true
 host_pid: true
+#protected: false
 schema:
   gui_rpc_password: "password?"
   remote_hosts:
