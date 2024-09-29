@@ -1,0 +1,27 @@
+configuración:
+  gui_rpc_password:
+    nombre: "Contraseña GUI RPC"
+    descripción: "Definir una contraseña GUI RPC para conectarse de forma remota"
+  remote_hosts:
+    nombre: Hosts remotos
+    descripción: Lista de hosts remotos para permitir la conexión remota
+  allow_remote_gui_rpc:
+    nombre: Permitir GUI RPC remota
+    descripción: Permitir todas las conexiones GUI RPC remotas (Anula los hosts remotos)
+  account_manager_url:
+    nombre: URL del Gestor de Cuentas
+    descripción: "Una URL para un Gestor de Cuentas Boinc, por ejemplo: https://scienceunited.org"
+  account_manager_username:
+    nombre: Nombre de Usuario del Gestor de Cuentas
+    descripción: "Un nombre de usuario para un usuario registrado en el Gestor de Cuentas Boinc"
+  account_manager_password:
+    nombre: Contraseña del Gestor de Cuentas
+    descripción: "Contraseña para el usuario configurado en el Gestor de Cuentas Boinc"
+  start_hour:
+    nombre: Hora de Inicio
+    descripción: "Configurar la hora en que Boinc comienza a computar"
+  end_hour:
+    nombre: Hora de Fin
+    descripción: "Configurar la hora en que Boinc deja de computar"
+red:
+  31416/tcp: Puerto GUI RPC del cliente Boinc (Por defecto 31416)
