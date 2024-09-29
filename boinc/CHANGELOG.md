@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0
+
+- Support the configuration of the start and end time of computing.
+- First version of the BOINC addon operator, if there are any problems with it, please notify me.
+
 ## 1.3.7
 
 - Fix Rosseta@Home libGL.so error
