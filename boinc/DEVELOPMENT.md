@@ -1,6 +1,7 @@
 # Development
 
 
+
 ## Build locally (AMD 64 platform)
 ```bash
 docker build --progress=plain -t hectorespert/amd64-addon-boinc .

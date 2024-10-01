@@ -17,5 +17,11 @@ configuration:
   account_manager_password:
     name: Account Manager Password
     description: "Password for the configured user in the Boinc Account Manager"
+  start_hour:
+    name: Start Hour
+    description: "Configure the hour when Boinc starts to compute"
+  end_hour:
+    name: End Hour
+    description: Configure the hour when Boinc stops to compute"
 network:
   31416/tcp: Boinc client gui rpc port (Default 31416)

@@ -1,3 +1,4 @@
 .idea
-boinc
 __pycache__
+data
+config

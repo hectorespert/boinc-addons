@@ -1,3 +1,5 @@
 {
   "gui_rpc_auth": "12345678"
+  "start_hour": "00:00",
+  "end_hour": "08:00"
 }

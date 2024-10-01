@@ -19,4 +19,3 @@ COPY operator/*.py /opt/operator/
 
 # Override init script
 COPY init /init
-
