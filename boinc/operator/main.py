@@ -3,6 +3,7 @@ import json
 import logging
 import os
 
+from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
 
 parser = argparse.ArgumentParser(prog='operator')
@@ -23,6 +24,8 @@ logging.debug(f'Current configuration\n{json.dumps(options, indent=2)}')
 
 data_folder = args.data
 logging.info(f'BOINC data folder {data_folder}')
+
+prepare_data_folders(data_folder)
 
 link_global_prefs_override(data_folder, args.config, options)
 
