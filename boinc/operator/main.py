@@ -37,7 +37,7 @@ prepare_gui_rpc_auth(data_folder, options.get('gui_rpc_auth'))
 
 prepare_remote_hosts(data_folder, options.get('remote_hosts'))
 
-link_global_prefs_override(data_folder)
+link_global_prefs_override(data_folder, args.config, options)
 
 prepare_cc_config(data_folder)
 

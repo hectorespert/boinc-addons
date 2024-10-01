@@ -1,7 +1,6 @@
 import logging
 import os
 
-
 def prepare_data_folders(path: str) -> None:
     if not os.path.exists(path):
         os.makedirs(path)

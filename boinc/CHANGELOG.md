@@ -4,6 +4,10 @@
 
 TODO Explain the change
 
+## 1.4.1
+
+- Fix translation
+
 ## 1.4.0
 
 - Support the configuration of the start and end time of computing.
