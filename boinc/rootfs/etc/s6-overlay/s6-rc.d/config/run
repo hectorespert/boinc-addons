@@ -3,18 +3,6 @@
 
 bashio::log.info "Configuring Boinc Addon"
 
-if ! bashio::fs.directory_exists "/data/boinc"; then
-    bashio::log.info "Creating boinc folders"
-    mkdir -p /data
-    mkdir -p /data/boinc
-    mkdir -p /data/boinc/slots
-fi
-
-# Fix locale folder
-if ! bashio::fs.directory_exists "/data/boinc/locale"; then
-    mkdir -p /data/boinc/locale
-fi
-
 if bashio::config.has_value 'gui_rpc_password'; then
     # shellcheck disable=SC2005
     echo "$(bashio::config 'gui_rpc_password')" > /data/boinc/gui_rpc_auth.cfg
@@ -30,12 +18,6 @@ if bashio::config.exists 'remote_hosts'; then
     for remote_host in $remote_hosts; do
         echo "$remote_host" >> /data/boinc/remote_hosts.cfg
     done
-fi
-
-# Preferences overrride
-rm -f /data/boinc/global_prefs_override.xml
-if bashio::fs.file_exists "/config/global_prefs_override.xml"; then
-    ln -s /config/global_prefs_override.xml /data/boinc/global_prefs_override.xml
 fi
 
 HOSTNAME=$(bashio::info.hostname)

@@ -22,6 +22,6 @@ configuration:
     description: "Configure the hour when Boinc starts to compute"
   end_hour:
     name: End Hour
-    description: Configure the hour when Boinc stops to compute"
+    description: "Configure the hour when Boinc stops to compute"
 network:
   31416/tcp: Boinc client gui rpc port (Default 31416)
