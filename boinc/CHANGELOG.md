@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.0
+
+TODO Explain the change
+
 ## 1.4.2
 
 - Improve addon operator
