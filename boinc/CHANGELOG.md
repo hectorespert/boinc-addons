@@ -4,6 +4,10 @@
 
 TODO Explain the change
 
+## 1.4.2
+
+- Improve addon operator
+
 ## 1.4.1
 
 - Fix translation
