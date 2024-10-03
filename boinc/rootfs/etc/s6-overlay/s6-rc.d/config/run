@@ -3,23 +3,6 @@
 
 bashio::log.info "Configuring Boinc Addon"
 
-if bashio::config.has_value 'gui_rpc_password'; then
-    # shellcheck disable=SC2005
-    echo "$(bashio::config 'gui_rpc_password')" > /data/boinc/gui_rpc_auth.cfg
-else
-    rm -f /data/boinc/gui_rpc_auth.cfg
-fi
-
-echo -n '' > /data/boinc/remote_hosts.cfg
-
-if bashio::config.exists 'remote_hosts'; then
-    # shellcheck disable=SC2005
-    remote_hosts=$(echo "$(bashio::config 'remote_hosts')" | tr ' ' '\n')
-    for remote_host in $remote_hosts; do
-        echo "$remote_host" >> /data/boinc/remote_hosts.cfg
-    done
-fi
-
 HOSTNAME=$(bashio::info.hostname)
 
 if [ "$HOSTNAME" == 'null' ]; then

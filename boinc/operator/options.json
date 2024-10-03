@@ -1,4 +1,9 @@
 {
+  "gui_rpc_auth": "12345678",
   "start_hour": "00:00",
-  "end_hour": "08:00"
+  "end_hour": "08:00",
+  "remote_hosts": [
+    "192.168.1.147",
+    "github.com"
+  ]
 }

@@ -5,6 +5,8 @@ import os
 
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
+from gui_rpc_auth import prepare_gui_rpc_auth
+from remote_hosts import prepare_remote_hosts
 
 parser = argparse.ArgumentParser(prog='operator')
 
@@ -26,6 +28,10 @@ data_folder = args.data
 logging.info(f'BOINC data folder {data_folder}')
 
 prepare_data_folders(data_folder)
+
+prepare_gui_rpc_auth(data_folder, options.get('gui_rpc_auth'))
+
+prepare_remote_hosts(data_folder, options.get('remote_hosts'))
 
 link_global_prefs_override(data_folder, args.config, options)
 
