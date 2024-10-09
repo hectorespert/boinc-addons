@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.3
+
+- Fix GUI password
+
 ## 1.4.2
 
 - Improve addon operator
