@@ -24,7 +24,7 @@ schema:
   account_manager_password: "password?"
   start_hour: "match(^(?:[01]\\d|2[0-3]):[0-5]\\d$)?"
   end_hour: "match(^(?:[01]\\d|2[0-3]):[0-5]\\d$)?"
-#image: "ghcr.io/hectorespert/{arch}-addon-boinc"
+image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false
 map:
   - addon_config
