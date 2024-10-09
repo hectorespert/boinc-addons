@@ -9,5 +9,5 @@ def prepare_gui_rpc_auth(data_folder: str, password: str | None) -> None:
         logger.debug(f'Removing existing BOINC GUI RPC auth file')
     if password:
         with open(gui_rpc_auth, 'w') as f:
-            f.write(password)
             logging.debug(f'Writing BOINC GUI RPC auth file on {gui_rpc_auth}')
+            f.write(f'{password}\n')
