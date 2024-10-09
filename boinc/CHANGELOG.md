@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0
+
+- Fix GUI password
+- Read hostname from host
+
 ## 1.4.3
 
 - Fix GUI password
