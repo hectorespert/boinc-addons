@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0
+
+Major rework to support suspending the BOINC client when the CPU is being used by other applications.
+
+To allow suspending the BOINC client based on the CPU usage from other processes, this addon requires running in privileged mode.
+
 ## 1.5.0
 
 - Fix GUI password

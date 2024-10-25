@@ -2,7 +2,13 @@ import argparse
 import json
 import logging
 import os
+import signal
+import subprocess
+from time import sleep
 
+from boinc import build_boinc_command
+from boinccmd import configure_boinc_projects
+from cc_config import prepare_cc_config
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
 from gui_rpc_auth import prepare_gui_rpc_auth
@@ -35,4 +41,43 @@ prepare_remote_hosts(data_folder, options.get('remote_hosts'))
 
 link_global_prefs_override(data_folder, args.config, options)
 
+prepare_cc_config(data_folder)
+
+boinc_command = build_boinc_command(data_folder, options.get('allow_remote_gui_rpc'))
+logging.debug(f'BOINC client command {boinc_command}')
+
+boinc_process = subprocess.Popen(boinc_command)
+logging.debug(f'BOINC client started with pid {boinc_process.pid}')
+
+def signal_handler(number, frame):
+    logging.debug(f'Caught signal {number}')
+    if  number != signal.SIGINT and boinc_process.poll() is None:
+        logging.debug(f'Stopping BOINC client with signal {number}')
+        boinc_process.send_signal(number)
+
+logging.info(f'BOINC Add-on Operator started')
+signal.signal(signal.SIGHUP, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGQUIT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
+boinc_process_initialized = False
+while boinc_process.poll() is None and not boinc_process_initialized:
+    sleep(0.5)
+    result = subprocess.run(["boinccmd", "--get_state"], capture_output=True, text=True, cwd=data_folder)
+    if result.returncode == 0:
+        boinc_process_initialized = True
+        logging.debug(f'BOINC client initialized')
+    else:
+        logging.debug(f'Waiting for BOINC client to initialize')
+
+projects_configured = configure_boinc_projects(data_folder, options.get('account_manager_url'), options.get('account_manager_username'), options.get('account_manager_password'))
+if not projects_configured:
+    boinc_process.send_signal(signal.SIGTERM)
+    boinc_process.wait()
+
+while boinc_process.poll() is None:
+    sleep(0.5)
+
+logging.debug(f'BOINC client stopped with code {boinc_process.returncode}')
 logging.info(f'BOINC Add-on Operator stopped')

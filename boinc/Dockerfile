@@ -1,4 +1,5 @@
 ARG BUILD_FROM="ghcr.io/home-assistant/amd64-base-debian:bookworm"
+
 # hadolint ignore=DL3006
 FROM $BUILD_FROM
 
@@ -13,8 +14,8 @@ RUN apt-get update && \
     bash -c 'arch=$(dpkg --print-architecture); if [ "$arch" = "amd64" ]; then apt-get install --no-install-recommends -y intel-opencl-icd; fi'  && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy root filesystem
-COPY rootfs /
-
 # Copy operator
 COPY operator/*.py /opt/operator/
+
+# Override init script
+COPY init /init

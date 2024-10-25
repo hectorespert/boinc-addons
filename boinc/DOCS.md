@@ -4,6 +4,10 @@
 
 The BOINC add-on, running on your Home Assistant, downloads scientific computing jobs and runs them invisibly in the background.
 
+## Privileged mode
+
+To allow suspending the BOINC client based on the CPU usage from other processes, this addon requires running in privileged mode.
+
 ## How to use
 
 ### Account Manager (Easy)
