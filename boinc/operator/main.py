@@ -6,6 +6,7 @@ import signal
 import subprocess
 from time import sleep
 
+from boinc import build_boinc_command
 from cc_config import prepare_cc_config
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
@@ -41,7 +42,10 @@ link_global_prefs_override(data_folder, args.config, options)
 
 prepare_cc_config(data_folder)
 
-boinc_process = subprocess.Popen(["boinc", "--dir", f'{data_folder}'])
+boinc_command = build_boinc_command(data_folder, options.get('allow_remote_gui_rpc'))
+logging.debug(f'BOINC client command {boinc_command}')
+
+boinc_process = subprocess.Popen(boinc_command)
 logging.debug(f'BOINC client started with pid {boinc_process.pid}')
 
 def signal_handler(number, frame):
