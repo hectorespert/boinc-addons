@@ -48,13 +48,24 @@ jobs:
         with:
           path: "./${{ matrix.path }}"
 
+  docker:
+    name: Lint add-on ${{ matrix.path }} docker image
+    runs-on: ubuntu-latest
+    needs: find
+    strategy:
+      matrix:
+        path: ${{ fromJson(needs.find.outputs.addons) }}
+    steps:
+      - name: ⤵️ Check out code from GitHub
+        uses: actions/checkout@v4.1.7
+
       - name: 🚀 Run Hadolint
         uses: brpaz/hadolint-action@v1.5.0
         with:
           dockerfile: "./${{ matrix.path }}/Dockerfile"
 
-  lint:
-    name: Lint shell ${{ matrix.path }}
+  shell:
+    name: Lint add-on ${{ matrix.path }} shell scripts
     runs-on: ubuntu-latest
     needs: find
     strategy:
