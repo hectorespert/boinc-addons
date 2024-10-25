@@ -33,7 +33,7 @@ logging.info(f'BOINC data folder {data_folder}')
 
 prepare_data_folders(data_folder)
 
-prepare_gui_rpc_auth(data_folder, options.get('gui_rpc_auth'))
+prepare_gui_rpc_auth(data_folder, options.get('gui_rpc_password'))
 
 prepare_remote_hosts(data_folder, options.get('remote_hosts'))
 
