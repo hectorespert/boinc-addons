@@ -1,4 +1,4 @@
-# Home Assistant Boinc Add-on
+# Home Assistant BOINC Add-on
 
 [BOINC](https://boinc.berkeley.edu) is an open-source software platform for computing using volunteered resources.
 
