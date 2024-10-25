@@ -1,4 +1,4 @@
-site_name: Home Assistant Boinc Addon
+site_name: Home Assistant BOINC Addon
 site_url: https://hectorespert.github.io/boinc-addons
 theme:
   name: material
