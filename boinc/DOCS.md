@@ -1,4 +1,4 @@
-# Home Assistant Boinc Add-on
+# Home Assistant BOINC Add-on
 
 [BOINC](https://boinc.berkeley.edu) is an open-source software platform for computing using volunteered resources.
 
@@ -12,7 +12,7 @@ To allow suspending the BOINC client based on the CPU usage from other processes
 
 ### Account Manager (Easy)
 
-The easy way to use this addon is to attach the boicn client to a [Boinc Account Manager](https://boinc.berkeley.edu/wiki/Account_managers).
+The easy way to use this addon is to attach the boicn client to a [BOINC Account Manager](https://boinc.berkeley.edu/wiki/Account_managers).
 
 [Science United](https://scienceunited.org) is recommended to simplify the process of start computing.
 

@@ -1,4 +1,4 @@
-name: Operator tests
+name: BOINC Operator tests
 
 on:
   push:
