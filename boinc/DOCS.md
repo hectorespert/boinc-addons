@@ -31,3 +31,8 @@ account_manager_password: "yoursecretpassword"
 ### Remote GUI RPC
 
 [Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the addon configuration and use it to manage the boinc client remotely.
+
+### Global preferences override
+
+To override the preferences of BOINC client a `global_preferences_override.xml` file could be defined in the addon config folder: [Preferences Override](
+https://github.com/BOINC/boinc/wiki/PrefsOverride)
