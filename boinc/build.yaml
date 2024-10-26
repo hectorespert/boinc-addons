@@ -11,4 +11,4 @@ labels:
   org.opencontainers.image.licenses: "Apache License 2.0"
 codenotary:
   signer: hectorespertpardo@gmail.com
-  base_image: notary@home-assistant.io
+  base_image: codenotary@frenck.dev
