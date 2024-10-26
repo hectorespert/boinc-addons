@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1
+
+Fix addon sign
+
 ## 2.0.0
 
 Major rework to support suspending the BOINC client when the CPU is being used by other applications.
