@@ -11,3 +11,6 @@ def prepare_data_folders(path: str) -> None:
 
     if not os.path.exists(f'{path}/locale'):
         os.mkdir(f'{path}/locale')
+
+    if not os.path.exists(f'{path}/projects'):
+        os.mkdir(f'{path}/projects')
