@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2
+
+Improve Account Manager configuration to fix problem with url comparasion
+
 ## 2.0.1
 
 Fix addon sign
