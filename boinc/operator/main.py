@@ -7,7 +7,7 @@ import subprocess
 from time import sleep
 
 from boinc import build_boinc_command
-from boinccmd import configure_boinc_projects
+from boinccmd import configure_boinc_projects, get_state
 from cc_config import prepare_cc_config
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
@@ -64,9 +64,8 @@ signal.signal(signal.SIGTERM, signal_handler)
 boinc_process_initialized = False
 while boinc_process.poll() is None and not boinc_process_initialized:
     sleep(0.5)
-    result = subprocess.run(["boinccmd", "--get_state"], capture_output=True, text=True, cwd=data_folder)
-    if result.returncode == 0:
-        boinc_process_initialized = True
+    boinc_process_initialized = get_state(data_folder)
+    if boinc_process_initialized:
         logging.debug(f'BOINC client initialized')
     else:
         logging.debug(f'Waiting for BOINC client to initialize')
