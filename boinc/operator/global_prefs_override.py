@@ -28,5 +28,13 @@ def link_global_prefs_override(data_folder: str, config_folder: str, data: dict)
     if end_hour is not None:
         preferences['end_hour'] = convert_time_to_boinc_format(end_hour)
 
+    max_num_cpus = data.get('max_ncpus')
+    if max_num_cpus is not None:
+        preferences['max_ncpus'] = max_num_cpus
+        
+    max_cpu_usage = data.get('cpu_usage_limit')
+    if max_cpu_usage is not None:
+        preferences['cpu_usage_limit'] = max_cpu_usage
+
     with open(gui_rpc_auth, 'w') as f:
         f.write(dict2xml(preferences, wrap="global_preferences", indent="  ", newlines=True))
