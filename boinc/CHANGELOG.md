@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+
+Add configuration options to allow limit cpu usage and cpu number
+
 ## 2.0.2
 
 Improve Account Manager configuration to fix problem with url comparasion
