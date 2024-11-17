@@ -5,5 +5,7 @@
   "remote_hosts": [
     "192.168.1.147",
     "github.com"
-  ]
+  ],
+  "max_ncpus": 50,
+  "cpu_usage_limit": 75
 }

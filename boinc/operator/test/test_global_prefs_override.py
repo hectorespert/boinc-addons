@@ -57,8 +57,8 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
             config_dir = f'{tmp_dir}/config'
             os.makedirs(config_dir)
             link_global_prefs_override(data_dir, config_dir, {
-                'max_ncpus': 50.0,
-                'cpu_usage_limit': 75.0
+                'max_ncpus': 50,
+                'cpu_usage_limit': 75
             })
 
             self.assertTrue(os.path.exists(f'{tmp_dir}/data/global_prefs_override.xml'))
