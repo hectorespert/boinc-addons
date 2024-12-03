@@ -1,3 +1,0 @@
-#!/usr/bin/bash
-# shellcheck shell=bash
-exec python3 /opt/operator/main.py --options /data/options.json --data /data/boinc --config /config "$@"

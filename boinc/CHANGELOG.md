@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+
+Reduce addon size
+
 ## 2.0.2
 
 Improve Account Manager configuration to fix problem with url comparasion
