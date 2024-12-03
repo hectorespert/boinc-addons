@@ -22,7 +22,7 @@ RUN apt-get update && \
     ocl-icd-libopencl1 \
     mesa-opencl-icd \
     libgl1 && \
-    dpkg --print-architecture | grep -q "amd64" && apt-get install --no-install-recommends -y intel-opencl-icd && \
+    if [ "$BUILD_ARCH" = "amd64" ]; then apt-get install --no-install-recommends -y intel-opencl-icd; fi && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy operator
