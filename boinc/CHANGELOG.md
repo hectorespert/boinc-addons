@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.0
+
+Update Docker base from Debian 12.8 to Debian 12.9
+
 ## 2.1.0
 
 Reduce addon size
