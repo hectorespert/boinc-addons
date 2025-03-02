@@ -30,7 +30,7 @@ def link_global_prefs_override(data_folder: str, config_folder: str, data: dict)
 
     max_num_cpus = data.get('max_ncpus')
     if max_num_cpus is not None:
-        preferences['max_ncpus'] = max_num_cpus
+        preferences['max_ncpus_pct'] = max_num_cpus
         
     max_cpu_usage = data.get('cpu_usage_limit')
     if max_cpu_usage is not None:
