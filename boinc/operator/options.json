@@ -6,6 +6,6 @@
     "192.168.1.147",
     "github.com"
   ],
-  "max_ncpus": 50,
+  "max_ncpus": 75.0,
   "cpu_usage_limit": 75
 }

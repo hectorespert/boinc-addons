@@ -2,7 +2,7 @@
 
 ## 2.3.0
 
-Add configuration options to allow limit cpu usage and cpu number
+Add configuration options to limit CPU usage and the number of CPUs used by the BOINC client.
 
 
 ## 2.2.0

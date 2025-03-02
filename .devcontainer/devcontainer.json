@@ -4,11 +4,13 @@
   "appPort": ["7123:8123", "7357:4357", "21416:31416"],
   "postStartCommand": "bash devcontainer_bootstrap",
   "runArgs": ["-e", "GIT_EDITOR=code --wait", "--privileged"],
-  "remoteUser":"root",
   "containerEnv": {
     "WORKSPACE_DIRECTORY": "${containerWorkspaceFolder}"
   },
-  "mounts": ["type=volume,target=/var/lib/docker"],
+  "mounts": [
+    "type=volume,target=/var/lib/docker",
+    "type=volume,target=/mnt/supervisor"
+  ],
   "customizations": {
     "extensions": [
         "timonwong.shellcheck",
