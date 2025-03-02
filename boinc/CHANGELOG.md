@@ -1,8 +1,17 @@
 # Changelog
 
-## 2.1.0
+## 2.3.0
 
 Add configuration options to allow limit cpu usage and cpu number
+
+
+## 2.2.0
+
+Update Docker base from Debian 12.8 to Debian 12.9
+
+## 2.1.0
+
+Reduce addon size
 
 ## 2.0.2
 

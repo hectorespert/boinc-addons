@@ -1,9 +1,9 @@
 build_from:
-  aarch64: "ghcr.io/home-assistant/aarch64-base-debian:bookworm"
-  amd64: "ghcr.io/home-assistant/amd64-base-debian:bookworm"
-  armhf: "ghcr.io/home-assistant/armhf-base-debian:bookworm"
-  armv7: "ghcr.io/home-assistant/armv7-base-debian:bookworm"
-  i386: "ghcr.io/home-assistant/i386-base-debian:bookworm"
+  aarch64: arm64v8/debian:12.9-slim
+  amd64: amd64/debian:12.9-slim
+  armhf: arm32v5/debian:12.9-slim
+  armv7: arm32v7/debian:12.9-slim
+  i386: i386/debian:12.9-slim
 labels:
   org.opencontainers.image.title: "Boinc add-on"
   org.opencontainers.image.description: "Home Assistant Boinc add-on."
@@ -11,4 +11,3 @@ labels:
   org.opencontainers.image.licenses: "Apache License 2.0"
 codenotary:
   signer: hectorespertpardo@gmail.com
-  base_image: codenotary@frenck.dev
