@@ -23,5 +23,11 @@ configuración:
   end_hour:
     nombre: Hora de Fin
     descripción: "Configurar la hora en que Boinc deja de computar"
+  max_ncpus:
+    nombre: Porcentaje Máximo de CPUs
+    descripción: "Número máximo de CPUs a utilizar"
+  cpu_usage_limit:
+    nombre: Porcentaje Máximo de Uso de CPU
+    descripción: "Tiempo máximo de uso por CPU"
 red:
   31416/tcp: Puerto GUI RPC del cliente Boinc (Por defecto 31416)
