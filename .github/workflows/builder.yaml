@@ -115,7 +115,7 @@ jobs:
             --cosign \
             --addon
 
-      -name: Test ${{ matrix.addon }} add-on
+      - name: Test ${{ matrix.addon }} add-on
         if: steps.check.outputs.build_arch == 'true'
         run: |
           echo Testing ${{ matrix.addon }} add-on
