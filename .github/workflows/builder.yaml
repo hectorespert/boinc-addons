@@ -119,4 +119,4 @@ jobs:
         if: steps.check.outputs.build_arch == 'true' && env.BUILD_ARGS == '--test' && ${{ matrix.addon }} == 'boinc' && ${{ matrix.arch }} == 'amd64'
         run: |
           echo Testing ${{ matrix.addon }} add-on
-          docker ps
+          docker images
