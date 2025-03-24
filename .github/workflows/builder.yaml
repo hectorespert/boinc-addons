@@ -116,8 +116,8 @@ jobs:
             --addon
 
       - name: Test boinc add-on
-        if: matrix.arch == 'amd64'
+        if: matrix.arch == 'amd64' && env.BUILD_ARGS == '--test'
         working-directory: boinc
         run: |
-          echo ${{ matrix.addon }}
+          echo ${{ matrix.arch }}
           docker run --uts=host --pid=host --rm -v boinc:/data -v $(pwd)/operator/options.json:/data/options.json:ro ghcr.io/hectorespert/amd64-addon-boinc:latest --log-level DEBUG --exit-immediately true
