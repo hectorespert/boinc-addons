@@ -20,6 +20,7 @@ parser.add_argument('--options', type=argparse.FileType('r', encoding='UTF-8'), 
 parser.add_argument('--data', type=str, required=True, help='BOINC data folder')
 parser.add_argument('--config', type=str, required=True, help='Add-on config folder')
 parser.add_argument("--log-level", default=logging.INFO, type=lambda x: getattr(logging, x))
+parser.add_argument("--exit-immediately", type=bool, help="Exit immediately after BOINC client is started", default=False)
 
 args = parser.parse_args()
 logging.basicConfig(level=args.log_level, format='%(asctime)s %(levelname)s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
@@ -72,6 +73,11 @@ while boinc_process.poll() is None and not boinc_process_initialized:
 
 projects_configured = configure_boinc_projects(data_folder, options.get('account_manager_url'), options.get('account_manager_username'), options.get('account_manager_password'))
 if not projects_configured:
+    boinc_process.send_signal(signal.SIGTERM)
+    boinc_process.wait()
+
+if args.exit_immediately:
+    logging.warning(f'Exiting immediately after BOINC client is started')
     boinc_process.send_signal(signal.SIGTERM)
     boinc_process.wait()
 

@@ -1,9 +1,12 @@
 # Changelog
 
+## 2.4.0
+
+Update base from Debian 12.9 to Debian 12.10
+
 ## 2.3.0
 
 Add configuration options to limit CPU usage and the number of CPUs used by the BOINC client.
-
 
 ## 2.2.0
 
