@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.0
+
+Update base from Debian 12.10 to Debian 13.0
+
 ## 2.4.0
 
 Update base from Debian 12.9 to Debian 12.10
