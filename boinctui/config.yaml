@@ -1,0 +1,15 @@
+name: boinctui
+version: "0.1.0"
+slug: boinctui
+description: Fullscreen text mode manager for BOINC client
+url: "https://github.com/hectorespert/boinc-addons/tree/main/boinctui"
+arch:
+  - armhf
+  - armv7
+  - aarch64
+  - amd64
+  - i386
+init: false
+codenotary: hectorespertpardo@gmail.com
+#image: "ghcr.io/hectorespert/{arch}-addon-boinctui"
+apparmor: false
