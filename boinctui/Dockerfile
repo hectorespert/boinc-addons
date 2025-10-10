@@ -8,26 +8,43 @@ ENV DEBIAN_FRONTEND="noninteractive" \
     LANG="C.UTF-8" \
     TERM="xterm-256color" \
     PS1="$(whoami)@$(hostname):$(pwd)$ " \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    TTYD_VERSION="1.7.7"
 
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install Python
-# hadolint ignore=DL3008
+# Build arguments for architecture mapping
+ARG BUILD_ARCH=amd64
+
+# Install runtime dependencies and download ttyd
+# hadolint ignore=DL3008,DL3003
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
-    python3 \
-    python3-pip && \
+    boinctui \
+    ca-certificates \
+    curl && \
+    rm -rf /var/lib/apt/lists/* && \
+    # Map Home Assistant arch to ttyd release arch
+    case "${BUILD_ARCH}" in \
+        amd64) TTYD_ARCH="x86_64" ;; \
+        aarch64) TTYD_ARCH="aarch64" ;; \
+        armv7) TTYD_ARCH="armv7" ;; \
+        armhf) TTYD_ARCH="arm" ;; \
+        i386) TTYD_ARCH="i686" ;; \
+        *) echo "Unsupported architecture: ${BUILD_ARCH}" && exit 1 ;; \
+    esac && \
+    # Download ttyd binary from GitHub releases
+    curl -L -o /usr/local/bin/ttyd \
+        "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${TTYD_ARCH}" && \
+    chmod +x /usr/local/bin/ttyd && \
+    # Clean up
+    apt-get remove -y curl && \
+    apt-get autoremove -y && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy application
-COPY run.sh /
-RUN chmod a+x /run.sh
-
 # Entrypoint & CMD
-CMD [ "/run.sh" ]
+ENTRYPOINT [ "ttyd", "-p", "7681", "-d", "1", "-W", "--auth-header", "X-Remote-User-Name", "boinctui" ]
 
 # Build arugments
 ARG BUILD_ARCH=amd64
