@@ -46,7 +46,7 @@ RUN apt-get update && \
 # Entrypoint & CMD
 ENTRYPOINT [ "ttyd", "-p", "7681", "-d", "1", "-W", "--auth-header", "X-Remote-User-Name", "boinctui" ]
 
-# Build arugments
+# Build arguments
 ARG BUILD_ARCH=amd64
 ARG BUILD_DATE
 ARG BUILD_REF
