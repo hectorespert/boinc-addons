@@ -1,0 +1,63 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - '*-v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    name: Create GitHub Release
+    
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Extract addon and version from tag
+        id: tag_info
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+          # Extract addon name and version (format: addon-vX.Y.Z)
+          ADDON=$(echo "$TAG_NAME" | sed 's/-v[0-9].*//')
+          VERSION=$(echo "$TAG_NAME" | sed 's/.*-v//')
+          
+          echo "addon=$ADDON" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Addon: $ADDON, Version: $VERSION"
+
+      - name: Read CHANGELOG
+        id: changelog
+        run: |
+          if [ -f "${{ steps.tag_info.outputs.addon }}/CHANGELOG.md" ]; then
+            # Extract the section for this version from CHANGELOG
+            # This is a simple extraction, assumes format ## X.Y.Z
+            CHANGELOG_CONTENT=$(awk '/^## ${{ steps.tag_info.outputs.version }}/,/^## [0-9]/' \
+              "${{ steps.tag_info.outputs.addon }}/CHANGELOG.md" | \
+              grep -v "^## [0-9]" | tail -n +2 | head -n -1)
+            
+            if [ -z "$CHANGELOG_CONTENT" ]; then
+              CHANGELOG_CONTENT="No changelog available for this version."
+            fi
+          else
+            CHANGELOG_CONTENT="No changelog file found."
+          fi
+          
+          # Save changelog to file for multiline content
+          echo "$CHANGELOG_CONTENT" > /tmp/changelog.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag_info.outputs.tag }}
+          name: ${{ steps.tag_info.outputs.addon }} v${{ steps.tag_info.outputs.version }}
+          body_path: /tmp/changelog.txt
+          draft: false
+          prerelease: false
+          generate_release_notes: true
