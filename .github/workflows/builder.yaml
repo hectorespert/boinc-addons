@@ -186,7 +186,7 @@ jobs:
           fi
           
           # Check if the line is commented in the original file
-          if grep -E '^\s*#.*image:' "$CONFIG_FILE" > /dev/null; then
+          if grep -E '^\s*#\s*image:' "$CONFIG_FILE" > /dev/null; then
             echo "❌ Error: 'image' attribute is commented out in $CONFIG_FILE"
             exit 1
           fi
