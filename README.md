@@ -20,6 +20,18 @@ This repository contains the following add-ons
 
 The BOINC add-on, running on your Home Assistant, downloads scientific computing jobs and runs them invisibly in the background.
 
+### [boinctui add-on](./boinctui)
+
+![Supports aarch64 Architecture][aarch64-shield]
+![Supports amd64 Architecture][amd64-shield]
+![Supports armhf Architecture][armhf-shield]
+![Supports armv7 Architecture][armv7-shield]
+![Supports i386 Architecture][i386-shield]
+
+[boinctui](https://github.com/suleman1971/boinctui) is a fullscreen text mode manager for the BOINC client.
+
+It provides a terminal user interface (TUI) to monitor and control the BOINC client.
+
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg
 [armhf-shield]: https://img.shields.io/badge/armhf-yes-green.svg
