@@ -2,7 +2,7 @@ name: Docker Builder
 
 env:
   BUILD_ARGS: "--test"
-  MONITORED_FILES: "build.yaml config.yaml Dockerfile operator"
+  MONITORED_FILES: "build.yaml config.yaml Dockerfile rootfs operator"
 
 on:
   push:
@@ -56,74 +56,8 @@ jobs:
           else
             echo "No add-on had any monitored files changed (${{ env.MONITORED_FILES }})";
           fi
-
-  check_version:
-    needs: init
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    if: needs.init.outputs.changed == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    name: Check version tag for ${{ matrix.addon }}
-    strategy:
-      matrix:
-        addon: ${{ fromJson(needs.init.outputs.changed_addons) }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Set up yq
-        uses: mikefarah/yq@v4
-
-      - name: Get addon version
-        id: version
-        run: |
-          VERSION=$(yq e '.version' ${{ matrix.addon }}/config.yaml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=${{ matrix.addon }}-v$VERSION" >> $GITHUB_OUTPUT
-          echo "Addon: ${{ matrix.addon }}, Version: $VERSION"
-
-      - name: Check version is greater than published
-        id: check_version
-        run: |
-          git fetch --tags
-          
-          # Get current version
-          CURRENT_VERSION="${{ steps.version.outputs.version }}"
-          echo "Current version: $CURRENT_VERSION"
-          
-          # Check if tag already exists
-          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
-            echo "❌ Tag ${{ steps.version.outputs.tag }} already exists"
-            exit 1
-          fi
-          
-          # Get the latest published version for this addon
-          LATEST_TAG=$(git tag -l "${{ matrix.addon }}-v*" | sort -V | tail -n 1)
-          
-          if [ -z "$LATEST_TAG" ]; then
-            echo "✅ No previous versions found, this is the first release"
-            exit 0
-          fi
-          
-          # Extract version from latest tag
-          LATEST_VERSION=$(echo "$LATEST_TAG" | sed 's/${{ matrix.addon }}-v//')
-          echo "Latest published version: $LATEST_VERSION"
-          
-          # Compare versions using sort -V (version sort)
-          HIGHER=$(printf "%s\n%s" "$LATEST_VERSION" "$CURRENT_VERSION" | sort -V | tail -n 1)
-          
-          if [ "$HIGHER" = "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
-            echo "✅ Version $CURRENT_VERSION is greater than $LATEST_VERSION"
-          else
-            echo "❌ Version $CURRENT_VERSION is not greater than latest published version $LATEST_VERSION"
-            exit 1
-          fi
-
   build:
-    needs: [init, check_version]
+    needs: init
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -168,6 +102,31 @@ jobs:
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set up yq
+        if: steps.check.outputs.build_arch == 'true'
+        uses: mikefarah/yq@v4
+
+      - name: Validate image attribute
+        if: steps.check.outputs.build_arch == 'true'
+        run: |
+          CONFIG_FILE="${{ matrix.addon }}/config.yaml"
+          
+          # Check if image attribute exists and is not commented
+          IMAGE=$(yq e '.image' "$CONFIG_FILE")
+          
+          if [ "$IMAGE" = "null" ] || [ -z "$IMAGE" ]; then
+            echo "❌ Error: 'image' attribute is not defined in $CONFIG_FILE"
+            exit 1
+          fi
+          
+          # Check if the line is commented in the original file
+          if grep -E '^\s*#.*image:' "$CONFIG_FILE" > /dev/null; then
+            echo "❌ Error: 'image' attribute is commented out in $CONFIG_FILE"
+            exit 1
+          fi
+          
+          echo "✅ Image attribute is properly defined: $IMAGE"
+
       - name: Build ${{ matrix.addon }} add-on
         if: steps.check.outputs.build_arch == 'true'
         uses: home-assistant/builder@2025.09.0
@@ -186,36 +145,3 @@ jobs:
         working-directory: boinc
         run: |
           docker run --uts=host --pid=host --rm -v boinc:/data -v $(pwd)/operator/options.json:/data/options.json:ro ghcr.io/hectorespert/amd64-addon-boinc:latest --log-level DEBUG --exit-immediately true
-
-  create_tag:
-    needs: [init, build, check_version]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    if: needs.init.outputs.changed == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-    name: Create version tag for ${{ matrix.addon }}
-    strategy:
-      matrix:
-        addon: ${{ fromJson(needs.init.outputs.changed_addons) }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v5
-
-      - name: Set up yq
-        uses: mikefarah/yq@v4
-
-      - name: Get addon version
-        id: version
-        run: |
-          VERSION=$(yq e '.version' ${{ matrix.addon }}/config.yaml)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=${{ matrix.addon }}-v$VERSION" >> $GITHUB_OUTPUT
-          echo "Creating tag: ${{ matrix.addon }}-v$VERSION"
-
-      - name: Create and push tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -a "${{ steps.version.outputs.tag }}" -m "Release ${{ matrix.addon }} version ${{ steps.version.outputs.version }}"
-          git push origin "${{ steps.version.outputs.tag }}"
