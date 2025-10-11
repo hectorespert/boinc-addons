@@ -43,11 +43,17 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+# Create user with home in /data/boinctui
+RUN useradd -m -d /data/boinctui -s /bin/bash boinctui
+
+# Copy and setup startup script
+COPY run.sh /
+RUN chmod a+x /run.sh
+
 # Entrypoint & CMD
-ENTRYPOINT [ "ttyd", "-p", "7681", "-d", "1", "-W", "--auth-header", "X-Remote-User-Name", "boinctui" ]
+ENTRYPOINT [ "/run.sh" ]
 
 # Build arguments
-ARG BUILD_ARCH=amd64
 ARG BUILD_DATE
 ARG BUILD_REF
 ARG BUILD_VERSION
