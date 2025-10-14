@@ -3,7 +3,6 @@
 ## 2.7.0
 
 Add documentation for connecting to the BOINC add-on using the boinctui add-on.
-
 ## 2.6.0
 
 Update base from Debian 13.0 to Debian 13.1
