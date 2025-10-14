@@ -254,7 +254,7 @@ jobs:
             # Extract the section for this version from CHANGELOG
             CHANGELOG_CONTENT=$(awk '/^## ${{ steps.version.outputs.version }}/,/^## [0-9]/' \
               "${{ matrix.addon }}/CHANGELOG.md" | \
-              grep -v "^## [0-9]" | tail -n +2 | head -n -1 || true)
+              grep -v "^## [0-9][0-9]*\." | tail -n +2 | head -n -1 || true)
             
             if [ -z "$CHANGELOG_CONTENT" ]; then
               CHANGELOG_CONTENT="No changelog available for this version."
