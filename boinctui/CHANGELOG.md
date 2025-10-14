@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.0
+
+- Add documentation for connecting to the BOINC add-on and other BOINC clients
+
 ## 0.2.0
 
 - Add persistent configuration storage
