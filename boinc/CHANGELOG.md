@@ -1,5 +1,10 @@
 # Changelog
-# 2.6.0
+
+## 2.7.0
+
+- Expose BOINC service for other addons to consume
+
+## 2.6.0
 
 Update base from Debian 13.0 to Debian 13.1
 
