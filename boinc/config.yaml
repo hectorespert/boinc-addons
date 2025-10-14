@@ -1,4 +1,4 @@
-name: Boinc
+name: BOINC
 version: "2.7.0"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
