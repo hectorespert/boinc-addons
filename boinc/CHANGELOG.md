@@ -2,7 +2,7 @@
 
 ## 2.7.0
 
-- Expose BOINC service for other addons to consume
+Add documentation for connecting to the BOINC add-on using the boinctui add-on.
 
 ## 2.6.0
 

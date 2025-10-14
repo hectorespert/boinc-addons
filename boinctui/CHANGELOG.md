@@ -2,7 +2,7 @@
 
 ## 0.3.0
 
-- Add service integration with BOINC addon
+- Add documentation for connecting to the BOINC add-on and other BOINC clients
 
 ## 0.2.0
 

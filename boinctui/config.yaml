@@ -16,5 +16,3 @@ panel_icon: mdi:console
 codenotary: hectorespertpardo@gmail.com
 image: "ghcr.io/hectorespert/{arch}-addon-boinctui"
 apparmor: false
-services:
-  - boinc:want

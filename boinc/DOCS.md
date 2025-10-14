@@ -32,6 +32,16 @@ account_manager_password: "yoursecretpassword"
 
 [Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the addon configuration and use it to manage the boinc client remotely.
 
+There is a boinctui add-on available for this purpose [here](https://github.com/hectorespert/boinc-addons/tree/main/boinctui).
+
+Related options include:
+
+- **remote_hosts**
+By default, no remote hosts are allowed to connect. You must explicitly specify the IP addresses or hostnames of the machines you want to grant access.
+
+- **allow_remote_gui_rpc**
+It allows remote connections from any host, independent of the `remote_hosts` setting.
+
 ### Global preferences override
 
 To override the preferences of BOINC client a `global_preferences_override.xml` file could be defined in the addon config folder: [Preferences Override](
