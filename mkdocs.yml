@@ -1,8 +1,0 @@
-site_name: Home Assistant BOINC Addon
-site_url: https://hectorespert.github.io/boinc-addons
-theme:
-  name: material
-nav:
-  - Welcome: index.md
-  - Configuration: config.md
-  - Development: development.md

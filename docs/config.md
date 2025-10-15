@@ -1,1 +1,0 @@
-../boinc/DOCS.md
