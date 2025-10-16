@@ -1,3 +1,15 @@
+title: Home Assistant BOINC Add-ons
+description: Home Assistant add-ons repository that provides a collection of add-ons for BOINC.
+show_downloads: false
+logo: /boinc/logo.png
+
 remote_theme: pages-themes/minimal@v0.2.0
+
 plugins:
+  - jekyll-default-layout
+  - jekyll-readme-index
   - jekyll-remote-theme
+  - jekyll-github-metadata
+  - jekyll-optional-front-matter
+  - jekyll-titles-from-headings
+  - jekyll-relative-links

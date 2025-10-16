@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.1
+
+- Minor maintenance update
+
 ## 0.3.0
 
 - Add documentation for connecting to the BOINC add-on and other BOINC clients
