@@ -1,0 +1,30 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  find_changed:
+    uses: ./.github/workflows/find-changed-addons.yaml
+    with:
+      monitored_files: 'build.yaml config.yaml Dockerfile operator'
+
+  check_version:
+    needs: find_changed
+    if: needs.find_changed.outputs.changed == 'true'
+    uses: ./.github/workflows/check-version.yaml
+    with:
+      changed_addons: ${{ needs.find_changed.outputs.changed_addons }}
+      strict_check: false
+
+  build:
+    needs: [find_changed, check_version]
+    if: needs.find_changed.outputs.changed == 'true'
+    uses: ./.github/workflows/build-addons.yaml
+    with:
+      changed_addons: ${{ needs.find_changed.outputs.changed_addons }}
+      test_mode: true
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

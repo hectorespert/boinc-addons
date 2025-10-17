@@ -1,0 +1,62 @@
+name: Find Changed Add-ons
+
+on:
+  workflow_call:
+    inputs:
+      monitored_files:
+        description: 'Files to monitor for changes'
+        required: false
+        type: string
+        default: 'build.yaml config.yaml Dockerfile operator'
+    outputs:
+      changed_addons:
+        description: 'JSON array of changed add-ons'
+        value: ${{ jobs.init.outputs.changed_addons }}
+      changed:
+        description: 'Whether any add-ons changed'
+        value: ${{ jobs.init.outputs.changed }}
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    name: Find changed add-ons
+    outputs:
+      changed_addons: ${{ steps.changed_addons.outputs.addons }}
+      changed: ${{ steps.changed_addons.outputs.changed }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Get changed files
+        id: changed_files
+        uses: jitterbit/get-changed-files@v1
+
+      - name: Find add-on directories
+        id: addons
+        uses: home-assistant/actions/helpers/find-addons@master
+
+      - name: Get changed add-ons
+        id: changed_addons
+        run: |
+          declare -a changed_addons
+          for addon in ${{ steps.addons.outputs.addons }}; do
+            if [[ "${{ steps.changed_files.outputs.all }}" =~ $addon ]]; then
+              for file in ${{ inputs.monitored_files }}; do
+                  if [[ "${{ steps.changed_files.outputs.all }}" =~ $addon/$file ]]; then
+                    if [[ ! "${changed_addons[@]}" =~ $addon ]]; then
+                      changed_addons+=("\"${addon}\",");
+                    fi
+                  fi
+              done
+            fi
+          done
+
+          changed=$(echo ${changed_addons[@]} | rev | cut -c 2- | rev)
+
+          if [[ -n ${changed} ]]; then
+            echo "Changed add-ons: $changed";
+            echo "changed=true" >> $GITHUB_OUTPUT;
+            echo "addons=[$changed]" >> $GITHUB_OUTPUT;
+          else
+            echo "No add-on had any monitored files changed (${{ inputs.monitored_files }})";
+          fi

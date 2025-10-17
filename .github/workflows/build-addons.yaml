@@ -1,0 +1,112 @@
+name: Build Add-ons
+
+on:
+  workflow_call:
+    inputs:
+      changed_addons:
+        description: 'JSON array of add-ons to build'
+        required: true
+        type: string
+      test_mode:
+        description: 'Build in test mode (do not publish)'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      GITHUB_TOKEN:
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
+    strategy:
+      matrix:
+        addon: ${{ fromJson(inputs.changed_addons) }}
+        arch: ["aarch64", "amd64", "armhf", "armv7", "i386"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Get information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: "./${{ matrix.addon }}"
+
+      - name: Check if add-on should be built
+        id: check
+        run: |
+          if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
+             echo "build_arch=true" >> $GITHUB_OUTPUT;
+             echo "image=$(echo ${{ steps.info.outputs.image }} | cut -d'/' -f3)" >> $GITHUB_OUTPUT;
+           else
+             echo "${{ matrix.arch }} is not a valid arch for ${{ matrix.addon }}, skipping build";
+             echo "build_arch=false" >> $GITHUB_OUTPUT;
+          fi
+
+      - name: Login to GitHub Container Registry
+        if: steps.check.outputs.build_arch == 'true' && inputs.test_mode == false
+        uses: docker/login-action@v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up yq
+        if: steps.check.outputs.build_arch == 'true'
+        uses: mikefarah/yq@v4
+
+      - name: Validate image attribute
+        if: steps.check.outputs.build_arch == 'true'
+        run: |
+          CONFIG_FILE="${{ matrix.addon }}/config.yaml"
+          
+          # Check if image attribute exists and is not commented
+          IMAGE=$(yq e '.image' "$CONFIG_FILE")
+          
+          if [ "$IMAGE" = "null" ] || [ -z "$IMAGE" ]; then
+            echo "❌ Error: 'image' attribute is not defined in $CONFIG_FILE"
+            exit 1
+          fi
+          
+          # Check if the line is commented in the original file
+          if grep -E '^\s*#\s*image:' "$CONFIG_FILE" > /dev/null; then
+            echo "❌ Error: 'image' attribute is commented out in $CONFIG_FILE"
+            exit 1
+          fi
+          
+          echo "✅ Image attribute is properly defined: $IMAGE"
+
+      - name: Set build args
+        id: build_args
+        run: |
+          if [[ "${{ inputs.test_mode }}" == "true" ]]; then
+            echo "args=--test" >> $GITHUB_OUTPUT
+          else
+            echo "args=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build ${{ matrix.addon }} add-on
+        if: steps.check.outputs.build_arch == 'true'
+        uses: home-assistant/builder@2025.09.0
+        with:
+          args: |
+            ${{ steps.build_args.outputs.args }} \
+            --${{ matrix.arch }} \
+            --target /data/${{ matrix.addon }} \
+            --image "${{ steps.check.outputs.image }}" \
+            --docker-hub "ghcr.io/${{ github.repository_owner }}" \
+            --cosign \
+            --addon
+
+      - name: Test boinc add-on
+        if: matrix.arch == 'amd64' && matrix.addon == 'boinc' && inputs.test_mode == true && steps.check.outputs.build_arch == 'true'
+        working-directory: boinc
+        run: |
+          docker run --uts=host --pid=host --rm -v boinc:/data -v $(pwd)/operator/options.json:/data/options.json:ro ghcr.io/hectorespert/amd64-addon-boinc:latest --log-level DEBUG --exit-immediately true
