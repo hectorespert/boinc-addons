@@ -1,5 +1,5 @@
 name: boinctui
-version: "0.3.1"
+version: "0.3.2"
 slug: boinctui
 description: Fullscreen text mode manager for BOINC client
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinctui"
