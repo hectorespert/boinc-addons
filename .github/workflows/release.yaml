@@ -16,6 +16,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  lint:
+    uses: ./.github/workflows/lint.yaml
+
   find_changed:
     uses: ./.github/workflows/find-changed-addons.yaml
     with:
@@ -30,7 +33,7 @@ jobs:
       strict_check: true
 
   build:
-    needs: [find_changed, check_version]
+    needs: [lint, find_changed, check_version]
     if: needs.find_changed.outputs.changed == 'true'
     uses: ./.github/workflows/build-addons.yaml
     with:
