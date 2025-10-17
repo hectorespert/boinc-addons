@@ -7,7 +7,7 @@ on:
         description: 'Files to monitor for changes'
         required: false
         type: string
-        default: 'build.yaml config.yaml Dockerfile operator'
+        default: 'build.yaml config.yaml Dockerfile'
     outputs:
       changed_addons:
         description: 'JSON array of changed add-ons'

@@ -24,6 +24,7 @@ jobs:
     uses: ./.github/workflows/operator.yaml
 
   find_changed:
+    needs: test
     uses: ./.github/workflows/find-changed-addons.yaml
     with:
       monitored_files: 'build.yaml config.yaml Dockerfile operator'
@@ -37,7 +38,7 @@ jobs:
       strict_check: true
 
   build:
-    needs: [test, find_changed, check_version]
+    needs: [find_changed, check_version]
     if: needs.find_changed.outputs.changed == 'true'
     uses: ./.github/workflows/build-addons.yaml
     with:
@@ -102,6 +103,7 @@ jobs:
           git push origin "${{ steps.version.outputs.tag }}"
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
@@ -142,4 +144,51 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  post_bluesky:
+    needs: [find_changed, create_release]
+    runs-on: ubuntu-latest
+    if: needs.find_changed.outputs.changed == 'true'
+    name: Post release to Bluesky for ${{ matrix.addon }}
+    strategy:
+      matrix:
+        addon: ${{ fromJson(needs.find_changed.outputs.changed_addons) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up yq
+        uses: mikefarah/yq@v4
+
+      - name: Get addon version
+        id: version
+        run: |
+          VERSION=$(yq e '.version' ${{ matrix.addon }}/config.yaml)
+          ADDON_NAME=$(yq e '.name' ${{ matrix.addon }}/config.yaml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${{ matrix.addon }}-v$VERSION" >> $GITHUB_OUTPUT
+          echo "name=$ADDON_NAME" >> $GITHUB_OUTPUT
+
+      - name: Prepare Bluesky post
+        id: bluesky_post
+        run: |
+          ADDON_NAME="${{ steps.version.outputs.name }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Create post text
+          POST_TEXT="🚀 New ${ADDON_NAME} HomeAssistant add-on released: ${VERSION}"
+          
+          echo "post_text<<EOF" >> $GITHUB_OUTPUT
+          echo "$POST_TEXT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post to Bluesky
+        uses: myConsciousness/bluesky-post@v1.0.0
+        with:
+          text: ${{ steps.bluesky_post.outputs.post_text }}
+          identifier: ${{ secrets.BLUESKY_IDENTIFIER }}
+          password: ${{ secrets.BLUESKY_PASSWORD }}
+          link-preview-url: https://github.com/hectorespert/boinc-addons/releases/tag/${{ steps.version.outputs.tag }}
+          tags: "BOINC,HomeAssistant"
 

@@ -19,6 +19,7 @@ jobs:
     uses: ./.github/workflows/operator.yaml
 
   find_changed:
+    needs: test
     uses: ./.github/workflows/find-changed-addons.yaml
     with:
       monitored_files: 'build.yaml config.yaml Dockerfile operator'
@@ -32,7 +33,7 @@ jobs:
       strict_check: false
 
   build:
-    needs: [test, find_changed, check_version]
+    needs: [find_changed, check_version]
     if: needs.find_changed.outputs.changed == 'true'
     uses: ./.github/workflows/build-addons.yaml
     with:
