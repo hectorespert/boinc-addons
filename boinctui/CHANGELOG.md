@@ -2,7 +2,7 @@
 
 ## 0.3.1
 
-- Minor maintenance update
+- Fix minor typo in documentation
 
 ## 0.3.0
 
