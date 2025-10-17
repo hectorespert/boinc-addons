@@ -2,7 +2,7 @@
 
 This repository allows to install the [Home Assistant BOINC Add-on](./boinc) and other related add-ons in your Home Assistant installation to contribute to scientific research projects using the [BOINC](https://boinc.berkeley.edu) platform.
 
-The BOINC [BOINC](https://boinc.berkeley.edu) platform enables individuals to contribute their computer's idle processing power to various scientific research projects, such as climate modeling, medical research, and astrophysics.
+The [BOINC](https://boinc.berkeley.edu) platform enables individuals to contribute their computer's idle processing power to various scientific research projects, such as climate modeling, medical research, and astrophysics.
 
 ## Installation
 
