@@ -175,13 +175,32 @@ jobs:
         run: |
           ADDON_NAME="${{ steps.version.outputs.name }}"
           VERSION="${{ steps.version.outputs.version }}"
+          RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
+          DOCS_URL="https://${{ github.repository_owner }}.github.io/boinc-addons/${{ matrix.addon }}/"
+          REPO_URL="https://github.com/${{ github.repository }}"
           
-          # Create post text
-          POST_TEXT="🚀 New ${ADDON_NAME} HomeAssistant add-on released: ${VERSION}"
+          # Create multi-line post text
+          cat << EOF > /tmp/bluesky_post.txt
+🚀 New release available!
+
+📦 ${ADDON_NAME} v${VERSION}
+
+Home Assistant add-on for BOINC - Contribute to scientific research from your HA instance.
+
+📥 How to install:
+1. Add repository: ${REPO_URL}
+2. Install ${ADDON_NAME} add-on
+3. Configure and start!
+
+📚 Docs: ${DOCS_URL}
+🔗 Release: ${RELEASE_URL}
+
+#HomeAssistant #BOINC #OpenSource
+EOF
           
-          echo "post_text<<EOF" >> $GITHUB_OUTPUT
-          echo "$POST_TEXT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "post_text<<EOFPOST" >> $GITHUB_OUTPUT
+          cat /tmp/bluesky_post.txt >> $GITHUB_OUTPUT
+          echo "EOFPOST" >> $GITHUB_OUTPUT
 
       - name: Post to Bluesky
         uses: myConsciousness/bluesky-post@v1.0.0
@@ -189,6 +208,4 @@ jobs:
           text: ${{ steps.bluesky_post.outputs.post_text }}
           identifier: ${{ secrets.BLUESKY_IDENTIFIER }}
           password: ${{ secrets.BLUESKY_PASSWORD }}
-          link-preview-url: https://github.com/hectorespert/boinc-addons/releases/tag/${{ steps.version.outputs.tag }}
-          tags: "BOINC,HomeAssistant"
 
