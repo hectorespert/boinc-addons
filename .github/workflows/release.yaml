@@ -188,7 +188,7 @@ jobs:
 
           Home Assistant add-ons for BOINC - Contribute to scientific research projects from your Home Assistant instance.
 
-          To install it, visit the [documentation](${DOCS_URL}).
+          To install it, visit the documentation: ${DOCS_URL}
 
           #HomeAssistant #BOINC
           EOF
