@@ -19,6 +19,10 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yaml
 
+  test:
+    needs: lint
+    uses: ./.github/workflows/operator.yaml
+
   find_changed:
     uses: ./.github/workflows/find-changed-addons.yaml
     with:
@@ -33,7 +37,7 @@ jobs:
       strict_check: true
 
   build:
-    needs: [lint, find_changed, check_version]
+    needs: [test, find_changed, check_version]
     if: needs.find_changed.outputs.changed == 'true'
     uses: ./.github/workflows/build-addons.yaml
     with:
