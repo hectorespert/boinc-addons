@@ -176,7 +176,7 @@ jobs:
           ADDON_NAME="${{ steps.version.outputs.name }}"
           VERSION="${{ steps.version.outputs.version }}"
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
-          DOCS_URL="https://${{ github.repository_owner }}.github.io/boinc-addons/${{ matrix.addon }}/"
+          DOCS_URL="https://${{ github.repository_owner }}.github.io/boinc-addons"
           
           # Create multi-line post text
           cat << EOF > /tmp/bluesky_post.txt
