@@ -198,7 +198,7 @@ jobs:
           echo "EOFPOST" >> $GITHUB_OUTPUT
 
       - name: Post to Bluesky
-        uses: myConsciousness/bluesky-post@v1.0.0
+        uses: myConsciousness/bluesky-post@v5
         with:
           text: ${{ steps.bluesky_post.outputs.post_text }}
           identifier: ${{ secrets.BLUESKY_IDENTIFIER }}
