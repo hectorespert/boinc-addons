@@ -5,6 +5,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 jobs:
   find_changed:
     uses: ./.github/workflows/find-changed-addons.yaml
