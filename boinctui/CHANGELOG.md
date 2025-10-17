@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- Enhance documentation
+
 ## 0.3.2
 
 - Update CI/CD workflows to improve build and release process
