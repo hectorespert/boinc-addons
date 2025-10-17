@@ -1,0 +1,86 @@
+name: Check Version
+
+on:
+  workflow_call:
+    inputs:
+      changed_addons:
+        description: 'JSON array of add-ons to check'
+        required: true
+        type: string
+      strict_check:
+        description: 'Perform strict version validation (check against published versions)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  check_version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: Check version for ${{ matrix.addon }}
+    strategy:
+      matrix:
+        addon: ${{ fromJson(inputs.changed_addons) }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: ${{ inputs.strict_check && 0 || 1 }}
+
+      - name: Set up yq
+        uses: mikefarah/yq@v4
+
+      - name: Get addon version
+        id: version
+        run: |
+          VERSION=$(yq e '.version' ${{ matrix.addon }}/config.yaml)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${{ matrix.addon }}-v$VERSION" >> $GITHUB_OUTPUT
+          echo "Addon: ${{ matrix.addon }}, Version: $VERSION"
+
+      - name: Check version is greater than published
+        if: inputs.strict_check
+        id: check_version
+        run: |
+          git fetch --tags
+          
+          # Get current version
+          CURRENT_VERSION="${{ steps.version.outputs.version }}"
+          echo "Current version: $CURRENT_VERSION"
+          
+          # Check if tag already exists
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "❌ Tag ${{ steps.version.outputs.tag }} already exists"
+            exit 1
+          fi
+          
+          # Get the latest published version for this addon
+          LATEST_TAG=$(git tag -l "${{ matrix.addon }}-v*" | sort -V | tail -n 1)
+          
+          if [ -z "$LATEST_TAG" ]; then
+            echo "✅ No previous versions found, this is the first release"
+            exit 0
+          fi
+          
+          # Extract version from latest tag
+          LATEST_VERSION=$(echo "$LATEST_TAG" | sed 's/${{ matrix.addon }}-v//')
+          echo "Latest published version: $LATEST_VERSION"
+          
+          # Compare versions using sort -V (version sort)
+          HIGHER=$(printf "%s\n%s" "$LATEST_VERSION" "$CURRENT_VERSION" | sort -V | tail -n 1)
+          
+          if [ "$HIGHER" = "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$LATEST_VERSION" ]; then
+            echo "✅ Version $CURRENT_VERSION is greater than $LATEST_VERSION"
+          else
+            echo "❌ Version $CURRENT_VERSION is not greater than latest published version $LATEST_VERSION"
+            exit 1
+          fi
+
+      - name: Display version info
+        if: inputs.strict_check == false
+        run: |
+          echo "ℹ️ Version check (informational only)"
+          echo "Addon: ${{ matrix.addon }}"
+          echo "Current version: ${{ steps.version.outputs.version }}"

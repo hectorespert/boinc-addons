@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- Update CI/CD workflows to improve build and release process
+
 ## 0.3.1
 
 - Fix minor typo in documentation

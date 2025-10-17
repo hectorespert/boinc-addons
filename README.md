@@ -1,12 +1,25 @@
-# Home Assistant BOINC Add-on repository
+# Home Assistant BOINC add-ons repository
 
-This repository allows to install the [Home Assistant BOINC Add-on](./boinc) in your Home Assistant installation.
+This repository allows to install the [Home Assistant BOINC Add-on](./boinc) and other related add-ons in your Home Assistant installation to contribute to scientific research projects using the [BOINC](https://boinc.berkeley.edu) platform.
+
+The [BOINC](https://boinc.berkeley.edu) platform enables individuals to contribute their computer's idle processing power to various scientific research projects, such as climate modeling, medical research, and astrophysics.
+
+## Installation
 
 [![Open your Home Assistant instance and show the add add-on repository dialog with a specific repository URL pre-filled.](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fhectorespert%2Fboinc-addons)
 
-## Add-ons
+To install the add-ons provided by this repository in your Home Assistant instance, click on the button above or follow these steps:
 
-This repository contains the following add-ons
+1. Open your Home Assistant instance.
+2. Go to the Supervisor panel.
+3. Click on the "Add-on Store" tab.
+4. Click on the three dots in the top right corner and select "Repositories".
+5. Add the repository URL: `https://github.com/hectorespert/boinc-addons`.
+6. Install the desired add-ons from the store.
+
+## Usage
+
+This repository contains the following add-ons, enable them as needed:
 
 ### [BOINC add-on](./boinc)
 
@@ -16,9 +29,9 @@ This repository contains the following add-ons
 ![Supports armv7 Architecture][armv7-shield]
 ![Supports i386 Architecture][i386-shield]
 
-[BOINC](https://boinc.berkeley.edu) is an open-source software platform for computing using volunteered resources.
+[BOINC](https://boinc.berkeley.edu) is an open-source software platform for computing using volunteered resources. 
 
-The BOINC add-on, running on your Home Assistant, downloads scientific computing jobs and runs them invisibly in the background.
+This add-on configures and executes the BOINC client in your Home Assistant instance, downloads scientific computing jobs and runs them invisibly in the background.
 
 ### [boinctui add-on](./boinctui)
 

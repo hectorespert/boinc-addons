@@ -1,0 +1,41 @@
+name: PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yaml
+
+  test:
+    needs: lint
+    uses: ./.github/workflows/operator.yaml
+
+  find_changed:
+    needs: test
+    uses: ./.github/workflows/find-changed-addons.yaml
+    with:
+      monitored_files: 'build.yaml config.yaml Dockerfile operator'
+
+  check_version:
+    needs: find_changed
+    if: needs.find_changed.outputs.changed == 'true'
+    uses: ./.github/workflows/check-version.yaml
+    with:
+      changed_addons: ${{ needs.find_changed.outputs.changed_addons }}
+      strict_check: false
+
+  build:
+    needs: [find_changed, check_version]
+    if: needs.find_changed.outputs.changed == 'true'
+    uses: ./.github/workflows/build-addons.yaml
+    with:
+      changed_addons: ${{ needs.find_changed.outputs.changed_addons }}
+      test_mode: true
