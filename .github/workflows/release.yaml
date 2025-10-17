@@ -177,26 +177,21 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}"
           DOCS_URL="https://${{ github.repository_owner }}.github.io/boinc-addons/${{ matrix.addon }}/"
-          REPO_URL="https://github.com/${{ github.repository }}"
           
           # Create multi-line post text
           cat << EOF > /tmp/bluesky_post.txt
-🚀 New release available!
+          🚀 New release available!
 
-📦 ${ADDON_NAME} v${VERSION}
+          📦 ${ADDON_NAME} v${VERSION}
 
-Home Assistant add-on for BOINC - Contribute to scientific research from your HA instance.
+          🔗 Release: ${RELEASE_URL}
 
-📥 How to install:
-1. Add repository: ${REPO_URL}
-2. Install ${ADDON_NAME} add-on
-3. Configure and start!
+          Home Assistant add-ons for BOINC - Contribute to scientific research projects from your Home Assistant instance.
 
-📚 Docs: ${DOCS_URL}
-🔗 Release: ${RELEASE_URL}
+          To install it, visit the [documentation](${DOCS_URL}).
 
-#HomeAssistant #BOINC #OpenSource
-EOF
+          #HomeAssistant #BOINC
+          EOF
           
           echo "post_text<<EOFPOST" >> $GITHUB_OUTPUT
           cat /tmp/bluesky_post.txt >> $GITHUB_OUTPUT
