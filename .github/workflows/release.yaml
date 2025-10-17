@@ -5,6 +5,16 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "release-${{ github.ref }}"
+  cancel-in-progress: false
+
 jobs:
   find_changed:
     uses: ./.github/workflows/find-changed-addons.yaml
@@ -26,8 +36,6 @@ jobs:
     with:
       changed_addons: ${{ needs.find_changed.outputs.changed_addons }}
       test_mode: false
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   create_release:
     needs: [find_changed, build, check_version]
@@ -95,3 +103,36 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
+
+  build_docs:
+    runs-on: ubuntu-latest
+    name: Build documentation
+    needs: create_release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Build with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./
+          destination: ./_site
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+
+  deploy_docs:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build_docs
+    name: Deploy documentation
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
