@@ -41,8 +41,10 @@ jobs:
       test_mode: true
 
   check_docs:
-    needs: lint
+    needs: test
     uses: ./.github/workflows/docs.yaml
+    permissions:
+      contents: read
     with:
       deploy: false
 
