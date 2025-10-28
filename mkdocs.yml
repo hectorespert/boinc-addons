@@ -6,6 +6,8 @@ repo_name: hectorespert/boinc-addons
 
 theme:
   name: material
+  logo: logo.png
+  favicon: icon.png
 
 plugins:
   - search

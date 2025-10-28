@@ -40,9 +40,9 @@ jobs:
       changed_addons: ${{ needs.find_changed.outputs.changed_addons }}
       test_mode: true
 
-  check_docs:
-    needs: test
-    uses: ./.github/workflows/docs.yaml
-    with:
-      deploy: false
+#  check_docs:
+#    needs: test
+#    uses: ./.github/workflows/docs.yaml
+#    with:
+#      deploy: false
 

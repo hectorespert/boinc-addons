@@ -4,9 +4,17 @@
 
 The BOINC add-on, running on your Home Assistant, downloads scientific computing jobs and runs them invisibly in the background.
 
+## ⚠️ Important: Protection Mode
+
+**This add-on requires Protection Mode to be disabled.**
+
+Protection Mode must be turned off because the add-on needs to monitor system-wide CPU usage across all processes on the host system. This functionality is essential to automatically suspend BOINC computations when other applications need CPU resources, preventing BOINC from interfering with your Home Assistant instance or other critical services.
+
+**Security Note:** Disabling Protection Mode grants the container elevated access to host resources. Only enable this add-on if you understand and accept the security implications.
+
 ## Privileged mode
 
-To allow suspending the BOINC client based on the CPU usage from other processes, this addon requires running in privileged mode.
+To allow the add-on to monitor system-wide CPU usage and suspend BOINC when other processes are active, it must run in privileged mode. This grants the container elevated access to host resources; enable only if you understand the security implications.
 
 ## How to use
 
