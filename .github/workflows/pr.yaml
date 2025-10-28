@@ -43,8 +43,6 @@ jobs:
   check_docs:
     needs: test
     uses: ./.github/workflows/docs.yaml
-    permissions:
-      contents: read
     with:
       deploy: false
 
