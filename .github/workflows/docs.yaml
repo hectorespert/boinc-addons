@@ -9,10 +9,6 @@ on:
         type: boolean
         default: true
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,6 +39,9 @@ jobs:
 
   deploy:
     if: inputs.deploy
+    concurrency:
+      group: "pages"
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
