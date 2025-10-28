@@ -39,3 +39,4 @@ jobs:
     with:
       changed_addons: ${{ needs.find_changed.outputs.changed_addons }}
       test_mode: true
+

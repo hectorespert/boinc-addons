@@ -1,0 +1,25 @@
+site_name: Home Assistant BOINC Add-ons
+site_description: Home Assistant add-ons repository that provides a collection of add-ons for BOINC.
+site_url: https://hectorespert.github.io/boinc-addons/
+repo_url: https://github.com/hectorespert/boinc-addons
+repo_name: hectorespert/boinc-addons
+
+theme:
+  name: material
+  logo: logo.png
+  favicon: icon.png
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - BOINC Add-on:
+      - Overview: boinc/README.md
+      - Documentation: boinc/DOCS.md
+      - Development: boinc/DEVELOPMENT.md
+      - Changelog: boinc/CHANGELOG.md
+  - boinctui Add-on:
+      - Overview: boinctui/README.md
+      - Documentation: boinctui/DOCS.md
+      - Changelog: boinctui/CHANGELOG.md
