@@ -13,11 +13,11 @@ plugins:
 nav:
   - Home: index.md
   - BOINC Add-on:
-    - Overview: boinc/README.md
-    - Documentation: boinc/DOCS.md
-    - Development: boinc/DEVELOPMENT.md
-    - Changelog: boinc/CHANGELOG.md
+      - Overview: boinc/README.md
+      - Documentation: boinc/DOCS.md
+      - Development: boinc/DEVELOPMENT.md
+      - Changelog: boinc/CHANGELOG.md
   - boinctui Add-on:
-    - Overview: boinctui/README.md
-    - Documentation: boinctui/DOCS.md
-    - Changelog: boinctui/CHANGELOG.md
+      - Overview: boinctui/README.md
+      - Documentation: boinctui/DOCS.md
+      - Changelog: boinctui/CHANGELOG.md
