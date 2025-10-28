@@ -43,6 +43,7 @@ jobs:
   check_docs:
     needs: test
     uses: ./.github/workflows/docs.yaml
+    secrets: inherit
     with:
       deploy: false
 
