@@ -148,17 +148,17 @@ jobs:
           
           # Create multi-line post text
           cat << EOF > /tmp/bluesky_post.txt
+          #HomeAssistant add-ons for #BOINC
+          
+          Contribute to scientific research projects from your Home Assistant instance.
+          
           🚀 New release available!
 
           📦 ${ADDON_NAME} v${VERSION}
 
           🔗 Release: ${RELEASE_URL}
 
-          Home Assistant add-ons for BOINC - Contribute to scientific research projects from your Home Assistant instance.
-
-          To install it, visit the documentation: ${DOCS_URL}
-
-          #HomeAssistant #BOINC
+          To install it, read the documentation: ${DOCS_URL}
           EOF
           
           echo "post_text<<EOFPOST" >> $GITHUB_OUTPUT
@@ -169,6 +169,7 @@ jobs:
         uses: myConsciousness/bluesky-post@v5
         with:
           text: ${{ steps.bluesky_post.outputs.post_text }}
+          link-preview-url: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}
           identifier: ${{ secrets.BLUESKY_IDENTIFIER }}
           password: ${{ secrets.BLUESKY_PASSWORD }}
 
