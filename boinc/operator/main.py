@@ -25,7 +25,12 @@ parser.add_argument("--exit-immediately", type=bool, help="Exit immediately afte
 args = parser.parse_args()
 logging.basicConfig(level=args.log_level, format='%(asctime)s %(levelname)s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
-logging.info(f'Starting BOINC Add-on Operator with pid {os.getpid()}')
+current_pid = os.getpid()
+logging.info(f'Starting BOINC Add-on Operator with pid {current_pid}')
+
+if current_pid == 1:
+    logging.warning('Protection Mode is enabled. BOINC requires system-wide usage monitoring to function properly.')
+
 logging.info(f'Configuration loaded from {args.options.name}')
 
 options = json.load(args.options)

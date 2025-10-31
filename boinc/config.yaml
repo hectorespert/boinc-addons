@@ -1,5 +1,5 @@
 name: BOINC
-version: "2.7.0"
+version: "2.7.1"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
@@ -28,7 +28,7 @@ schema:
   end_hour: "match(^(?:[01]\\d|2[0-3]):[0-5]\\d$)?"
   max_ncpus: "float(0,100)?"
   cpu_usage_limit: "float(0,100)?"
-image: "ghcr.io/hectorespert/{arch}-addon-boinc"
+#image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false
 map:
   - addon_config
