@@ -119,12 +119,12 @@ jobs:
               ;;
           esac
 
-      - name: Set up QEMU
-        if: matrix.addon == 'boinc' && steps.check.outputs.build_arch == 'true' && steps.qemu.outputs.platforms != ''
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: ${{ steps.qemu.outputs.platforms }}
-          cache-image: true
+#      - name: Set up QEMU
+#        if: matrix.addon == 'boinc' && steps.check.outputs.build_arch == 'true' && steps.qemu.outputs.platforms != ''
+#        uses: docker/setup-qemu-action@v3
+#        with:
+#          platforms: ${{ steps.qemu.outputs.platforms }}
+#          cache-image: true
 
       - name: Test boinc add-on
         if: matrix.addon == 'boinc' && steps.check.outputs.build_arch == 'true'
