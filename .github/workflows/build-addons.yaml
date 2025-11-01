@@ -102,9 +102,29 @@ jobs:
             --cosign \
             --addon
 
-      - name: Set up QEMU
+      - name: Compute QEMU platforms
         if: matrix.addon == 'boinc' && steps.check.outputs.build_arch == 'true'
+        id: qemu
+        run: |
+          case "${{ matrix.arch }}" in
+            aarch64)
+              echo "platforms=arm64" >> $GITHUB_OUTPUT
+              ;;
+            armhf|armv7)
+              echo "platforms=arm" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              # amd64 and i386: no QEMU needed on x86_64 runners
+              echo "platforms=" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Set up QEMU
+        if: matrix.addon == 'boinc' && steps.check.outputs.build_arch == 'true' && steps.qemu.outputs.platforms != ''
         uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ steps.qemu.outputs.platforms }}
+          cache-image: true
 
       - name: Test boinc add-on
         if: matrix.addon == 'boinc' && steps.check.outputs.build_arch == 'true'
