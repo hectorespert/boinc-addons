@@ -8,9 +8,9 @@
 
 ## About
 
-boinctui is a fullscreen text mode manager for BOINC client.
+boinctui is a fullscreen text mode manager for the BOINC client.
 
-Provides a terminal user interface (TUI) to manage and monitor BOINC projects and tasks.
+It provides a terminal user interface (TUI) to manage and monitor BOINC projects and tasks.
 
 ## Features
 

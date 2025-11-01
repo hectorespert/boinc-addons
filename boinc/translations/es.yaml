@@ -10,19 +10,19 @@ configuración:
     descripción: Permitir todas las conexiones GUI RPC remotas (Anula los hosts remotos)
   account_manager_url:
     nombre: URL del Gestor de Cuentas
-    descripción: "Una URL para un Gestor de Cuentas Boinc, por ejemplo: https://scienceunited.org"
+    descripción: "URL de un Gestor de Cuentas BOINC, por ejemplo: https://scienceunited.org"
   account_manager_username:
     nombre: Nombre de Usuario del Gestor de Cuentas
-    descripción: "Un nombre de usuario para un usuario registrado en el Gestor de Cuentas Boinc"
+    descripción: "Nombre de usuario registrado en el Gestor de Cuentas BOINC"
   account_manager_password:
     nombre: Contraseña del Gestor de Cuentas
-    descripción: "Contraseña para el usuario configurado en el Gestor de Cuentas Boinc"
+    descripción: "Contraseña del usuario configurado en el Gestor de Cuentas BOINC"
   start_hour:
     nombre: Hora de Inicio
-    descripción: "Configurar la hora en que Boinc comienza a computar"
+    descripción: "Hora en que BOINC comienza a computar"
   end_hour:
     nombre: Hora de Fin
-    descripción: "Configurar la hora en que Boinc deja de computar"
+    descripción: "Hora en que BOINC deja de computar"
   max_ncpus:
     nombre: Porcentaje Máximo de CPUs
     descripción: "Número máximo de CPUs a utilizar"
@@ -30,4 +30,4 @@ configuración:
     nombre: Porcentaje Máximo de Uso de CPU
     descripción: "Tiempo máximo de uso por CPU"
 red:
-  31416/tcp: Puerto GUI RPC del cliente Boinc (Por defecto 31416)
+  31416/tcp: Puerto GUI RPC del cliente BOINC (por defecto 31416)

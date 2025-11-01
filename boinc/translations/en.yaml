@@ -6,28 +6,28 @@ configuration:
     name: Remote hosts
     description: List of remote hosts to allow remote connection
   allow_remote_gui_rpc:
-    name: Allow remote gui rpc
-    description: Allow all remote gui rpc connections (Overrides remote hosts)
+    name: Allow remote GUI RPC
+    description: Allow all remote GUI RPC connections (overrides remote hosts)
   account_manager_url:
     name: Account Manager URL
-    description: "An URL for a Boinc Account Manager, for example: https://scienceunited.org"
+    description: "A URL for a BOINC Account Manager, for example: https://scienceunited.org"
   account_manager_username:
     name: Account Manager Username
-    description: "An username for a user registered in the Boinc Account Manager"
+    description: "A username for a user registered in the BOINC Account Manager"
   account_manager_password:
     name: Account Manager Password
-    description: "Password for the configured user in the Boinc Account Manager"
+    description: "Password for the configured user in the BOINC Account Manager"
   start_hour:
     name: Start Hour
-    description: "Configure the hour when Boinc starts to compute"
+    description: "Configure the hour when BOINC starts computing"
   end_hour:
     name: End Hour
-    description: "Configure the hour when Boinc stops to compute"
+    description: "Configure the hour when BOINC stops computing"
   max_ncpus:
-    name: Max CPUs percentage
+    name: Max CPUs Percentage
     description: "Maximum number of CPUs to use"
   cpu_usage_limit:
-    name: Max CPU Usage percentage
+    name: Max CPU Usage Percentage
     description: "Maximum time of usage per CPU"
 network:
-  31416/tcp: Boinc client gui rpc port (Default 31416)
+  31416/tcp: BOINC client GUI RPC port (default 31416)

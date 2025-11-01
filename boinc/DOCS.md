@@ -12,23 +12,19 @@ Protection Mode must be turned off because the add-on needs to monitor system-wi
 
 **Security Note:** Disabling Protection Mode grants the container elevated access to host resources. Only enable this add-on if you understand and accept the security implications.
 
-## Privileged mode
-
-To allow the add-on to monitor system-wide CPU usage and suspend BOINC when other processes are active, it must run in privileged mode. This grants the container elevated access to host resources; enable only if you understand the security implications.
-
 ## How to use
 
 ### Account Manager (Easy)
 
-The easy way to use this addon is to attach the boicn client to a [BOINC Account Manager](https://boinc.berkeley.edu/wiki/Account_managers).
+The easy way to use this add-on is to attach the BOINC client to a [BOINC Account Manager](https://boinc.berkeley.edu/wiki/Account_managers).
 
-[Science United](https://scienceunited.org) is recommended to simplify the process of start computing.
+[Science United](https://scienceunited.org) is recommended to simplify the process of starting computing.
 
-If you do not have an account created in an [account manager](https://boinc.berkeley.edu/wiki/Account_managers), you need to create it and use the same username and password in the addon configuration.
+If you do not have an account created in an [account manager](https://boinc.berkeley.edu/wiki/Account_managers), you need to create it and use the same username and password in the add-on configuration.
 
-For example, in [Science United](https://scienceunited.org), you could sign up in this page: [Join Science United](https://scienceunited.org/su_join.php).
+For example, in [Science United](https://scienceunited.org), you could sign up on this page: [Join Science United](https://scienceunited.org/su_join.php).
 
-After create the accountm, set the url of the account manager, your user and your password in the addon configuration or edit the yaml configuration.
+After creating the account, set the URL of the account manager, your user and your password in the add-on configuration or edit the YAML configuration.
 
 ```yaml
 account_manager_url: "https://scienceunited.org"
@@ -36,21 +32,123 @@ account_manager_username: "youremail@email.com"
 account_manager_password: "yoursecretpassword"
 ```
 
-### Remote GUI RPC
+### Remote Control (Advanced)
 
-[Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the addon configuration and use it to manage the boinc client remotely.
+[Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the add-on configuration and used to manage the BOINC client remotely.
 
 There is a boinctui add-on available for this purpose [here](https://github.com/hectorespert/boinc-addons/tree/main/boinctui).
 
-Related options include:
+## Configuration
 
-- **remote_hosts**
-By default, no remote hosts are allowed to connect. You must explicitly specify the IP addresses or hostnames of the machines you want to grant access.
+### Configuration Options
 
-- **allow_remote_gui_rpc**
-It allows remote connections from any host, independent of the `remote_hosts` setting.
+#### Account Manager Options
 
-### Global preferences override
+- **account_manager_url** (optional)
+  - A URL for a BOINC Account Manager, for example: `https://scienceunited.org`
+  - This is the easiest way to get started with BOINC
 
-To override the preferences of BOINC client a `global_preferences_override.xml` file could be defined in the addon config folder: [Preferences Override](
-https://github.com/BOINC/boinc/wiki/PrefsOverride)
+- **account_manager_username** (optional)
+  - A username for a user registered in the BOINC Account Manager
+  - Required if `account_manager_url` is set
+
+- **account_manager_password** (optional)
+  - Password for the configured user in the BOINC Account Manager
+  - Required if `account_manager_url` is set
+
+#### Remote Control Options
+
+- **gui_rpc_password** (optional)
+  - Define a GUI RPC password to connect remotely
+
+- **remote_hosts** (optional)
+  - List of remote hosts to allow remote connection
+  - Specify IP addresses or hostnames (e.g., `192.168.1.100`, `myhost.local`)
+  - By default, no remote hosts are allowed
+
+- **allow_remote_gui_rpc** (optional, boolean)
+  - Allow all remote GUI RPC connections (overrides `remote_hosts` setting)
+  - Default: `false`
+  - **Warning:** Enabling this allows connections from any host
+
+#### Computing Schedule Options
+
+- **start_hour** (optional, format: `HH:MM`)
+  - Configure the hour when BOINC starts computing
+  - Format: 24-hour time (e.g., `09:00`, `22:30`)
+  - If not set, BOINC computes all the time
+
+- **end_hour** (optional, format: `HH:MM`)
+  - Configure the hour when BOINC stops computing
+  - Format: 24-hour time (e.g., `18:00`, `06:00`)
+  - Must be used together with `start_hour`
+
+#### Resource Usage Options
+
+- **max_ncpus** (optional, range: 0-100)
+  - Maximum percentage of CPUs to use
+  - Value represents the percentage of available CPU cores
+  - Example: `50` means use up to 50% of available cores
+
+- **cpu_usage_limit** (optional, range: 0-100)
+  - Maximum CPU usage percentage per core
+  - Value represents the percentage of time each CPU can be used
+  - Example: `75` means each CPU can be used up to 75% of the time
+
+### Example Configurations
+
+#### Basic Setup with Account Manager
+
+```yaml
+account_manager_url: "https://scienceunited.org"
+account_manager_username: "youremail@example.com"
+account_manager_password: "your_password"
+```
+
+#### Computing Only at Night (22:00 to 07:00)
+
+```yaml
+account_manager_url: "https://scienceunited.org"
+account_manager_username: "youremail@example.com"
+account_manager_password: "your_password"
+start_hour: "22:00"
+end_hour: "07:00"
+```
+
+#### Limited Resource Usage
+
+```yaml
+account_manager_url: "https://scienceunited.org"
+account_manager_username: "youremail@example.com"
+account_manager_password: "your_password"
+max_ncpus: 50
+cpu_usage_limit: 75
+```
+
+#### Remote Control Setup
+
+```yaml
+gui_rpc_password: "my_secure_password"
+remote_hosts:
+  - "192.168.1.100"
+  - "192.168.1.101"
+```
+
+#### Full Configuration Example
+
+```yaml
+account_manager_url: "https://scienceunited.org"
+account_manager_username: "youremail@example.com"
+account_manager_password: "your_password"
+gui_rpc_password: "rpc_password"
+remote_hosts:
+  - "192.168.1.100"
+start_hour: "22:00"
+end_hour: "07:00"
+max_ncpus: 50
+cpu_usage_limit: 75
+```
+
+### Global Preferences Override
+
+To override the preferences of the BOINC client, a `global_preferences_override.xml` file can be defined in the add-on config folder: [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOverride)
