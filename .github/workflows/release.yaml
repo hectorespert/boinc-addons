@@ -171,7 +171,6 @@ jobs:
         uses: myConsciousness/bluesky-post@v5
         with:
           text: ${{ steps.bluesky_post.outputs.post_text }}
-          link-preview-url: ${{ steps.bluesky_post.outputs.release_url }}
           identifier: ${{ secrets.BLUESKY_IDENTIFIER }}
           password: ${{ secrets.BLUESKY_PASSWORD }}
 
