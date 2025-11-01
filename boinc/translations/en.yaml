@@ -16,7 +16,7 @@ configuration:
     description: "A username for a user registered in the BOINC Account Manager"
   account_manager_password:
     name: Account Manager Password
-    description: "Password for the configured user in the Boinc Account Manager"
+    description: "Password for the configured user in the BOINC Account Manager"
   start_hour:
     name: Start Hour
     description: "Configure the hour when BOINC starts computing"
