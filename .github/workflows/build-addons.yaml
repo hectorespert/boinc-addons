@@ -106,11 +106,10 @@ jobs:
         if: matrix.arch == 'amd64' && matrix.addon == 'boinc' && steps.check.outputs.build_arch == 'true'
         working-directory: boinc
         run: |
-          # Determine the image tag based on test_mode
           if [[ "${{ inputs.test_mode }}" == "true" ]]; then
-            IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-${{ steps.check.outputs.image }}:latest"
+            IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-boinc:latest"
           else
-            IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-${{ steps.check.outputs.image }}:${{ steps.info.outputs.version }}"
+            IMAGE_TAG="ghcr.io/${{ github.repository_owner }}/${{ matrix.arch }}-addon-boinc:${{ steps.info.outputs.version }}"
           fi
           
           docker run --uts=host --pid=host --rm \
