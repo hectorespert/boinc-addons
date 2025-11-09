@@ -1,12 +1,16 @@
 # Changelog
 
+## 2.7.2
+
+Codenotary is now deprecated and has been removed from the configuration
+
 ## 2.7.1
 
-- Add warning message when Protection Mode is enabled
+Add warning message when Protection Mode is enabled
 
 ## 2.7.0
 
-Add documentation for connecting to the BOINC add-on using the boinctui add-on.
+Add documentation for connecting to the BOINC add-on using the boinctui add-on
 
 ## 2.6.0
 
@@ -48,65 +52,65 @@ To allow suspending the BOINC client based on the CPU usage from other processes
 
 ## 1.5.0
 
-- Fix GUI password
-- Read hostname from host
+Fix GUI password
+Read hostname from host
 
 ## 1.4.3
 
-- Fix GUI password
+Fix GUI password
 
 ## 1.4.2
 
-- Improve addon operator
+Improve addon operator
 
 ## 1.4.1
 
-- Fix translation
+Fix translation
 
 ## 1.4.0
 
-- Support the configuration of the start and end time of computing.
-- First version of the BOINC addon operator, if there are any problems with it, please notify me.
+Support the configuration of the start and end time of computing.
+First version of the BOINC addon operator, if there are any problems with it, please notify me.
 
 ## 1.3.7
 
-- Fix Rosseta@Home libGL.so error
+Fix Rosseta@Home libGL.so error
 
 ## 1.3.6
 
-- Improve build using linters
+Improve build using linters
 
 ## 1.3.5
 
-- Fix preferences override
+Fix preferences override
 
 ## 1.3.0
 
-- Support preferences override
+Support preferences override
 
 ## 1.2.1
 
-- Sign image
+Sign image
 
 ## 1.2.0
 
-- Cosing image configuration
-- Improve docs
-- Enable video support to detect GPUs
+Cosing image configuration
+Improve docs
+Enable video support to detect GPUs
 
 ## 1.1.1
 
-- Fix locale folder error
+Fix locale folder error
 
 ## 1.1.0
 
-- Support remote connections
+Support remote connections
 
 ## 1.0.1
 
-- Fix Account Manager attach
+Fix Account Manager attach
 
 ## 1.0.0
 
-- First stable release
-- Account manager support
+First stable release
+Account manager support
