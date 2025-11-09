@@ -25,9 +25,9 @@ schema:
   account_manager_username: "str?"
   account_manager_password: "password?"
   projects:
-  - url: str?
-    username: str?
-    password: password?
+    - url: url?
+      username: str?
+      password: password?
   start_hour: "match(^(?:[01]\\d|2[0-3]):[0-5]\\d$)?"
   end_hour: "match(^(?:[01]\\d|2[0-3]):[0-5]\\d$)?"
   max_ncpus: "float(0,100)?"
