@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2
+
+Update base from Debian 13.1 to Debian 13.2
+
 ## 1.0.1
 
 Codenotary is now deprecated and has been removed from the configuration
