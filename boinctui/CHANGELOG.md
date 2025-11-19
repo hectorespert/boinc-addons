@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.2
+## 1.1.0
 
 Update base from Debian 13.1 to Debian 13.2
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.7.3
+## 2.8.0
 
 Update base from Debian 13.1 to Debian 13.2
 
