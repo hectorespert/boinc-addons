@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+Configure addon to use cold backups instead of hot backups
+
 ## 1.1.0
 
 Update base from Debian 13.1 to Debian 13.2
