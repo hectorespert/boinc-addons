@@ -1,5 +1,5 @@
 name: boinctui
-version: "1.1.0"
+version: "1.1.1"
 slug: boinctui
 description: Fullscreen text mode manager for BOINC client
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinctui"
@@ -15,3 +15,4 @@ ingress_port: 7681
 panel_icon: mdi:console
 image: "ghcr.io/hectorespert/{arch}-addon-boinctui"
 apparmor: false
+backup: cold
