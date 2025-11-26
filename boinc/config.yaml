@@ -1,5 +1,5 @@
 name: BOINC
-version: "2.8.0"
+version: "2.8.1"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
@@ -15,7 +15,6 @@ ports:
 video: true
 host_pid: true
 host_uts: true
-codenotary: hectorespertpardo@gmail.com
 schema:
   gui_rpc_password: "password?"
   remote_hosts:
@@ -34,5 +33,6 @@ schema:
   cpu_usage_limit: "float(0,100)?"
 #image: "ghcr.io/hectorespert/{arch}-addon-boinc"
 apparmor: false
+backup: cold
 map:
   - addon_config

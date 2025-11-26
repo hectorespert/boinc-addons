@@ -1,29 +1,41 @@
 # Changelog
 
+## 1.1.1
+
+Configure addon to use cold backups instead of hot backups
+
+## 1.1.0
+
+Update base from Debian 13.1 to Debian 13.2
+
+## 1.0.1
+
+Codenotary is now deprecated and has been removed from the configuration
+
 ## 1.0.0
 
-- First stable release
+First stable release
 
 ## 0.3.3
 
-- Enhance documentation
+Enhance documentation
 
 ## 0.3.2
 
-- Update CI/CD workflows to improve build and release process
+Update CI/CD workflows to improve build and release process
 
 ## 0.3.1
 
-- Fix minor typo in documentation
+Fix minor typo in documentation
 
 ## 0.3.0
 
-- Add documentation for connecting to the BOINC add-on and other BOINC clients
+Add documentation for connecting to the BOINC add-on and other BOINC clients
 
 ## 0.2.0
 
-- Add persistent configuration storage
+Add persistent configuration storage
 
 ## 0.1.0
 
-- Initial release
+Initial release
