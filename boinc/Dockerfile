@@ -19,10 +19,7 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN apt-get update && \
     apt-get install --no-install-recommends -y boinc-client \
     python3-dict2xml \
-    ocl-icd-libopencl1 \
-    mesa-opencl-icd \
     libgl1 && \
-    if [ "$BUILD_ARCH" = "amd64" ]; then apt-get install --no-install-recommends -y intel-opencl-icd; fi && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy operator
