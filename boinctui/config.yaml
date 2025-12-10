@@ -4,11 +4,8 @@ slug: boinctui
 description: Fullscreen text mode manager for BOINC client
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinctui"
 arch:
-  - armhf
-  - armv7
   - aarch64
   - amd64
-  - i386
 init: false
 ingress: true
 ingress_port: 7681

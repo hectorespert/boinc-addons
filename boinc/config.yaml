@@ -4,11 +4,8 @@ slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
 arch:
-  - armhf
-  - armv7
   - aarch64
   - amd64
-  - i386
 init: false
 ports:
   31416/tcp: null

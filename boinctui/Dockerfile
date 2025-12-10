@@ -28,9 +28,6 @@ RUN apt-get update && \
     case "${BUILD_ARCH}" in \
         amd64) TTYD_ARCH="x86_64" ;; \
         aarch64) TTYD_ARCH="aarch64" ;; \
-        armv7) TTYD_ARCH="armv7" ;; \
-        armhf) TTYD_ARCH="arm" ;; \
-        i386) TTYD_ARCH="i686" ;; \
         *) echo "Unsupported architecture: ${BUILD_ARCH}" && exit 1 ;; \
     esac && \
     # Download ttyd binary from GitHub releases
