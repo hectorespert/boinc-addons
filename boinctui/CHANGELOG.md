@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.0
+
+Breaking: Drop support of armhf, armv7 and i386.
+
 ## 1.1.1
 
 Configure addon to use cold backups instead of hot backups
