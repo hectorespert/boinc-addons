@@ -20,6 +20,7 @@ RUN apt-get update && \
     ca-certificates \
     curl \
     python3-dict2xml \
+    docker-cli \
     libgl1 && \
     ARCH=$(dpkg --print-architecture) && \
     curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.8/boinc-client_8.2.8-3429_${ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
