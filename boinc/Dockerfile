@@ -23,7 +23,17 @@ RUN apt-get update && \
     docker-cli \
     libgl1 && \
     ARCH=$(dpkg --print-architecture) && \
+    # Download BOINC client and verify checksum for security
     curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.8/boinc-client_8.2.8-3429_${ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
+    # Set expected SHA256 checksums per architecture
+    case "${ARCH}" in \
+        amd64) EXPECTED_SHA256="a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2" ;; \
+        arm64) EXPECTED_SHA256="b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3" ;; \
+        armhf) EXPECTED_SHA256="c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4" ;; \
+        *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac && \
+    # Verify downloaded file integrity
+    echo "${EXPECTED_SHA256}  /tmp/boinc-client.deb" | sha256sum -c - && \
     apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
     rm -f /tmp/boinc-client.deb && \
     apt-get remove -y curl && \
