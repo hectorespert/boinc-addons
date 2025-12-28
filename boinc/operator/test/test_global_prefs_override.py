@@ -65,7 +65,7 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
             self.assertFalse(os.path.islink(f'{tmp_dir}/data/global_prefs_override.xml'))
 
             with open(f'{tmp_dir}/data/global_prefs_override.xml', 'r') as f:
-                self.assertEqual(f.read(), '<global_preferences>\n  <cpu_usage_limit>75.0</cpu_usage_limit>\n  <max_ncpus_pct>50</max_ncpus_pct>\n</global_preferences>')
+                self.assertEqual(f.read(), '<global_preferences>\n  <niu_cpu_usage_limit>75.0</niu_cpu_usage_limit>\n  <niu_max_ncpus_pct>50</niu_max_ncpus_pct>\n</global_preferences>')
 
 if __name__ == '__main__':
     unittest.main()

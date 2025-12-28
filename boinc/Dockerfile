@@ -14,12 +14,20 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install boinc client
 # hadolint ignore=DL3008
 RUN apt-get update && \
-    apt-get install --no-install-recommends -y boinc-client \
+    apt-get install --no-install-recommends -y \
+    ca-certificates \
+    curl \
     python3-dict2xml \
+    docker-cli \
     libgl1 && \
+    ARCH=$(dpkg --print-architecture) && \
+    curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.8/boinc-client_8.2.8-3429_${ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
+    apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
+    rm -f /tmp/boinc-client.deb && \
+    apt-get remove -y curl && \
+    apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy operator

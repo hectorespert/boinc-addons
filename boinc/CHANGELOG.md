@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.0
+
+Install BOINC client from BOINC project releases instead of Debian version.
+Add Docker support to allow using Docker containers as applications in BOINC.
+
 ## 3.0.0
 
 Breaking: Drop support of armhf, armv7 and i386.
