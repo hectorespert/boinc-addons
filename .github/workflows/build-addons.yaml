@@ -49,7 +49,7 @@ jobs:
 
       - name: Login to GitHub Container Registry
         if: steps.check.outputs.build_arch == 'true' && inputs.test_mode == false
-        uses: docker/login-action@v3.6.0
+        uses: docker/login-action@v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
