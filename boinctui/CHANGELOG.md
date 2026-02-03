@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0
+
+Update base from Debian 13.2 to Debian 13.3
+
 ## 2.0.0
 
 Breaking: Drop support of armhf, armv7 and i386.
