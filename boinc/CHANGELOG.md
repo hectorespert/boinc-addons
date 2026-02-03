@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.0
+
+Update base from Debian 13.2 to Debian 13.3
+
 ## 3.1.0
 
 Install BOINC client from BOINC project releases instead of Debian version.
