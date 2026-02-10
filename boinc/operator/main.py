@@ -77,15 +77,13 @@ def configure_boinc_in_background():
         # Wait for BOINC client to initialize
         boinc_process_initialized = False
         while boinc_process.poll() is None and not boinc_process_initialized:
-            try:
-                boinc_process.wait(timeout=0.5)
-            except subprocess.TimeoutExpired:
-                pass
             boinc_process_initialized = get_state(data_folder)
             if boinc_process_initialized:
                 logging.debug(f'BOINC client initialized')
             else:
                 logging.debug(f'Waiting for BOINC client to initialize')
+                # Sleep briefly before next check if not initialized
+                sleep(0.5)
         
         # If process already terminated, exit thread
         if boinc_process.poll() is not None:
