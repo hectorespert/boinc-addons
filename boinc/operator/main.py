@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import subprocess
+import threading
 from time import sleep
 
 from boinc import build_boinc_command
@@ -67,27 +68,59 @@ signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGQUIT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-boinc_process_initialized = False
-while boinc_process.poll() is None and not boinc_process_initialized:
-    sleep(0.5)
-    boinc_process_initialized = get_state(data_folder)
-    if boinc_process_initialized:
-        logging.debug(f'BOINC client initialized')
-    else:
-        logging.debug(f'Waiting for BOINC client to initialize')
+# Flag to indicate if configuration thread should terminate the process
+should_terminate = threading.Event()
 
-projects_configured = configure_boinc_projects(data_folder, options.get('account_manager_url'), options.get('account_manager_username'), options.get('account_manager_password'))
-if not projects_configured:
-    boinc_process.send_signal(signal.SIGTERM)
-    boinc_process.wait()
+def configure_boinc_in_background():
+    """Background thread to wait for BOINC initialization and configure projects"""
+    try:
+        # Wait for BOINC client to initialize
+        boinc_process_initialized = False
+        while boinc_process.poll() is None and not boinc_process_initialized:
+            try:
+                boinc_process.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                pass
+            boinc_process_initialized = get_state(data_folder)
+            if boinc_process_initialized:
+                logging.debug(f'BOINC client initialized')
+            else:
+                logging.debug(f'Waiting for BOINC client to initialize')
+        
+        # If process already terminated, exit thread
+        if boinc_process.poll() is not None:
+            return
+        
+        # Configure BOINC projects
+        projects_configured = configure_boinc_projects(
+            data_folder,
+            options.get('account_manager_url'),
+            options.get('account_manager_username'),
+            options.get('account_manager_password')
+        )
+        
+        if not projects_configured:
+            logging.error('Failed to configure BOINC projects, terminating')
+            should_terminate.set()
+            boinc_process.send_signal(signal.SIGTERM)
+            return
+        
+        if args.exit_immediately:
+            logging.warning(f'Exiting immediately after BOINC client is started')
+            should_terminate.set()
+            boinc_process.send_signal(signal.SIGTERM)
+    except Exception as e:
+        logging.error(f'Error in configuration thread: {e}')
+        should_terminate.set()
+        if boinc_process.poll() is None:
+            boinc_process.send_signal(signal.SIGTERM)
 
-if args.exit_immediately:
-    logging.warning(f'Exiting immediately after BOINC client is started')
-    boinc_process.send_signal(signal.SIGTERM)
-    boinc_process.wait()
+# Start configuration in background thread
+config_thread = threading.Thread(target=configure_boinc_in_background, daemon=True)
+config_thread.start()
 
-while boinc_process.poll() is None:
-    sleep(0.5)
+# Main thread waits efficiently for process to exit
+boinc_process.wait()
 
 logging.debug(f'BOINC client stopped with code {boinc_process.returncode}')
 logging.info(f'BOINC Add-on Operator stopped')
