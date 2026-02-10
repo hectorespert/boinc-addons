@@ -78,7 +78,7 @@ if args.exit_immediately:
     # Wait for configuration to complete
     config_thread.join()
     if boinc_process.poll() is None:
-        logging.warning(f'Exiting immediately after BOINC client is configured')
+        logging.warning('Exiting immediately after BOINC client is configured')
         boinc_process.send_signal(signal.SIGTERM)
 
 # Main thread waits efficiently for process to exit
