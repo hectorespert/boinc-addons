@@ -5,15 +5,14 @@ import os
 import signal
 import subprocess
 import threading
-from time import sleep
 
 from boinc import build_boinc_command
-from boinccmd import configure_boinc_projects, get_state
 from cc_config import prepare_cc_config
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
 from gui_rpc_auth import prepare_gui_rpc_auth
 from remote_hosts import prepare_remote_hosts
+from startup import start_configuration_thread
 
 parser = argparse.ArgumentParser(prog='operator')
 
@@ -71,51 +70,16 @@ signal.signal(signal.SIGTERM, signal_handler)
 # Flag to indicate if configuration thread should terminate the process
 should_terminate = threading.Event()
 
-def configure_boinc_in_background():
-    """Background thread to wait for BOINC initialization and configure projects"""
-    try:
-        # Wait for BOINC client to initialize
-        boinc_process_initialized = False
-        while boinc_process.poll() is None and not boinc_process_initialized:
-            boinc_process_initialized = get_state(data_folder)
-            if boinc_process_initialized:
-                logging.debug(f'BOINC client initialized')
-            else:
-                logging.debug(f'Waiting for BOINC client to initialize')
-                # Sleep briefly before next check if not initialized
-                sleep(0.5)
-        
-        # If process already terminated, exit thread
-        if boinc_process.poll() is not None:
-            return
-        
-        # Configure BOINC projects
-        projects_configured = configure_boinc_projects(
-            data_folder,
-            options.get('account_manager_url'),
-            options.get('account_manager_username'),
-            options.get('account_manager_password')
-        )
-        
-        if not projects_configured:
-            logging.error('Failed to configure BOINC projects, terminating')
-            should_terminate.set()
-            boinc_process.send_signal(signal.SIGTERM)
-            return
-        
-        if args.exit_immediately:
-            logging.warning(f'Exiting immediately after BOINC client is started')
-            should_terminate.set()
-            boinc_process.send_signal(signal.SIGTERM)
-    except Exception as e:
-        logging.error(f'Error in configuration thread: {e}')
-        should_terminate.set()
-        if boinc_process.poll() is None:
-            boinc_process.send_signal(signal.SIGTERM)
-
 # Start configuration in background thread
-config_thread = threading.Thread(target=configure_boinc_in_background, daemon=True)
-config_thread.start()
+config_thread = start_configuration_thread(boinc_process, data_folder, options, should_terminate)
+
+# Handle exit_immediately flag in main thread
+if args.exit_immediately:
+    # Wait for configuration to complete
+    config_thread.join()
+    if boinc_process.poll() is None:
+        logging.warning(f'Exiting immediately after BOINC client is configured')
+        boinc_process.send_signal(signal.SIGTERM)
 
 # Main thread waits efficiently for process to exit
 boinc_process.wait()
