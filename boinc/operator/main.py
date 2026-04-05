@@ -86,8 +86,7 @@ if args.exit_immediately:
     boinc_process.send_signal(signal.SIGTERM)
     boinc_process.wait()
 
-while boinc_process.poll() is None:
-    sleep(0.5)
+boinc_process.wait()
 
 logging.debug(f'BOINC client stopped with code {boinc_process.returncode}')
 logging.info(f'BOINC Add-on Operator stopped')
