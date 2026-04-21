@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.4.0
+
+Update BOINC client from 8.2.9 to 8.2.11
+
 ## 3.3.0
 
 Update BOINC client from 8.2.8 to 8.2.9
