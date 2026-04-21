@@ -3,7 +3,6 @@
 ## 3.4.0
 
 Update BOINC client from 8.2.9 to 8.2.11
-Checked Debian base image updates: current Debian 13.4 is still the latest available.
 
 ## 3.3.0
 
