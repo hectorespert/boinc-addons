@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.5.0
+
+Update base from Debian 13.4 to Debian 13.5
+
 ## 3.4.0
 
 Update BOINC client from 8.2.9 to 8.2.11
