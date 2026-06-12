@@ -26,7 +26,7 @@ schema:
   max_ncpus: "float(0,100)?"
   cpu_usage_limit: "float(0,100)?"
 image: "ghcr.io/hectorespert/{arch}-addon-boinc"
-apparmor: false
+apparmor: true
 backup: cold
 map:
   - addon_config

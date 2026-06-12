@@ -1,0 +1,93 @@
+#include <tunables/global>
+
+profile boinc flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities
+  file,
+  signal (send) set=(kill,term,int,hup,cont),
+
+  # Bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+
+  # System binaries (Python3 operator, boinccmd, docker CLI)
+  /bin/** ix,
+  /usr/bin/** ix,
+  /usr/sbin/** ix,
+
+  # Python3 libraries and operator scripts
+  /usr/lib/python3*/** r,
+  /usr/local/lib/python3*/** r,
+  /opt/operator/** r,
+
+  # Access to options.json and BOINC data within the addon
+  /data/** rw,
+
+  # Addon config folder (global_prefs_override.xml symlink source)
+  /config/** rw,
+
+  # System info access required by host_pid and host_uts options
+  /proc/** r,
+  /sys/** r,
+
+  # Networking for BOINC GUI RPC and project server communication
+  network,
+
+  # Video and GPU access for accelerated scientific tasks
+  /dev/dri/** rw,
+  /dev/nvidia** rw,
+  /dev/tty rw,
+
+  # Shared memory
+  /dev/shm/** rwk,
+
+  # Runtime directory
+  /run/{,**} rwk,
+
+  # Docker socket (docker_api: true)
+  /run/docker.sock rw,
+  /var/run/docker.sock rw,
+
+  # System libraries
+  /lib/** mr,
+  /lib64/** mr,
+  /usr/lib/** mr,
+  /usr/local/lib/** mr,
+
+  # BOINC client sub-profile
+  /usr/bin/boinc cx -> boinc_client,
+
+  profile boinc_client flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+
+    # Receive signals from the operator
+    signal (receive) peer=*_boinc,
+    signal (send),
+
+    # BOINC downloads and executes arbitrary scientific applications from
+    # project and slot directories; broad file access is required
+    file,
+    network,
+
+    # System monitoring (host_pid) and hardware info
+    /proc/** r,
+    /sys/** r,
+
+    # GPU and device access for GPU-accelerated scientific tasks
+    /dev/** rw,
+
+    # Shared memory for inter-process communication
+    /dev/shm/** rwk,
+
+    # BOINC data: project downloads, running slots, and config files
+    /tmp/** rwmix,
+    /data/boinc/** rwmix,
+
+    # System libraries needed by downloaded scientific applications
+    /lib/** mr,
+    /lib64/** mr,
+    /usr/lib/** mr,
+    /usr/local/lib/** mr,
+  }
+}
