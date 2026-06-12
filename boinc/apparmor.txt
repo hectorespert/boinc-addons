@@ -24,8 +24,8 @@ profile boinc flags=(attach_disconnected,mediate_deleted) {
   # Access to options.json and BOINC data within the addon
   /data/** rw,
 
-  # Addon config folder (global_prefs_override.xml symlink source)
-  /config/** rw,
+  # Addon config folder (global_prefs_override.xml symlink source, read-only)
+  /config/** r,
 
   # System info access required by host_pid and host_uts options
   /proc/** r,
@@ -42,10 +42,7 @@ profile boinc flags=(attach_disconnected,mediate_deleted) {
   # Shared memory
   /dev/shm/** rwk,
 
-  # Runtime directory
-  /run/{,**} rwk,
-
-  # Docker socket (docker_api: true)
+  # Runtime directory (BOINC and Docker daemon communication)
   /run/docker.sock rw,
   /var/run/docker.sock rw,
 
@@ -75,7 +72,9 @@ profile boinc flags=(attach_disconnected,mediate_deleted) {
     /sys/** r,
 
     # GPU and device access for GPU-accelerated scientific tasks
-    /dev/** rw,
+    /dev/dri/** rw,
+    /dev/nvidia** rw,
+    /dev/tty rw,
 
     # Shared memory for inter-process communication
     /dev/shm/** rwk,
