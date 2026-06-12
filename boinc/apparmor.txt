@@ -1,6 +1,6 @@
 #include <tunables/global>
 
-profile boinc flags=(attach_disconnected,mediate_deleted) {
+profile boinc flags=(attach_disconnected,mediate_deleted,complain) {
   #include <abstractions/base>
 
   # Capabilities
@@ -55,7 +55,7 @@ profile boinc flags=(attach_disconnected,mediate_deleted) {
   # BOINC client sub-profile
   /usr/bin/boinc cx -> boinc_client,
 
-  profile boinc_client flags=(attach_disconnected,mediate_deleted) {
+  profile boinc_client flags=(attach_disconnected,mediate_deleted,complain) {
     #include <abstractions/base>
 
     # Receive signals from the operator
