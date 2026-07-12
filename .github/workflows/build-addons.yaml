@@ -51,29 +51,20 @@ jobs:
         if: steps.check.outputs.build_arch == 'true'
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
-        if: steps.check.outputs.build_arch == 'true' && inputs.test_mode == false
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Validate image attribute
-        if: steps.check.outputs.build_arch == 'true'
-        uses: mikefarah/yq@v4
-        with:
-          cmd: yq eval '.image' '${{ matrix.addon }}/config.yaml'
-
       - name: Build ${{ matrix.addon }} add-on
         if: steps.check.outputs.build_arch == 'true'
         uses: home-assistant/builder/actions/build-image@2026.06.0
         with:
           arch: ${{ matrix.arch }}
           image: ${{ steps.check.outputs.image }}
-          docker-hub: ghcr.io/${{ github.repository_owner }}
-          push: ${{ inputs.test_mode == false }}
+          image-tags: |
+            ${{ steps.info.outputs.version }}
+            latest
           version: ${{ steps.info.outputs.version }}
+          container-registry: ghcr.io
+          container-registry-username: ${{ github.repository_owner }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          push: ${{ inputs.test_mode == false && 'true' || 'false' }}
           cosign: true
 
       - name: Test boinc add-on
