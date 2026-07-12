@@ -1,1 +1,1 @@
-# Home Assistant Boinc Add-on Operator
+# Home Assistant Boinc App Operator
