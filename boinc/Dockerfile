@@ -14,6 +14,9 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Build arguments for architecture mapping
+ARG BUILD_ARCH=amd64
+
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
@@ -22,8 +25,12 @@ RUN apt-get update && \
     python3-dict2xml \
     docker-cli \
     libgl1 && \
-    ARCH=$(dpkg --print-architecture) && \
-    curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
+    case "${BUILD_ARCH}" in \
+        amd64) BOINC_ARCH="amd64" ;; \
+        aarch64) BOINC_ARCH="arm64" ;; \
+        *) BOINC_ARCH=$(dpkg --print-architecture) ;; \
+    esac && \
+    curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
     apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
     rm -f /tmp/boinc-client.deb && \
     apt-get remove -y curl && \
@@ -36,8 +43,7 @@ COPY operator/*.py /opt/operator/
 # Entrypoint & CMD
 ENTRYPOINT [ "python3", "/opt/operator/main.py", "--options", "/data/options.json", "--data", "/data/boinc", "--config", "/config" ]
 
-# Build arugments
-ARG BUILD_ARCH=amd64
+# Build arguments
 ARG BUILD_DATE
 ARG BUILD_REF
 ARG BUILD_VERSION
