@@ -60,7 +60,9 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           image: ${{ steps.check.outputs.image }}
-          image-tags: ${{ steps.info.outputs.version }} latest
+          image-tags: |
+            ${{ steps.info.outputs.version }}
+            latest
           version: ${{ steps.info.outputs.version }}
           container-registry: ghcr.io
           container-registry-username: ${{ github.repository_owner }}
