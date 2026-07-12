@@ -27,9 +27,8 @@ RUN apt-get update && \
     else \
       TTYD_ARCH="x86_64"; \
     fi && \
-    curl -L --retry 3 --retry-delay 2 -o /usr/local/bin/ttyd \
+    curl -fL -o /usr/local/bin/ttyd \
         "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.${TTYD_ARCH}" && \
-    test -f /usr/local/bin/ttyd || (echo "Failed to download ttyd" && exit 1) && \
     chmod +x /usr/local/bin/ttyd && \
     apt-get remove -y curl && \
     apt-get autoremove -y && \
