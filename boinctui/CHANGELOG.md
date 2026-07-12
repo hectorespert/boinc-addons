@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.1
+
+Update base from Debian 13.5 to Debian 13.6
+
 ## 2.3.0
 
 Update base from Debian 13.4 to Debian 13.5
