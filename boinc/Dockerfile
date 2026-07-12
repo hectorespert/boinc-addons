@@ -22,8 +22,13 @@ RUN apt-get update && \
     python3-dict2xml \
     docker-cli \
     libgl1 && \
-    ARCH=$(dpkg --print-architecture) && \
-    curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.11/boinc-client_8.2.11-4275_${ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
+    CONTAINER_ARCH=$(dpkg --print-architecture) && \
+    if [ "$CONTAINER_ARCH" = "arm64" ]; then \
+      BOINC_ARCH="arm64"; \
+    else \
+      BOINC_ARCH="$CONTAINER_ARCH"; \
+    fi && \
+    curl -fL "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
     apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
     rm -f /tmp/boinc-client.deb && \
     apt-get remove -y curl && \
@@ -36,23 +41,23 @@ COPY operator/*.py /opt/operator/
 # Entrypoint & CMD
 ENTRYPOINT [ "python3", "/opt/operator/main.py", "--options", "/data/options.json", "--data", "/data/boinc", "--config", "/config" ]
 
-# Build arugments
-ARG BUILD_ARCH=amd64
+# Build arguments
 ARG BUILD_DATE
 ARG BUILD_REF
 ARG BUILD_VERSION
+ARG BUILD_ARCH
 ARG BUILD_REPOSITORY
 
 # Labels
 LABEL \
-    io.hass.name="Home Assistant Boinc Add-on for ${BUILD_ARCH}" \
-    io.hass.description="Home Assistant Boinc Add-on for ${BUILD_ARCH}" \
-    io.hass.arch="${BUILD_ARCH}" \
+    io.hass.name="Home Assistant Boinc Add-on" \
+    io.hass.description="Home Assistant Boinc Add-on" \
+    io.hass.arch=${BUILD_ARCH} \
     io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
     maintainer="Hector Espert <hectorespertpardo@gmail.com>" \
-    org.opencontainers.image.title="Home Assistant Boinc Add-on for ${BUILD_ARCH}" \
-    org.opencontainers.image.description="Home Assistant Boinc Add-on for ${BUILD_ARCH}" \
+    org.opencontainers.image.title="Home Assistant Boinc Add-on" \
+    org.opencontainers.image.description="Home Assistant Boinc Add-on" \
     org.opencontainers.image.vendor="Home Assistant Boinc Add-ons" \
     org.opencontainers.image.authors="Hector Espert <hectorespertpardo@gmail.com>" \
     org.opencontainers.image.licenses="Apache2" \

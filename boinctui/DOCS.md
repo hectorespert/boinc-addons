@@ -1,12 +1,12 @@
-# Home Assistant boinctui Add-on
+# Home Assistant boinctui App
 
 ## Usage
 
-### Connecting to the BOINC Add-on
+### Connecting to the BOINC App
 
-To connect to the BOINC add-on, use the hostname shown on the add-on info page in Home Assistant.
+To connect to the BOINC app, use the hostname shown on the app info page in Home Assistant.
 
-Make sure to allow remote GUI RPC connections in your BOINC client settings. You need to add the boinctui add-on's hostname as a permitted remote host to enable the connection.
+Make sure to allow remote GUI RPC connections in your BOINC client settings. You need to add the boinctui app's hostname as a permitted remote host to enable the connection.
 
 ### Connecting to Other BOINC Clients
 

@@ -13,9 +13,6 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Build arguments for architecture mapping
-ARG BUILD_ARCH=amd64
-
 # Install runtime dependencies and download ttyd
 # hadolint ignore=DL3008,DL3003
 RUN apt-get update && \
@@ -24,17 +21,15 @@ RUN apt-get update && \
     ca-certificates \
     curl && \
     rm -rf /var/lib/apt/lists/* && \
-    # Map Home Assistant arch to ttyd release arch
-    case "${BUILD_ARCH}" in \
-        amd64) TTYD_ARCH="x86_64" ;; \
-        aarch64) TTYD_ARCH="aarch64" ;; \
-        *) echo "Unsupported architecture: ${BUILD_ARCH}" && exit 1 ;; \
-    esac && \
-    # Download ttyd binary from GitHub releases
-    curl -L -o /usr/local/bin/ttyd \
-        "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${TTYD_ARCH}" && \
+    CONTAINER_ARCH=$(dpkg --print-architecture) && \
+    if [ "$CONTAINER_ARCH" = "arm64" ]; then \
+      TTYD_ARCH="aarch64"; \
+    else \
+      TTYD_ARCH="x86_64"; \
+    fi && \
+    curl -fL -o /usr/local/bin/ttyd \
+        "https://github.com/tsl0922/ttyd/releases/download/1.7.7/ttyd.${TTYD_ARCH}" && \
     chmod +x /usr/local/bin/ttyd && \
-    # Clean up
     apt-get remove -y curl && \
     apt-get autoremove -y && \
     apt-get clean && \
@@ -54,18 +49,19 @@ ENTRYPOINT [ "/run.sh" ]
 ARG BUILD_DATE
 ARG BUILD_REF
 ARG BUILD_VERSION
+ARG BUILD_ARCH
 ARG BUILD_REPOSITORY
 
 # Labels
 LABEL \
-    io.hass.name="Home Assistant boinctui Add-on for ${BUILD_ARCH}" \
-    io.hass.description="Home Assistant boinctui Add-on for ${BUILD_ARCH}" \
-    io.hass.arch="${BUILD_ARCH}" \
+    io.hass.name="Home Assistant boinctui Add-on" \
+    io.hass.description="Home Assistant boinctui Add-on" \
+    io.hass.arch=${BUILD_ARCH} \
     io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
     maintainer="Hector Espert <hectorespertpardo@gmail.com>" \
-    org.opencontainers.image.title="Home Assistant boinctui Add-on for ${BUILD_ARCH}" \
-    org.opencontainers.image.description="Home Assistant boinctui Add-on for ${BUILD_ARCH}" \
+    org.opencontainers.image.title="Home Assistant boinctui Add-on" \
+    org.opencontainers.image.description="Home Assistant boinctui Add-on" \
     org.opencontainers.image.vendor="Hector Espert" \
     org.opencontainers.image.authors="Hector Espert <hectorespertpardo@gmail.com>" \
     org.opencontainers.image.licenses="Apache 2.0" \

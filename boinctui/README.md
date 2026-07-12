@@ -1,11 +1,11 @@
-# Home Assistant Add-on: boinctui
+# Home Assistant App: boinctui
 
 ![Supports aarch64 Architecture][aarch64-shield]
 ![Supports amd64 Architecture][amd64-shield]
 
 ## About
 
-boinctui is a fullscreen text mode manager for the BOINC client.
+boinctui is a fullscreen text mode manager for the BOINC client running on Home Assistant.
 
 It provides a terminal user interface (TUI) to manage and monitor BOINC projects and tasks.
 
