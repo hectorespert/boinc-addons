@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.6.0
+
+Update base from Debian 13.5 to Debian 13.6
+Update BOINC client from 8.2.11 to 8.2.15
+
 ## 3.5.0
 
 Update base from Debian 13.4 to Debian 13.5
