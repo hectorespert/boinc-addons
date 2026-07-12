@@ -14,58 +14,26 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Create installation script to handle architecture detection
-RUN cat > /tmp/install-boinc.sh << 'EOF'
-#!/bin/bash
-set -ex
-
-# Update package lists
-apt-get update
-
-# Install dependencies
-apt-get install --no-install-recommends -y \
+# hadolint ignore=DL3008
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
     ca-certificates \
     curl \
     python3-dict2xml \
     docker-cli \
-    libgl1
-
-# Detect architecture using dpkg
-CONTAINER_ARCH=$(dpkg --print-architecture)
-echo "Container architecture detected as: $CONTAINER_ARCH"
-
-# Map to BOINC package architecture name
-if [ "$CONTAINER_ARCH" = "arm64" ]; then
-    BOINC_ARCH="arm64"
-else
-    BOINC_ARCH="$CONTAINER_ARCH"
-fi
-
-echo "Will download BOINC package for architecture: $BOINC_ARCH"
-
-# Download and install BOINC client
-curl -fL "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" \
-    -o /tmp/boinc-client.deb
-
-if [ ! -f /tmp/boinc-client.deb ]; then
-    echo "ERROR: Failed to download BOINC client package"
-    exit 1
-fi
-
-apt-get install --no-install-recommends -y /tmp/boinc-client.deb
-rm -f /tmp/boinc-client.deb
-
-# Clean up
-apt-get remove -y curl
-apt-get autoremove -y
-rm -rf /var/lib/apt/lists/*
-
-echo "BOINC installation completed successfully for $BOINC_ARCH"
-EOF
-
-chmod +x /tmp/install-boinc.sh
-/tmp/install-boinc.sh
-rm /tmp/install-boinc.sh
+    libgl1 && \
+    CONTAINER_ARCH=$(dpkg --print-architecture) && \
+    if [ "$CONTAINER_ARCH" = "arm64" ]; then \
+      BOINC_ARCH="arm64"; \
+    else \
+      BOINC_ARCH="$CONTAINER_ARCH"; \
+    fi && \
+    curl -fL "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
+    apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
+    rm -f /tmp/boinc-client.deb && \
+    apt-get remove -y curl && \
+    apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy operator
 COPY operator/*.py /opt/operator/
