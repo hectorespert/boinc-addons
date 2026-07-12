@@ -45,12 +45,14 @@ ENTRYPOINT [ "python3", "/opt/operator/main.py", "--options", "/data/options.jso
 ARG BUILD_DATE
 ARG BUILD_REF
 ARG BUILD_VERSION
+ARG BUILD_ARCH
 ARG BUILD_REPOSITORY
 
 # Labels
 LABEL \
     io.hass.name="Home Assistant Boinc Add-on" \
     io.hass.description="Home Assistant Boinc Add-on" \
+    io.hass.arch=${BUILD_ARCH} \
     io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
     maintainer="Hector Espert <hectorespertpardo@gmail.com>" \
