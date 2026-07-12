@@ -71,6 +71,8 @@ jobs:
         with:
           arch: ${{ matrix.arch }}
           image: ${{ steps.check.outputs.image }}
+          dockerfile: ${{ matrix.addon }}/Dockerfile
+          build-context: ${{ matrix.addon }}
           image-tags: |
             ${{ fromJson(steps.info.outputs.version) }}
             latest
