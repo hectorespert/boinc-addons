@@ -54,6 +54,10 @@ jobs:
              echo "build_arch=false" >> $GITHUB_OUTPUT;
           fi
 
+      - name: Set up QEMU
+        if: steps.check.outputs.build_arch == 'true'
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         if: steps.check.outputs.build_arch == 'true'
         uses: docker/setup-buildx-action@v3
