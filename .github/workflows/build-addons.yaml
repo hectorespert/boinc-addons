@@ -78,7 +78,7 @@ jobs:
           container-registry-username: ${{ github.repository_owner }}
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
           push: ${{ inputs.test_mode == false && 'true' || 'false' }}
-          cosign: true
+          cosign: ${{ inputs.test_mode == false && 'true' || 'false' }}
 
       - name: Test boinc add-on
         if: matrix.addon == 'boinc' && steps.check.outputs.build_arch == 'true'
