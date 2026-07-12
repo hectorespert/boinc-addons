@@ -13,30 +13,56 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install runtime dependencies and download ttyd
-# hadolint ignore=DL3008,DL3003
-RUN apt-get update && \
-    apt-get install --no-install-recommends -y \
+# Create installation script to handle architecture detection
+RUN cat > /tmp/install-ttyd.sh << 'EOF'
+#!/bin/bash
+set -ex
+
+# Update and install base dependencies
+apt-get update
+apt-get install --no-install-recommends -y \
     boinctui \
     ca-certificates \
-    curl && \
-    rm -rf /var/lib/apt/lists/* && \
-    # Detect architecture inside container and map to ttyd release name
-    CONTAINER_ARCH=$(dpkg --print-architecture) && \
-    if [ "$CONTAINER_ARCH" = "arm64" ]; then \
-      TTYD_ARCH="aarch64"; \
-    else \
-      TTYD_ARCH="x86_64"; \
-    fi && \
-    echo "Downloading ttyd for architecture: $TTYD_ARCH" && \
-    curl -L -o /usr/local/bin/ttyd \
-        "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${TTYD_ARCH}" && \
-    chmod +x /usr/local/bin/ttyd && \
-    # Clean up
-    apt-get remove -y curl && \
-    apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    curl
+rm -rf /var/lib/apt/lists/*
+
+# Detect architecture using dpkg
+CONTAINER_ARCH=$(dpkg --print-architecture)
+echo "Container architecture detected as: $CONTAINER_ARCH"
+
+# Map to ttyd release architecture name
+if [ "$CONTAINER_ARCH" = "arm64" ]; then
+    TTYD_ARCH="aarch64"
+else
+    TTYD_ARCH="x86_64"
+fi
+
+echo "Will download ttyd for architecture: $TTYD_ARCH"
+
+# Download ttyd
+TTYD_VERSION="1.7.7"
+curl -fL -o /usr/local/bin/ttyd \
+    "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${TTYD_ARCH}"
+    
+if [ ! -f /usr/local/bin/ttyd ]; then
+    echo "ERROR: Failed to download ttyd binary"
+    exit 1
+fi
+
+chmod +x /usr/local/bin/ttyd
+
+# Clean up
+apt-get remove -y curl
+apt-get autoremove -y
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+
+echo "ttyd installation completed successfully for $TTYD_ARCH"
+EOF
+
+chmod +x /tmp/install-ttyd.sh
+/tmp/install-ttyd.sh
+rm /tmp/install-ttyd.sh
 
 # Create user with home in /data/boinctui
 RUN useradd -m -d /data/boinctui -s /bin/bash boinctui
