@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.2
+
+Fix image publishing to GitHub Container Registry
+
 ## 2.3.1
 
 Keep Debian 13.5 base (13.6 not yet published)

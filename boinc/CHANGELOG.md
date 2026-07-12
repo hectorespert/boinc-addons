@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.6.1
+
+Fix image publishing to GitHub Container Registry
+
 ## 3.6.0
 
 Update BOINC client from 8.2.11 to 8.2.15
