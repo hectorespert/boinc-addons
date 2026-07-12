@@ -41,7 +41,10 @@ jobs:
         run: |
           if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
              echo "build_arch=true" >> $GITHUB_OUTPUT;
-             echo "image=${{ steps.info.outputs.image }}" >> $GITHUB_OUTPUT;
+             # Replace {arch} placeholder with the actual architecture
+             image="${{ steps.info.outputs.image }}"
+             image="${image//\{arch\}/${{ matrix.arch }}}"
+             echo "image=$image" >> $GITHUB_OUTPUT;
            else
              echo "${{ matrix.arch }} is not a valid arch for ${{ matrix.addon }}, skipping build";
              echo "build_arch=false" >> $GITHUB_OUTPUT;
