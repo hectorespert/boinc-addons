@@ -24,12 +24,14 @@ RUN apt-get update && \
     ca-certificates \
     curl && \
     rm -rf /var/lib/apt/lists/* && \
+    export BUILDARCH=${BUILDARCH} && \
     # Map BUILDARCH to ttyd release architecture
     if [ "$BUILDARCH" = "arm64" ]; then \
       TTYD_ARCH="aarch64"; \
     else \
       TTYD_ARCH="x86_64"; \
     fi && \
+    echo "Building for BUILDARCH=${BUILDARCH}, TTYD_ARCH=${TTYD_ARCH}" && \
     curl -L -o /usr/local/bin/ttyd \
         "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${TTYD_ARCH}" && \
     chmod +x /usr/local/bin/ttyd && \
