@@ -28,7 +28,8 @@ RUN apt-get update && \
     else \
       BOINC_ARCH="$CONTAINER_ARCH"; \
     fi && \
-    curl -fL "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
+    curl -L --retry 3 --retry-delay 2 "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
+    test -f /tmp/boinc-client.deb || (echo "Failed to download BOINC client" && exit 1) && \
     apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
     rm -f /tmp/boinc-client.deb && \
     apt-get remove -y curl && \
