@@ -14,6 +14,9 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Declare BUILDARCH argument (set by buildx automatically)
+ARG BUILDARCH
+
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \

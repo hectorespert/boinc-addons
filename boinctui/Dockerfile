@@ -13,6 +13,9 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Declare BUILDARCH argument (set by buildx automatically)
+ARG BUILDARCH
+
 # Install runtime dependencies and download ttyd
 # hadolint ignore=DL3008,DL3003
 RUN apt-get update && \
