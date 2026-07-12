@@ -41,9 +41,12 @@ jobs:
         run: |
           if [[ "${{ steps.info.outputs.architectures }}" =~ ${{ matrix.arch }} ]]; then
              echo "build_arch=true" >> $GITHUB_OUTPUT;
-             # The builder action expects image WITHOUT {arch} placeholder
-             # Must substitute {arch} with actual architecture
+             # The builder action expects image name without registry
+             # Extract just the image name part (after the last /)
              image="${{ steps.info.outputs.image }}"
+             # Remove the registry part (ghcr.io/owner/)
+             image="${image##*/}"
+             # Replace {arch} placeholder with the actual architecture
              image="${image//\{arch\}/${{ matrix.arch }}}"
              echo "image=$image" >> $GITHUB_OUTPUT;
            else
