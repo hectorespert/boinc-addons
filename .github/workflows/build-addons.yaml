@@ -58,10 +58,8 @@ jobs:
         if: steps.check.outputs.build_arch == 'true'
         run: |
           echo "DEBUG: image = '${{ steps.check.outputs.image }}'"
-          echo "DEBUG: version = '${{ steps.info.outputs.version }}'"
-          echo "DEBUG: image-tags will be:"
-          echo "  ${{ steps.info.outputs.version }}"
-          echo "  latest"
+          echo "DEBUG: version (raw) = '${{ steps.info.outputs.version }}'"
+          echo "DEBUG: version (clean) = '$(echo '${{ steps.info.outputs.version }}' | jq -r)'"
 
       - name: Build ${{ matrix.addon }} add-on
         if: steps.check.outputs.build_arch == 'true'
@@ -70,9 +68,9 @@ jobs:
           arch: ${{ matrix.arch }}
           image: ${{ steps.check.outputs.image }}
           image-tags: |
-            ${{ steps.info.outputs.version }}
+            ${{ fromJson(steps.info.outputs.version) }}
             latest
-          version: ${{ steps.info.outputs.version }}
+          version: ${{ fromJson(steps.info.outputs.version) }}
           container-registry: ghcr.io
           container-registry-username: ${{ github.repository_owner }}
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
