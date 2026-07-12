@@ -62,13 +62,6 @@ jobs:
         if: steps.check.outputs.build_arch == 'true'
         uses: docker/setup-buildx-action@v3
 
-      - name: Debug image and version values
-        if: steps.check.outputs.build_arch == 'true'
-        run: |
-          echo "DEBUG: image = '${{ steps.check.outputs.image }}'"
-          echo "DEBUG: version (raw) = '${{ steps.info.outputs.version }}'"
-          echo "DEBUG: version (clean) = '$(echo '${{ steps.info.outputs.version }}' | jq -r)'"
-
       - name: Build ${{ matrix.addon }} add-on
         if: steps.check.outputs.build_arch == 'true'
         uses: home-assistant/builder/actions/build-image@2026.06.0
