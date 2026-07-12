@@ -1,14 +1,14 @@
-# Home Assistant BOINC Add-on
+# Home Assistant BOINC App
 
 [BOINC](https://boinc.berkeley.edu) is an open-source software platform for computing using volunteered resources.
 
-The BOINC add-on, running on your Home Assistant, downloads scientific computing jobs and runs them invisibly in the background.
+The BOINC app, running on your Home Assistant, downloads scientific computing jobs and runs them invisibly in the background.
 
 ## ⚠️ Important: Protection Mode
 
-**This add-on requires Protection Mode to be disabled.**
+**This app requires Protection Mode to be disabled.**
 
-Protection Mode must be turned off because the add-on needs to monitor system-wide CPU usage across all processes on the host system. This functionality is essential to automatically suspend BOINC computations when other applications need CPU resources, preventing BOINC from interfering with your Home Assistant instance or other critical services.
+Protection Mode must be turned off because the app needs to monitor system-wide CPU usage across all processes on the host system. This functionality is essential to automatically suspend BOINC computations when other applications need CPU resources, preventing BOINC from interfering with your Home Assistant instance or other critical services.
 
 **Security Note:** Disabling Protection Mode grants the container elevated access to host resources. Only enable this add-on if you understand and accept the security implications.
 
@@ -36,7 +36,7 @@ account_manager_password: "yoursecretpassword"
 
 [Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the add-on configuration and used to manage the BOINC client remotely.
 
-There is a boinctui add-on available for this purpose [here](https://github.com/hectorespert/boinc-addons/tree/main/boinctui).
+There is a boinctui app available for this purpose [here](https://github.com/hectorespert/boinc-addons/tree/main/boinctui).
 
 ## Configuration
 
