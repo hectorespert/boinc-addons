@@ -149,7 +149,7 @@ jobs:
           
           # Create multi-line post text
           cat << EOF > /tmp/bluesky_post.txt
-          #HomeAssistant add-ons for #BOINC
+          #HomeAssistant apps for #BOINC
           
           Contribute to scientific research projects from your Home Assistant instance.
           
