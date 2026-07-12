@@ -73,6 +73,8 @@ jobs:
           image: ${{ steps.check.outputs.image }}
           file: ${{ matrix.addon }}/Dockerfile
           context: ${{ matrix.addon }}
+          build-args: |
+            BUILD_ARCH=${{ matrix.arch }}
           image-tags: |
             ${{ fromJson(steps.info.outputs.version) }}
             latest

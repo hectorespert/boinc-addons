@@ -13,6 +13,9 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# Build arguments for architecture mapping
+ARG BUILD_ARCH=amd64
+
 # Install runtime dependencies and download ttyd
 # hadolint ignore=DL3008,DL3003
 RUN apt-get update && \
@@ -21,11 +24,11 @@ RUN apt-get update && \
     ca-certificates \
     curl && \
     rm -rf /var/lib/apt/lists/* && \
-    # Map buildx architecture to ttyd release arch
-    case "${BUILDARCH}" in \
+    # Map Home Assistant arch to ttyd release arch
+    case "${BUILD_ARCH}" in \
         amd64) TTYD_ARCH="x86_64" ;; \
-        arm64) TTYD_ARCH="aarch64" ;; \
-        *) echo "Unsupported architecture: ${BUILDARCH}" && exit 1 ;; \
+        aarch64) TTYD_ARCH="aarch64" ;; \
+        *) echo "Unsupported architecture: ${BUILD_ARCH}" && exit 1 ;; \
     esac && \
     # Download ttyd binary from GitHub releases
     curl -L -o /usr/local/bin/ttyd \
