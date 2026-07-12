@@ -14,9 +14,6 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Declare BUILDARCH argument (set by buildx automatically)
-ARG BUILDARCH
-
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
@@ -25,14 +22,14 @@ RUN apt-get update && \
     python3-dict2xml \
     docker-cli \
     libgl1 && \
-    export BUILDARCH=${BUILDARCH} && \
-    # Map BUILDARCH to BOINC package architecture
-    if [ "$BUILDARCH" = "arm64" ]; then \
+    # Detect architecture inside container and map to BOINC package name
+    CONTAINER_ARCH=$(dpkg --print-architecture) && \
+    if [ "$CONTAINER_ARCH" = "arm64" ]; then \
       BOINC_ARCH="arm64"; \
     else \
-      BOINC_ARCH="$BUILDARCH"; \
+      BOINC_ARCH="$CONTAINER_ARCH"; \
     fi && \
-    echo "Building for BUILDARCH=${BUILDARCH}, BOINC_ARCH=${BOINC_ARCH}" && \
+    echo "Installing BOINC for architecture: $BOINC_ARCH" && \
     curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
     apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
     rm -f /tmp/boinc-client.deb && \
@@ -54,14 +51,13 @@ ARG BUILD_REPOSITORY
 
 # Labels
 LABEL \
-    io.hass.name="Home Assistant Boinc Add-on for ${BUILDARCH}" \
-    io.hass.description="Home Assistant Boinc Add-on for ${BUILDARCH}" \
-    io.hass.arch="${BUILDARCH}" \
+    io.hass.name="Home Assistant Boinc Add-on" \
+    io.hass.description="Home Assistant Boinc Add-on" \
     io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
     maintainer="Hector Espert <hectorespertpardo@gmail.com>" \
-    org.opencontainers.image.title="Home Assistant Boinc Add-on for ${BUILDARCH}" \
-    org.opencontainers.image.description="Home Assistant Boinc Add-on for ${BUILDARCH}" \
+    org.opencontainers.image.title="Home Assistant Boinc Add-on" \
+    org.opencontainers.image.description="Home Assistant Boinc Add-on" \
     org.opencontainers.image.vendor="Home Assistant Boinc Add-ons" \
     org.opencontainers.image.authors="Hector Espert <hectorespertpardo@gmail.com>" \
     org.opencontainers.image.licenses="Apache2" \

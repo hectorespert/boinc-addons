@@ -13,9 +13,6 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Declare BUILDARCH argument (set by buildx automatically)
-ARG BUILDARCH
-
 # Install runtime dependencies and download ttyd
 # hadolint ignore=DL3008,DL3003
 RUN apt-get update && \
@@ -24,14 +21,14 @@ RUN apt-get update && \
     ca-certificates \
     curl && \
     rm -rf /var/lib/apt/lists/* && \
-    export BUILDARCH=${BUILDARCH} && \
-    # Map BUILDARCH to ttyd release architecture
-    if [ "$BUILDARCH" = "arm64" ]; then \
+    # Detect architecture inside container and map to ttyd release name
+    CONTAINER_ARCH=$(dpkg --print-architecture) && \
+    if [ "$CONTAINER_ARCH" = "arm64" ]; then \
       TTYD_ARCH="aarch64"; \
     else \
       TTYD_ARCH="x86_64"; \
     fi && \
-    echo "Building for BUILDARCH=${BUILDARCH}, TTYD_ARCH=${TTYD_ARCH}" && \
+    echo "Downloading ttyd for architecture: $TTYD_ARCH" && \
     curl -L -o /usr/local/bin/ttyd \
         "https://github.com/tsl0922/ttyd/releases/download/${TTYD_VERSION}/ttyd.${TTYD_ARCH}" && \
     chmod +x /usr/local/bin/ttyd && \
@@ -59,14 +56,13 @@ ARG BUILD_REPOSITORY
 
 # Labels
 LABEL \
-    io.hass.name="Home Assistant boinctui Add-on for ${BUILDARCH}" \
-    io.hass.description="Home Assistant boinctui Add-on for ${BUILDARCH}" \
-    io.hass.arch="${BUILDARCH}" \
+    io.hass.name="Home Assistant boinctui Add-on" \
+    io.hass.description="Home Assistant boinctui Add-on" \
     io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
     maintainer="Hector Espert <hectorespertpardo@gmail.com>" \
-    org.opencontainers.image.title="Home Assistant boinctui Add-on for ${BUILDARCH}" \
-    org.opencontainers.image.description="Home Assistant boinctui Add-on for ${BUILDARCH}" \
+    org.opencontainers.image.title="Home Assistant boinctui Add-on" \
+    org.opencontainers.image.description="Home Assistant boinctui Add-on" \
     org.opencontainers.image.vendor="Hector Espert" \
     org.opencontainers.image.authors="Hector Espert <hectorespertpardo@gmail.com>" \
     org.opencontainers.image.licenses="Apache 2.0" \
