@@ -1,4 +1,4 @@
-ARG BUILD_FROM="amd64/debian:13.5-slim"
+ARG BUILD_FROM="amd64/debian:13.6-slim"
 
 # hadolint ignore=DL3006
 FROM $BUILD_FROM
@@ -23,7 +23,7 @@ RUN apt-get update && \
     docker-cli \
     libgl1 && \
     ARCH=$(dpkg --print-architecture) && \
-    curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.11/boinc-client_8.2.11-4275_${ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
+    curl -L "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4275_${ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
     apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
     rm -f /tmp/boinc-client.deb && \
     apt-get remove -y curl && \
