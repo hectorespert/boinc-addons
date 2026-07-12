@@ -52,14 +52,14 @@ ARG BUILD_REPOSITORY
 
 # Labels
 LABEL \
-    io.hass.name="Home Assistant Boinc Add-on for ${BUILD_ARCH}" \
-    io.hass.description="Home Assistant Boinc Add-on for ${BUILD_ARCH}" \
-    io.hass.arch="${BUILD_ARCH}" \
+    io.hass.name="Home Assistant Boinc Add-on for ${BUILDARCH}" \
+    io.hass.description="Home Assistant Boinc Add-on for ${BUILDARCH}" \
+    io.hass.arch="${BUILDARCH}" \
     io.hass.type="addon" \
     io.hass.version=${BUILD_VERSION} \
     maintainer="Hector Espert <hectorespertpardo@gmail.com>" \
-    org.opencontainers.image.title="Home Assistant Boinc Add-on for ${BUILD_ARCH}" \
-    org.opencontainers.image.description="Home Assistant Boinc Add-on for ${BUILD_ARCH}" \
+    org.opencontainers.image.title="Home Assistant Boinc Add-on for ${BUILDARCH}" \
+    org.opencontainers.image.description="Home Assistant Boinc Add-on for ${BUILDARCH}" \
     org.opencontainers.image.vendor="Home Assistant Boinc Add-ons" \
     org.opencontainers.image.authors="Hector Espert <hectorespertpardo@gmail.com>" \
     org.opencontainers.image.licenses="Apache2" \
