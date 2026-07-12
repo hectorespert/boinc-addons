@@ -10,21 +10,21 @@ The BOINC app, running on your Home Assistant, downloads scientific computing jo
 
 Protection Mode must be turned off because the app needs to monitor system-wide CPU usage across all processes on the host system. This functionality is essential to automatically suspend BOINC computations when other applications need CPU resources, preventing BOINC from interfering with your Home Assistant instance or other critical services.
 
-**Security Note:** Disabling Protection Mode grants the container elevated access to host resources. Only enable this add-on if you understand and accept the security implications.
+**Security Note:** Disabling Protection Mode grants the container elevated access to host resources. Only enable this app if you understand and accept the security implications.
 
 ## How to use
 
 ### Account Manager (Easy)
 
-The easy way to use this add-on is to attach the BOINC client to a [BOINC Account Manager](https://boinc.berkeley.edu/wiki/Account_managers).
+The easy way to use this app is to attach the BOINC client to a [BOINC Account Manager](https://boinc.berkeley.edu/wiki/Account_managers).
 
 [Science United](https://scienceunited.org) is recommended to simplify the process of starting computing.
 
-If you do not have an account created in an [account manager](https://boinc.berkeley.edu/wiki/Account_managers), you need to create it and use the same username and password in the add-on configuration.
+If you do not have an account created in an [account manager](https://boinc.berkeley.edu/wiki/Account_managers), you need to create it and use the same username and password in the app configuration.
 
 For example, in [Science United](https://scienceunited.org), you could sign up on this page: [Join Science United](https://scienceunited.org/su_join.php).
 
-After creating the account, set the URL of the account manager, your user and your password in the add-on configuration or edit the YAML configuration.
+After creating the account, set the URL of the account manager, your user and your password in the app configuration or edit the YAML configuration.
 
 ```yaml
 account_manager_url: "https://scienceunited.org"
@@ -34,7 +34,7 @@ account_manager_password: "yoursecretpassword"
 
 ### Remote Control (Advanced)
 
-[Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the add-on configuration and used to manage the BOINC client remotely.
+[Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the app configuration and used to manage the BOINC client remotely.
 
 There is a boinctui app available for this purpose [here](https://github.com/hectorespert/boinc-addons/tree/main/boinctui).
 
@@ -151,4 +151,4 @@ cpu_usage_limit: 75
 
 ### Global Preferences Override
 
-To override the preferences of the BOINC client, a `global_preferences_override.xml` file can be defined in the add-on config folder: [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOverride)
+To override the preferences of the BOINC client, a `global_preferences_override.xml` file can be defined in the app config folder: [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOverride)
