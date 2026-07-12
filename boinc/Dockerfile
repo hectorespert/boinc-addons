@@ -23,15 +23,19 @@ RUN apt-get update && \
     docker-cli \
     libgl1 && \
     CONTAINER_ARCH=$(dpkg --print-architecture) && \
+    echo "Container detected architecture: $CONTAINER_ARCH" && \
     if [ "$CONTAINER_ARCH" = "arm64" ]; then \
       BOINC_ARCH="arm64"; \
     else \
       BOINC_ARCH="$CONTAINER_ARCH"; \
     fi && \
-    curl -L --retry 3 --retry-delay 2 "https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" -o /tmp/boinc-client.deb && \
-    test -f /tmp/boinc-client.deb || (echo "Failed to download BOINC client" && exit 1) && \
+    echo "Will download BOINC package for: $BOINC_ARCH" && \
+    DOWNLOAD_URL="https://github.com/BOINC/boinc/releases/download/client_release%2F8.2%2F8.2.15/boinc-client_8.2.15-4612_${BOINC_ARCH}_trixie.deb" && \
+    echo "Download URL: $DOWNLOAD_URL" && \
+    curl -L -v --retry 3 --retry-delay 2 "$DOWNLOAD_URL" -o /tmp/boinc-client.deb 2>&1 | tee /tmp/curl-log.txt && \
+    test -f /tmp/boinc-client.deb && echo "Download successful" || (echo "Download failed" && cat /tmp/curl-log.txt && exit 1) && \
     apt-get install --no-install-recommends -y /tmp/boinc-client.deb && \
-    rm -f /tmp/boinc-client.deb && \
+    rm -f /tmp/boinc-client.deb /tmp/curl-log.txt && \
     apt-get remove -y curl && \
     apt-get autoremove -y && \
     rm -rf /var/lib/apt/lists/*
