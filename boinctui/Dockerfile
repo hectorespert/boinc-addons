@@ -1,4 +1,4 @@
-ARG BUILD_FROM="amd64/debian:trixie-slim"
+ARG BUILD_FROM="amd64/debian:13.5-slim"
 
 # hadolint ignore=DL3006
 FROM $BUILD_FROM
