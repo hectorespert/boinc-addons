@@ -107,7 +107,7 @@ jobs:
         uses: home-assistant/builder/actions/build-image@2026.06.0
         with:
           arch: ${{ matrix.arch }}
-          image: ${{ matrix.image }}
+          image: ${{ matrix.registry_prefix }}/${{ matrix.arch }}-${{ matrix.image_name }}
           context: "./${{ matrix.addon }}"
           image-tags: |
             ${{ matrix.version }}
@@ -128,9 +128,9 @@ jobs:
         working-directory: boinc
         run: |
           if [[ "${{ inputs.test_mode }}" == "true" ]]; then
-            IMAGE_TAG="${{ matrix.image }}:latest"
+            IMAGE_TAG="${{ matrix.registry_prefix }}/${{ matrix.arch }}-${{ matrix.image_name }}:latest"
           else
-            IMAGE_TAG="${{ matrix.image }}:${{ matrix.version }}"
+            IMAGE_TAG="${{ matrix.registry_prefix }}/${{ matrix.arch }}-${{ matrix.image_name }}:${{ matrix.version }}"
           fi
 
           docker run --uts=host --pid=host --rm \
