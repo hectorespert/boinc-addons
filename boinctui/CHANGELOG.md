@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.4
+
+Bump version to next patch
+
 ## 2.3.3
 
 Fix problem downloading ARM images
