@@ -2,7 +2,7 @@
 
 ## 3.6.3
 
-Bump version to next patch
+Maintenance update with minor improvements
 
 ## 3.6.2
 

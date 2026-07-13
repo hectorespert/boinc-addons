@@ -2,7 +2,7 @@
 
 ## 2.3.4
 
-Bump version to next patch
+Maintenance update with minor improvements
 
 ## 2.3.3
 
