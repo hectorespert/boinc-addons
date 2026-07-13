@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.3
+
+Align build workflow with Home Assistant apps-example:
+add prepare job with dynamic matrix generation,
+add image labels, pin action versions, add persist-credentials
+
 ## 2.3.2
 
 Fix image publishing to GitHub Container Registry
