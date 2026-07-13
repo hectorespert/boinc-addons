@@ -2,9 +2,7 @@
 
 ## 3.6.2
 
-Align build workflow with Home Assistant apps-example:
-add prepare job with dynamic matrix generation,
-add image labels, pin action versions, add persist-credentials
+Fix problem downloading ARM images
 
 ## 3.6.1
 

@@ -2,9 +2,7 @@
 
 ## 2.3.3
 
-Align build workflow with Home Assistant apps-example:
-add prepare job with dynamic matrix generation,
-add image labels, pin action versions, add persist-credentials
+Fix problem downloading ARM images
 
 ## 2.3.2
 
