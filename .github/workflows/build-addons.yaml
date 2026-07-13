@@ -15,77 +15,78 @@ on:
 
 jobs:
   prepare:
-    name: Prepare ${{ matrix.addon }}
+    name: Prepare build matrix
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        addon: ${{ fromJson(inputs.changed_addons) }}
     outputs:
-      build_matrix: ${{ steps.combine.outputs.matrix }}
+      build_matrix: ${{ steps.aggregate.outputs.matrix }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.0
 
-      - name: Get add-on information
-        id: info
-        uses: home-assistant/actions/helpers/info@master
-        with:
-          path: "./${{ matrix.addon }}"
-
-      - name: Normalize add-on information
-        id: normalize
+      - name: Build combined matrix for all add-ons
+        id: aggregate
         run: |
-          image=${{ steps.info.outputs.image }}
-          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
-          echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
-          version=${{ steps.info.outputs.version }}
-          echo "version=${version}" >> "$GITHUB_OUTPUT"
-          name=${{ steps.info.outputs.name }}
-          echo "name=${name}" >> "$GITHUB_OUTPUT"
-          description=${{ steps.info.outputs.description }}
-          echo "description=${description}" >> "$GITHUB_OUTPUT"
-          url=${{ steps.info.outputs.url }}
-          if [[ -n "$url" && "$url" != "null" ]]; then
-            echo "url=${url}" >> "$GITHUB_OUTPUT"
-          fi
+          CHANGED_ADDONS='${{ inputs.changed_addons }}'
+          COMBINED_INCLUDES="[]"
 
-      - name: Prepare build matrix
-        id: matrix
-        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@2026.06.0
-        with:
-          architectures: ${{ steps.info.outputs.architectures }}
-          image-name: ${{ steps.normalize.outputs.image_name }}
-          registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
+          for ADDON in $(echo "$CHANGED_ADDONS" | jq -r '.[]'); do
+            echo "::group::Processing ${ADDON}"
 
-      - name: Combine matrix with addon metadata
-        id: combine
-        run: |
-          MATRIX='${{ steps.matrix.outputs.matrix }}'
-          ADDON='${{ matrix.addon }}'
-          VERSION='${{ steps.normalize.outputs.version }}'
-          NAME='${{ steps.normalize.outputs.name }}'
-          DESCRIPTION='${{ steps.normalize.outputs.description }}'
-          URL='${{ steps.normalize.outputs.url }}'
-          IMAGE_NAME='${{ steps.normalize.outputs.image_name }}'
-          REGISTRY_PREFIX='${{ steps.normalize.outputs.registry_prefix }}'
-          ARCHITECTURES='${{ steps.info.outputs.architectures }}'
+            # Get add-on information using config.yaml
+            CONFIG="./${ADDON}/config.yaml"
+            BUILD_CONFIG="./${ADDON}/build.yaml"
 
-          # Add addon metadata to each matrix entry
-          ENHANCED_MATRIX=$(echo "$MATRIX" | jq -c \
-            --arg addon "$ADDON" \
-            --arg version "$VERSION" \
-            --arg name "$NAME" \
-            --arg description "$DESCRIPTION" \
-            --arg url "$URL" \
-            --arg image_name "$IMAGE_NAME" \
-            --arg registry_prefix "$REGISTRY_PREFIX" \
-            --arg architectures "$ARCHITECTURES" \
-            '.include |= map(. + {addon: $addon, version: $version, name: $name, description: $description, url: $url, image_name: $image_name, registry_prefix: $registry_prefix, architectures: $architectures})')
+            # Extract info from config.yaml
+            VERSION=$(yq e '.version' "$CONFIG")
+            NAME=$(yq e '.name' "$CONFIG")
+            DESCRIPTION=$(yq e '.description' "$CONFIG")
+            URL=$(yq e '.url // ""' "$CONFIG")
+            IMAGE=$(yq e '.image' "$CONFIG")
+            ARCHITECTURES=$(yq e '.arch' "$CONFIG" -o=json)
 
-          echo "matrix=$ENHANCED_MATRIX" >> "$GITHUB_OUTPUT"
+            IMAGE_NAME="${IMAGE##*/}"
+            REGISTRY_PREFIX="${IMAGE%/*}"
+
+            if [[ -z "$URL" || "$URL" == "null" ]]; then
+              URL=""
+            fi
+
+            # Build matrix entries for each architecture
+            for ARCH in $(echo "$ARCHITECTURES" | jq -r '.[]'); do
+              case "${ARCH}" in
+                amd64)    OS="ubuntu-latest" ; PLATFORM="linux/amd64" ;;
+                aarch64)  OS="ubuntu-latest" ; PLATFORM="linux/arm64" ;;
+                *)        echo "::warning::Unknown arch ${ARCH}, skipping"; continue ;;
+              esac
+
+              IMAGE_TAG="${REGISTRY_PREFIX}/${IMAGE_NAME}"
+
+              ENTRY=$(jq -nc \
+                --arg arch "$ARCH" \
+                --arg os "$OS" \
+                --arg image "$IMAGE_TAG" \
+                --arg addon "$ADDON" \
+                --arg version "$VERSION" \
+                --arg name "$NAME" \
+                --arg description "$DESCRIPTION" \
+                --arg url "$URL" \
+                --arg image_name "$IMAGE_NAME" \
+                --arg registry_prefix "$REGISTRY_PREFIX" \
+                --arg architectures "$ARCHITECTURES" \
+                '{arch: $arch, os: $os, image: $image, addon: $addon, version: $version, name: $name, description: $description, url: $url, image_name: $image_name, registry_prefix: $registry_prefix, architectures: $architectures}')
+
+              COMBINED_INCLUDES=$(echo "$COMBINED_INCLUDES" | jq -c --argjson entry "$ENTRY" '. + [$entry]')
+            done
+
+            echo "::endgroup::"
+          done
+
+          MATRIX=$(jq -nc --argjson includes "$COMBINED_INCLUDES" '{include: $includes}')
+          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
+          echo "Combined matrix: $MATRIX"
 
   build:
-    name: Build ${{ matrix.arch }} ${{ matrix.addon }} add-on
+    name: Build ${{ matrix.addon }} add-on (${{ matrix.arch }})
     needs: prepare
     runs-on: ${{ matrix.os }}
     permissions:
@@ -140,7 +141,7 @@ jobs:
             --exit-immediately true
 
   manifest:
-    name: Publish ${{ matrix.addon }} multi-arch manifest
+    name: Publish multi-arch manifest (${{ matrix.addon }})
     if: ${{ inputs.test_mode == false }}
     needs: [prepare, build]
     runs-on: ubuntu-latest
