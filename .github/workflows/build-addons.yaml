@@ -1,98 +1,73 @@
-name: Build Add-ons
+name: Build Add-on
 
 on:
   workflow_call:
     inputs:
-      changed_addons:
-        description: 'JSON array of add-ons to build'
+      addon:
+        description: 'Add-on directory to build'
         required: true
         type: string
-      test_mode:
-        description: 'Build in test mode (do not publish)'
-        required: false
+      publish:
+        description: 'Whether to publish images to registry'
+        required: true
         type: boolean
-        default: false
 
 jobs:
   prepare:
-    name: Prepare build matrix
+    name: Prepare
     runs-on: ubuntu-latest
     outputs:
-      build_matrix: ${{ steps.aggregate.outputs.matrix }}
+      architectures: ${{ steps.info.outputs.architectures }}
+      build_matrix: ${{ steps.matrix.outputs.matrix }}
+      image_name: ${{ steps.normalize.outputs.image_name }}
+      name: ${{ steps.normalize.outputs.name }}
+      description: ${{ steps.normalize.outputs.description }}
+      url: ${{ steps.normalize.outputs.url }}
+      registry_prefix: ${{ steps.normalize.outputs.registry_prefix }}
+      version: ${{ steps.normalize.outputs.version }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7.0.0
 
-      - name: Build combined matrix for all add-ons
-        id: aggregate
+      - name: Get add-on information
+        id: info
+        uses: home-assistant/actions/helpers/info@master
+        with:
+          path: "./${{ inputs.addon }}"
+
+      - name: Normalize add-on information
+        id: normalize
         run: |
-          CHANGED_ADDONS='${{ inputs.changed_addons }}'
-          COMBINED_INCLUDES="[]"
+          image=${{ steps.info.outputs.image }}
+          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
+          echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
+          version=${{ steps.info.outputs.version }}
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          name=${{ steps.info.outputs.name }}
+          echo "name=${name}" >> "$GITHUB_OUTPUT"
+          description=${{ steps.info.outputs.description }}
+          echo "description=${description}" >> "$GITHUB_OUTPUT"
+          url=${{ steps.info.outputs.url }}
+          if [[ -n "$url" && "$url" != "null" ]]; then
+            echo "url=${url}" >> "$GITHUB_OUTPUT"
+          fi
 
-          for ADDON in $(echo "$CHANGED_ADDONS" | jq -r '.[]'); do
-            echo "::group::Processing ${ADDON}"
-
-            # Get add-on information using config.yaml
-            CONFIG="./${ADDON}/config.yaml"
-            BUILD_CONFIG="./${ADDON}/build.yaml"
-
-            # Extract info from config.yaml
-            VERSION=$(yq e '.version' "$CONFIG")
-            NAME=$(yq e '.name' "$CONFIG")
-            DESCRIPTION=$(yq e '.description' "$CONFIG")
-            URL=$(yq e '.url // ""' "$CONFIG")
-            IMAGE=$(yq e '.image' "$CONFIG")
-            ARCHITECTURES=$(yq e '.arch' "$CONFIG" -o=json)
-
-            IMAGE_NAME="${IMAGE##*/}"
-            REGISTRY_PREFIX="${IMAGE%/*}"
-
-            if [[ -z "$URL" || "$URL" == "null" ]]; then
-              URL=""
-            fi
-
-            # Build matrix entries for each architecture
-            for ARCH in $(echo "$ARCHITECTURES" | jq -r '.[]'); do
-              case "${ARCH}" in
-                amd64)    OS="ubuntu-latest" ; PLATFORM="linux/amd64" ;;
-                aarch64)  OS="ubuntu-latest" ; PLATFORM="linux/arm64" ;;
-                *)        echo "::warning::Unknown arch ${ARCH}, skipping"; continue ;;
-              esac
-
-              IMAGE_TAG="${REGISTRY_PREFIX}/${IMAGE_NAME}"
-
-              ENTRY=$(jq -nc \
-                --arg arch "$ARCH" \
-                --arg os "$OS" \
-                --arg image "$IMAGE_TAG" \
-                --arg addon "$ADDON" \
-                --arg version "$VERSION" \
-                --arg name "$NAME" \
-                --arg description "$DESCRIPTION" \
-                --arg url "$URL" \
-                --arg image_name "$IMAGE_NAME" \
-                --arg registry_prefix "$REGISTRY_PREFIX" \
-                --arg architectures "$ARCHITECTURES" \
-                '{arch: $arch, os: $os, image: $image, addon: $addon, version: $version, name: $name, description: $description, url: $url, image_name: $image_name, registry_prefix: $registry_prefix, architectures: $architectures}')
-
-              COMBINED_INCLUDES=$(echo "$COMBINED_INCLUDES" | jq -c --argjson entry "$ENTRY" '. + [$entry]')
-            done
-
-            echo "::endgroup::"
-          done
-
-          MATRIX=$(jq -nc --argjson includes "$COMBINED_INCLUDES" '{include: $includes}')
-          echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "Combined matrix: $MATRIX"
+      - name: Prepare build matrix
+        id: matrix
+        uses: home-assistant/builder/actions/prepare-multi-arch-matrix@2026.06.0
+        with:
+          architectures: ${{ steps.info.outputs.architectures }}
+          image-name: ${{ steps.normalize.outputs.image_name }}
+          registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
 
   build:
-    name: Build ${{ matrix.addon }} add-on (${{ matrix.arch }})
+    name: Build ${{ matrix.arch }} ${{ inputs.addon }} add-on
     needs: prepare
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      packages: write
       id-token: write
+      packages: write
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.prepare.outputs.build_matrix) }}
@@ -103,34 +78,34 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Build ${{ matrix.addon }} add-on
+      - name: Build add-on image
         uses: home-assistant/builder/actions/build-image@2026.06.0
         with:
           arch: ${{ matrix.arch }}
+          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
+          context: "./${{ inputs.addon }}"
           image: ${{ matrix.image }}
-          context: "./${{ matrix.addon }}"
           image-tags: |
-            ${{ matrix.version }}
+            ${{ needs.prepare.outputs.version }}
             latest
           labels: |
             io.hass.type=addon
-            io.hass.name=${{ matrix.name }}
-            io.hass.description=${{ matrix.description }}
-            ${{ matrix.url && format('io.hass.url={0}', matrix.url) || '' }}
-          version: ${{ matrix.version }}
-          container-registry-password: ${{ secrets.GITHUB_TOKEN }}
-          push: ${{ inputs.test_mode == false && 'true' || 'false' }}
-          load: ${{ inputs.test_mode == true && 'true' || 'false' }}
-          cosign: ${{ inputs.test_mode == false && 'true' || 'false' }}
+            io.hass.name=${{ needs.prepare.outputs.name }}
+            io.hass.description=${{ needs.prepare.outputs.description }}
+            ${{ needs.prepare.outputs.url && format('io.hass.url={0}', needs.prepare.outputs.url) || '' }}
+          push: ${{ inputs.publish }}
+          load: ${{ inputs.publish == false }}
+          cosign: ${{ inputs.publish }}
+          version: ${{ needs.prepare.outputs.version }}
 
       - name: Test boinc add-on
-        if: matrix.addon == 'boinc'
+        if: inputs.addon == 'boinc'
         working-directory: boinc
         run: |
-          if [[ "${{ inputs.test_mode }}" == "true" ]]; then
+          if [[ "${{ inputs.publish }}" == "false" ]]; then
             IMAGE_TAG="${{ matrix.image }}:latest"
           else
-            IMAGE_TAG="${{ matrix.image }}:${{ matrix.version }}"
+            IMAGE_TAG="${{ matrix.image }}:${{ needs.prepare.outputs.version }}"
           fi
 
           docker run --uts=host --pid=host --rm \
@@ -141,52 +116,32 @@ jobs:
             --exit-immediately true
 
   manifest:
-    name: Publish multi-arch manifest (${{ matrix.addon }})
-    if: ${{ inputs.test_mode == false }}
+    name: Publish multi-arch manifest
     needs: [prepare, build]
+    if: inputs.publish
     runs-on: ubuntu-latest
     permissions:
       id-token: write
       packages: write
-    strategy:
-      matrix:
-        addon: ${{ fromJson(inputs.changed_addons) }}
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v7.0.0
-
-      - name: Get information
-        id: info
-        uses: home-assistant/actions/helpers/info@master
-        with:
-          path: "./${{ matrix.addon }}"
-
-      - name: Normalize image information
-        id: normalize
-        run: |
-          image=${{ steps.info.outputs.image }}
-          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
-          echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
-
       - name: Publish multi-arch manifest
         uses: home-assistant/builder/actions/publish-multi-arch-manifest@2026.06.0
         with:
-          architectures: ${{ steps.info.outputs.architectures }}
+          architectures: ${{ needs.prepare.outputs.architectures }}
           container-registry-password: ${{ secrets.GITHUB_TOKEN }}
-          image-name: ${{ steps.normalize.outputs.image_name }}
+          image-name: ${{ needs.prepare.outputs.image_name }}
           image-tags: |
-            ${{ fromJson(steps.info.outputs.version) }}
+            ${{ needs.prepare.outputs.version }}
             latest
-          registry-prefix: ${{ steps.normalize.outputs.registry_prefix }}
+          registry-prefix: ${{ needs.prepare.outputs.registry_prefix }}
 
       - name: Verify multi-arch manifest
         run: |
-          IMAGE="${{ steps.normalize.outputs.registry_prefix }}/${{ steps.normalize.outputs.image_name }}:${{ fromJson(steps.info.outputs.version) }}"
+          IMAGE="${{ needs.prepare.outputs.registry_prefix }}/${{ needs.prepare.outputs.image_name }}:${{ needs.prepare.outputs.version }}"
           echo "Inspecting manifest for ${IMAGE}"
           docker buildx imagetools inspect "${IMAGE}"
 
-          EXPECTED_ARCHS='${{ steps.info.outputs.architectures }}'
+          EXPECTED_ARCHS='${{ needs.prepare.outputs.architectures }}'
           for arch in $(echo "${EXPECTED_ARCHS}" | jq -r '.[]'); do
             case "${arch}" in
               amd64)    platform="linux/amd64" ;;

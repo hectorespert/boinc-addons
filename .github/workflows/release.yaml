@@ -40,10 +40,19 @@ jobs:
   build:
     needs: [find_changed, check_version]
     if: needs.find_changed.outputs.changed == 'true'
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: ${{ fromJson(needs.find_changed.outputs.changed_addons) }}
     uses: ./.github/workflows/build-addons.yaml
     with:
-      changed_addons: ${{ needs.find_changed.outputs.changed_addons }}
-      test_mode: false
+      addon: ${{ matrix.addon }}
+      publish: true
+    secrets: inherit
 
   create_release:
     needs: [find_changed, build, check_version]

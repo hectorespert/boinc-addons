@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.6.3
+
+Maintenance update with minor improvements
+
 ## 3.6.2
 
 Fix problem downloading ARM images
