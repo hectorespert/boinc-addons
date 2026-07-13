@@ -133,3 +133,25 @@ jobs:
           image-tags: |
             ${{ fromJson(steps.info.outputs.version) }}
             latest
+
+      - name: Verify multi-arch manifest
+        run: |
+          IMAGE="ghcr.io/${{ github.repository_owner }}/${{ steps.image.outputs.name }}:${{ fromJson(steps.info.outputs.version) }}"
+          echo "Inspecting manifest for ${IMAGE}"
+          docker buildx imagetools inspect "${IMAGE}"
+
+          EXPECTED_ARCHS='${{ steps.info.outputs.architectures }}'
+          for arch in $(echo "${EXPECTED_ARCHS}" | jq -r '.[]'); do
+            case "${arch}" in
+              amd64)    platform="linux/amd64" ;;
+              aarch64)  platform="linux/arm64" ;;
+              *)        echo "::warning::Unknown arch ${arch}, skipping check"; continue ;;
+            esac
+
+            if docker buildx imagetools inspect "${IMAGE}" --raw | jq -e ".manifests[] | select(.platform.os == \"linux\" and .platform.architecture == \"${platform#linux/}\")" > /dev/null 2>&1; then
+              echo "✅ ${platform} found in manifest"
+            else
+              echo "::error::${platform} not found in manifest for ${IMAGE}"
+              exit 1
+            fi
+          done
