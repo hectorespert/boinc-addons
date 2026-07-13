@@ -36,7 +36,10 @@ jobs:
         id: normalize
         run: |
           image=${{ steps.info.outputs.image }}
-          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
+          image_name="${image##*/}"
+          # Remove {arch}- placeholder used in HA add-on image naming
+          image_name="${image_name//\{arch\}-/}"
+          echo "image_name=${image_name}" >> "$GITHUB_OUTPUT"
           echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
           version=${{ steps.info.outputs.version }}
           echo "version=${version}" >> "$GITHUB_OUTPUT"
@@ -165,7 +168,10 @@ jobs:
         id: normalize
         run: |
           image=${{ steps.info.outputs.image }}
-          echo "image_name=${image##*/}" >> "$GITHUB_OUTPUT"
+          image_name="${image##*/}"
+          # Remove {arch}- placeholder used in HA add-on image naming
+          image_name="${image_name//\{arch\}-/}"
+          echo "image_name=${image_name}" >> "$GITHUB_OUTPUT"
           echo "registry_prefix=${image%/*}" >> "$GITHUB_OUTPUT"
 
       - name: Publish multi-arch manifest
