@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.3.3
+
+Fix problem downloading ARM images
+
 ## 2.3.2
 
 Fix image publishing to GitHub Container Registry
