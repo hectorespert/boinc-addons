@@ -177,7 +177,7 @@ jobs:
           echo "release_url=${RELEASE_URL}" >> $GITHUB_OUTPUT
 
       - name: Post to Bluesky
-        uses: myConsciousness/bluesky-post@v5
+        uses: myConsciousness/bluesky-post@v6
         with:
           text: ${{ steps.bluesky_post.outputs.post_text }}
           identifier: ${{ secrets.BLUESKY_IDENTIFIER }}
