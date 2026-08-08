@@ -5,6 +5,11 @@ documented in [`CLAUDE.md`](../CLAUDE.md) (repo root) — read it first, it is t
 canonical source for this section and is kept up to date; this file only adapts
 it to Copilot's own conventions instead of repeating it.
 
+[`TODO.md`](../TODO.md) is the standing backlog of known bugs, Home Assistant
+platform conformance gaps, and feature ideas found by review but not yet acted
+on. Check it before starting work — what you're about to investigate may already
+be written up there with file:line references — and update it as items are fixed.
+
 Quick reference (see `CLAUDE.md` for the full explanation of each):
 
 - Two independent Home Assistant add-ons, each self-contained: `boinc/` (runs the

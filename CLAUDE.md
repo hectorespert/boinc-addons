@@ -8,6 +8,11 @@ For what this repo is, how to install it, and per-app end-user docs, see:
 [boinctui/DOCS.md](boinctui/DOCS.md), and [boinc/operator/README.md](boinc/operator/README.md).
 This file only covers what those don't: internal architecture and contributor workflow.
 
+[TODO.md](TODO.md) is the standing backlog of known bugs, HA-platform conformance gaps, and
+feature ideas found by review but not yet acted on. Consult it before starting work in this repo —
+the item you're about to investigate may already be written up there with file:line references —
+and update it as items are fixed or discarded.
+
 ## Repository structure
 
 Two independent Home Assistant add-ons, each self-contained with its own `config.yaml`,

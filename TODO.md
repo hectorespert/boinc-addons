@@ -1,0 +1,283 @@
+# TODO / Analysis notes
+
+Working memory from a repo-wide review (2026-08-08). Nothing here has been acted on yet —
+this is a list of findings and ideas to triage, not a changelog. Update/prune as items are
+resolved or discarded.
+
+## Bugs / correctness
+
+- [ ] **`global_prefs_override.py` clobbers a user-supplied override file on every start.**
+  `link_global_prefs_override` (`boinc/operator/global_prefs_override.py:9-40`) symlinks
+  `/config/global_prefs_override.xml` into the data folder when it exists (lines 15-19), but
+  then falls through unconditionally to lines 21-40, which build a `preferences` dict from
+  `start_hour`/`end_hour`/`max_ncpus`/`cpu_usage_limit` and `open(gui_rpc_auth, 'w')` — writing
+  *through* the symlink it just created. Any custom XML the user placed in `/config` gets
+  truncated and replaced with the auto-generated (possibly empty) preferences on the very next
+  operator start. The docs (`boinc/README.md:152-154`) present the custom-file path as a
+  supported feature, so this silently defeats it.
+  `test_should_link_global_prefs_override` (`boinc/operator/test/test_global_prefs_override.py:21-34`)
+  only asserts the symlink exists — it never checks file content, so the bug has no test
+  coverage catching it. Needs an early `return` after the symlink branch.
+
+- [ ] **`gui_rpc_auth.py` imports `logger` from the stdlib `venv` module.**
+  `boinc/operator/gui_rpc_auth.py:3` does `from venv import logger` and calls `logger.debug(...)`
+  at line 9, instead of using its own `logging.getLogger(__name__)` like every other module in
+  `operator/`. It happens to work because CPython's `venv` package exposes a module-level
+  `logger`, but that's an implementation detail of an unrelated stdlib module, not a public API —
+  it's not guaranteed stable across Python versions. Looks like an autocomplete/typo accident
+  rather than an intentional import.
+
+- [ ] **`--exit-immediately` is parsed with `type=bool`, so any non-empty string is truthy.**
+  `boinc/operator/main.py:23`: `parser.add_argument("--exit-immediately", type=bool, ...)`.
+  Verified in-session:
+  ```
+  python3 -c "
+  import argparse
+  p = argparse.ArgumentParser()
+  p.add_argument('--exit-immediately', type=bool, default=False)
+  print(p.parse_args(['--exit-immediately', 'false']))
+  print(p.parse_args(['--exit-immediately', '0']))
+  "
+  # Namespace(exit_immediately=True)
+  # Namespace(exit_immediately=True)
+  ```
+  `--exit-immediately false` and `--exit-immediately 0` both evaluate to `True` — only omitting
+  the flag entirely gives `False`. Currently only ever invoked with the literal `true`
+  (`build-addons.yaml:116`), so no live incident, but it's a landmine for anyone who later scripts
+  this flag from a variable that can be `"false"`. Fix is `action=argparse.BooleanOptionalAction`
+  or explicit string parsing.
+
+- [ ] **`SIGINT` is caught but neither forwarded nor acted on — Ctrl-C hangs the container.**
+  `boinc/operator/main.py:58-68` registers `signal_handler` for `SIGHUP`/`SIGINT`/`SIGQUIT`/`SIGTERM`,
+  but the handler body (`main.py:60`) explicitly skips forwarding when
+  `number == signal.SIGINT`, and does nothing else (no exit, no re-raise). Because
+  `signal.signal(signal.SIGINT, ...)` replaces Python's default handler (which would otherwise
+  raise `KeyboardInterrupt` and terminate the script), pressing Ctrl-C on an interactive run
+  (`boinc/DEVELOPMENT.md:9-13` uses `docker run -it --rm`) is fully swallowed: the BOINC client
+  is never signaled and the operator's `sleep(0.5)` loop just continues. The container only stops
+  via `docker kill`/`SIGTERM` from another terminal. If the intent was "don't forward SIGINT to
+  BOINC," the operator itself still needs to exit in that branch instead of silently continuing.
+
+- [ ] **The operator always exits with code 0, even when startup fails.**
+  `boinc/operator/main.py` never calls `sys.exit(...)` (no `import sys` at all). When
+  `configure_boinc_projects` fails (e.g. wrong account-manager credentials) it stops the BOINC
+  process (`main.py:80-82`) and the script then falls through the rest of main.py and ends
+  normally — process exit code 0. Home Assistant Supervisor (and anyone scripting
+  `docker run`/CI around this image) reads the exit code to distinguish "stopped cleanly" from
+  "crashed"; a bad account-manager password currently looks identical, from the outside, to a
+  deliberate stop. Only an *unhandled* Python exception produces a non-zero exit today.
+
+## Security / permissions — needs documentation or review
+
+- [ ] **Secrets are logged in plaintext at `DEBUG` level.**
+  `boinc/operator/main.py:37`: `logging.debug(f'Current configuration\n{json.dumps(options, indent=2)}')`
+  dumps the entire parsed `options.json`, including `gui_rpc_password` and
+  `account_manager_password` (both `password?` in the schema, `boinc/config.yaml:17,23`), verbatim
+  into the log stream whenever `--log-level DEBUG` is used. This isn't hypothetical — CI already
+  runs the image this way (`build-addons.yaml:115`: `--log-level DEBUG --exit-immediately true`),
+  so every build's public GitHub Actions log contains the (dummy, thankfully) password from
+  `boinc/operator/options.json:2`. A real user who sets DEBUG logging to troubleshoot something
+  else and then pastes container logs into a GitHub issue would leak their actual BOINC/account-
+  manager password. Should redact/omit the password fields before logging.
+
+- [ ] `boinc/config.yaml:12-15` grants `video: true`, `host_pid: true`, `host_uts: true`, and
+  `docker_api: true`. `host_pid`/`host_uts` are explained (CPU-monitoring, see
+  `boinc/README.md:7-13` and the Protection Mode warning in `main.py:31-32`), but `video` and
+  `docker_api` are not mentioned anywhere in README/DOCS. `boinc/Dockerfile:19-24` installs
+  `docker-cli` and `libgl1`, which confirms the intent: `docker-cli` → BOINC's `docker_wrapper`
+  jobs that spawn sibling containers, `libgl1` → GPU-compute projects (OpenCL/CUDA via `/dev/dri`).
+  So the grants are almost certainly deliberate, not leftover boilerplate — but that reasoning
+  exists only in this analysis, not in any user-facing doc. `docker_api: true` in particular is a
+  meaningful privilege grant (Docker socket access); users accepting it deserve a one-line
+  explanation in `boinc/README.md` next to the existing Protection Mode warning, same as the
+  bugs above — document or drop, don't leave silent.
+
+## Conformance with the official HA apps docs
+
+Reviewed against <https://developers.home-assistant.io/docs/apps/> (configuration, security,
+presentation pages, fetched 2026-08-08). Ordered roughly by impact.
+
+### Broken / non-functional
+
+- [ ] **`boinc/translations/es.yaml` is entirely non-functional — the structural keys are
+  translated too.** The file uses `configuración:` / `nombre:` / `descripción:` / `red:` where
+  the format requires the literal English keys `configuration:` / `name:` / `description:`
+  (`network:`). Per the configuration docs the shape is fixed:
+  ```yaml
+  configuration:
+    ssl:
+      name: Enable SSL
+      description: Enable usage of SSL on the webserver inside the app
+  ```
+  — "The key under configuration (ssl) in this case, needs to match a key in your schema
+  configuration." Only the *values* are translatable. `boinc/translations/en.yaml` is correct;
+  `es.yaml` is a faithful Spanish translation of the wrong thing, so Supervisor finds no
+  `configuration:` block and silently falls back to English for every option label. Fix is
+  mechanical: revert the four structural key names, keep all the Spanish strings.
+  (Side note: `network:` as a top-level translations key is used by `en.yaml` for the
+  `31416/tcp` port description — it did not appear in the docs pages fetched, so **verify it's a
+  supported key** rather than assuming; if it isn't, port descriptions need `ports_description:`
+  in `config.yaml` instead.)
+
+- [ ] **`icon.png` violates the documented aspect-ratio requirement in both apps.**
+  Docs: "The aspect ratio of the icon must be 1x1 (square)", recommended 128x128px. Actual
+  (`file boinc/icon.png boinctui/icon.png`): both are **256 x 245** — close to square but not
+  square, so it will be letterboxed/distorted in the store. `logo.png` is 600x305 against a
+  recommended 250x100, which is fine — the docs explicitly allow other logo ratios.
+
+### Missing capabilities the platform already offers
+
+- [ ] **Neither app declares a `watchdog`, so a crashed BOINC client is never restarted.**
+  Docs: `watchdog: "tcp://[HOST]:[PORT:31416]"` (or `http://…`) lets Supervisor monitor app
+  health and restart it. Today, if the BOINC client dies, `main.py`'s `while boinc_process.poll()
+  is None` loop (`main.py:89-90`) simply falls through and the operator exits **0** (see the
+  exit-code bug above), so Supervisor sees a clean stop and leaves the app down — silently, until
+  someone notices they've stopped contributing compute. `boinc` has port 31416 available for a
+  TCP watchdog; `boinctui` could use `tcp://[HOST]:[PORT:7681]`. This is probably the single
+  highest-value item in this file: it converts a silent-death failure mode into auto-recovery.
+
+- [ ] **No `backup_exclude`, so cold backups snapshot the entire BOINC working set.**
+  Docs list `backup_exclude` as "List of files/paths (with glob support) that are excluded from
+  backups". `boinc/config.yaml:30` sets `backup: cold` (app stopped for the duration), and
+  `folders.py:9-16` creates `slots/`, `locale/`, `projects/` under the data dir. `slots/` is
+  purely transient scratch space for running tasks and `projects/` holds re-downloadable project
+  binaries — both can be many GB. Every HA full backup therefore stops BOINC (losing compute
+  progress) and copies gigabytes of regenerable data. Excluding at minimum `slots/` looks like a
+  clear win; whether `projects/` is safe to exclude needs a check against how BOINC recovers on
+  restart.
+
+- [ ] **`account_manager_url` is typed `str?` when the schema language has a `url` type.**
+  `boinc/config.yaml:21`. The documented schema types include `url` (and `email`, `port`,
+  `password`). Switching to `url?` gets free validation in the Supervisor UI instead of letting a
+  typo through to `boinccmd --acct_mgr attach`, where it surfaces only as a runtime log error.
+  Same category: `remote_hosts` entries are `str?` — worth checking whether the trailing `?`
+  even means anything on a *list element* (docs describe `?` as marking an optional field, not an
+  optional element type); it may be silently ignored, in which case `- "str"` is the honest form.
+
+### Deprecated / template-copied config worth modernizing
+
+- [ ] **`map:` uses the legacy plain-string form.** `boinc/config.yaml:31-32` is
+  `map: [addon_config]`; the documented format is now structured:
+  ```yaml
+  map:
+    - type: addon_config
+      read_only: false
+  ```
+  with "Defaults to read-only, which you can change by adding the property read_only: false".
+  **This interacts with the `global_prefs_override.py` clobber bug at the top of this file**: if
+  the mount is read-only (which is the default in both the legacy and documented forms), then the
+  unconditional `open(gui_rpc_auth, 'w')` writing *through* the symlink into `/config` doesn't
+  silently truncate the user's file — it raises `OSError`, uncaught, and the operator dies before
+  BOINC ever starts. So the documented "Preferences Override" feature (`boinc/README.md:152-154`)
+  may currently produce a **startup crash loop**, not just data loss. Needs verification on a real
+  Supervisor install to know which of the two failure modes users actually hit; either way the
+  early-`return` fix resolves both.
+
+- [ ] **`init: false` isn't justified by the documented reason, and `main.py` silently depends on
+  it.** Docs: `init` defaults `true`; disable it "if the image has a custom init system (e.g.
+  s6-overlay)". Neither image has one — `boinc/Dockerfile:42` is a plain `python3 main.py`
+  entrypoint and `boinctui/run.sh:13` `exec`s ttyd. So the setting looks template-copied.
+  Two consequences worth thinking about before changing it:
+  1. The protection-mode detection at `boinc/operator/main.py:31` (`if current_pid == 1`) is an
+     *undocumented implicit dependency on `init: false`* — the heuristic works only because
+     nothing else occupies PID 1. Flipping `init` to `true` would put Docker's init at PID 1,
+     giving the operator a non-1 PID and silently disabling the Protection Mode warning that the
+     whole README leads with. This coupling deserves a comment in the code at minimum.
+  2. With no init process, orphaned grandchildren are never reaped. For `boinc` this is masked by
+     `host_pid: true` (host PID namespace); for `boinctui`, ttyd is PID 1 and spawns
+     `bash` → `boinctui` per session, so zombie accumulation across many ingress sessions is
+     plausible. Worth actually checking `ps` inside a long-lived boinctui container before
+     deciding.
+
+- [ ] **`apparmor: false` on both apps runs against an explicit documented recommendation.**
+  The security page's best-practice list includes "Establish an AppArmor profile", and states
+  apps are rated 1–6 "based on the wanted rights". These two apps disable AppArmor *and* request
+  `host_pid`, `host_uts`, `docker_api`, and `video` — so they sit at the low end of that scale by
+  construction. (The docs do not publish a per-option point table, so no specific number is
+  claimed here.) This ties directly to the dead `boinc/apparmor.txt.disable` boilerplate noted
+  under Housekeeping: writing a real profile matching the actual process tree is the fix for both
+  items at once. Realistically this is a large task, not a quick win — but it should be a
+  conscious decision, recorded somewhere, rather than an unexamined default.
+
+### Confirmed-correct (checked, no action needed — recorded so it isn't re-litigated)
+
+- `boinctui/run.sh:17` uses `--auth-header X-Remote-User-Name`, which matches the ingress identity
+  headers the security docs specify (`X-Remote-User-Id`, `X-Remote-User-Name`,
+  `X-Remote-User-Display-Name`). Correct use of the platform auth mechanism.
+- `boinc/config.yaml:10-11` maps `31416/tcp: null` — null means "not published by default, user
+  may opt in", which is the secure-by-default form.
+- Neither app requests `hassio_api`, `homeassistant_api`, `auth_api`, `full_access`, or
+  `privileged`, matching the docs' "request only essential API permissions".
+- CI signs published images with Cosign (`build-addons.yaml:98`), matching the docs' "Sign
+  published images using the official workflow with Cosign"; the old Codenotary path was already
+  removed (`boinctui/CHANGELOG.md:43-45`).
+- `boinctui` has no `translations/` dir, but its `config.yaml` declares no `schema:` at all, so
+  there is nothing to translate. Not a gap.
+
+## Config schema — feature gaps vs. upstream BOINC preferences
+
+`boinc/config.yaml:16-27` covers account manager, remote RPC, a computing time window, and two
+CPU-usage knobs. Common BOINC global-preference options that aren't exposed and might be worth
+adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py`):
+
+- [ ] `work_buf_min_days` / `work_buf_additional_days` — how much work to keep queued; probably
+  the single most-requested BOINC tuning knob after CPU limits.
+- [ ] GPU usage toggle (`no_gpus` / `exclude_gpu`) — relevant given `video: true` is already
+  granted (see above).
+- [ ] `disk_max_used_gb` / `disk_max_used_pct` — disk usage cap, useful on small HA hosts.
+- [ ] `run_on_batteries` — mostly N/A for typical HA hardware (NUCs, RPis on mains) but trivial
+  to add if anyone runs HA on a laptop.
+- [ ] A `suspend`/`no_new_work` boolean would let users pause computation from the add-on config
+  without detaching, complementing the existing start/end-hour schedule.
+
+## Test coverage
+
+- [ ] `test_global_prefs_override.py` needs a case that supplies a config-dir override file
+  *and* schedule/CPU options together, asserting the override file's original bytes survive —
+  this is exactly the scenario the bug above breaks silently.
+- [ ] No test currently asserts on `gui_rpc_auth.py` logging behavior specifically (low
+  priority — cosmetic — but flagging alongside the `venv.logger` import finding).
+- [ ] No test covers `main.py`'s exit-code/signal behavior (the `--exit-immediately` parsing bug,
+  the SIGINT swallow, and the always-exits-0 issue above) — reasonable since `main.py` is a script
+  with no functions to import, but worth a lightweight subprocess-based test if any of those get
+  fixed, so they don't regress silently.
+
+## Future add-on / feature ideas (not scoped, just candidates)
+
+- [ ] **HA-native sensors for BOINC stats** (tasks running/queued, credits, project status,
+  disk/CPU usage) — today the only way to see BOINC state from Home Assistant itself is opening
+  the `boinctui` ingress panel. A small exporter (MQTT discovery or a REST endpoint HA's
+  `sensor: platform: rest` can poll) built on top of `boinccmd --get_tasks`/`--get_state` would
+  enable dashboards and automations (e.g., notify on task completion/error, pause BOINC via
+  automation instead of only the static schedule). Could live in the existing `boinc` add-on
+  (a sidecar thread in the operator) or as a new third add-on.
+- [ ] **Prometheus metrics endpoint** — same data source as above, different consumer, for users
+  who already run Prometheus/Grafana off their HA host.
+- [ ] Consider whether the missing config options above (work buffer, GPU toggle) are common
+  enough support requests to justify scoping as a real change — check open GitHub issues before
+  investing time.
+
+## Housekeeping
+
+- [ ] `boinc/config.yaml` doesn't document `video`/`docker_api` (see Security section) —
+  smallest fix here is just adding a short paragraph to `boinc/README.md` alongside the
+  existing Protection Mode warning.
+- [ ] Confirm CHANGELOG minor-bump convention (base-image bumps → minor) is written down
+  somewhere other than tribal knowledge / `CLAUDE.md` — it already is, in `CLAUDE.md`'s
+  Conventions section, so this is just a note that it's the reference to follow when the next
+  bump PR comes up.
+- [ ] `boinc/apparmor.txt.disable` is the unmodified Home Assistant add-on template boilerplate
+  (references `/etc/services.d`, `/etc/cont-init.d`, bashio, s6-overlay `/init`) — none of which
+  this add-on uses; its actual entrypoint is a plain `python3 /opt/operator/main.py`
+  (`boinc/Dockerfile:42`). It's inert today (`apparmor: false` in `boinc/config.yaml:29`), so no
+  functional impact, but it would need a full rewrite — not just re-enabling — before it could
+  ever be turned on. Either rewrite it to match the real process tree or delete it so it doesn't
+  mislead a future contributor into thinking AppArmor support is closer than it is.
+- [ ] `configure_boinc_projects` (`boinc/operator/boinccmd.py:45-90`) logs a warning and returns
+  `True` (success) when account-manager options are partially set (e.g. URL without
+  username/password) — `boinccmd.py:63-64`. That's arguably the right runtime behavior (don't
+  tear down a running client over a config typo), but it means an invalid partial config is
+  silently accepted forever, re-warned on every restart, with no schema-level validation ever
+  surfacing it as an error in the Supervisor UI. Low priority; noting since it compounds the
+  "always exits 0" issue above — there's currently no path from *misconfigured account manager*
+  to *visible failure state*.
