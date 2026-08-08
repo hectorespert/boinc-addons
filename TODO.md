@@ -292,8 +292,159 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
   enable dashboards and automations (e.g., notify on task completion/error, pause BOINC via
   automation instead of only the static schedule). Could live in the existing `boinc` add-on
   (a sidecar thread in the operator) or as a new third add-on.
+  **⚠ Partly solved by a third party already — see the prior-art item below before scoping this.**
+
+- [ ] **Prior art: link the existing third-party HA integration instead of rebuilding it**
+  (searched 2026-08-08). Cheapest high-value item in this section.
+
+  - **<https://github.com/SpuelMett/Boinc-Home-Assistant-Integration>** — custom component, MIT,
+    config flow (no YAML), ~12 stars, v0.0.7, compatible with HA 2025.6.0. **Not in HACS** (listed
+    as a roadmap item); installed by copying into `config/custom_components`. Talks **GUI RPC
+    directly** to remote BOINC hosts — needs `remote_hosts.cfg`, `gui_rpc_auth.cfg` and port 31416,
+    exactly the mechanism analysed here. Sensors: total tasks, running tasks, average progress rate.
+    Services: start, hard stop, **soft stop** (waits for the next checkpoint, configurable threshold,
+    default 120 s), GPU start/stop. Supports multiple BOINC hosts. Advertised use cases: run BOINC
+    on surplus solar, reuse compute heat for heating.
+  - **The fit is mutual and explicit**: that README states it *cannot* run BOINC on the Home
+    Assistant host itself and that a separate add-on is needed for that — which is precisely this
+    repo. This repo, in turn, has no HA entity surface at all. They are complements, not competitors.
+  - **Action (small):** document the pairing in `boinc/DOCS.md` — the exact three-step recipe
+    (`allow_remote_gui_rpc: true`, add the HA host to `remote_hosts`, share `gui_rpc_password`) plus
+    a link to the integration. Closes the loop for users (this add-on *runs* BOINC, that integration
+    *monitors and controls* it) and directly attacks the cross-add-on setup friction noted below,
+    which that integration demonstrably suffers too.
+  - **Consequence for the sensors item above:** rebuilding it from scratch would duplicate existing
+    work. Realistic options are contributing to SpuelMett's integration (e.g. helping it into HACS,
+    adding sensors) or simply linking it.
+  - **The "configure" half is still genuinely unfilled.** That integration does run-mode control and
+    basic task sensors — no project attach/detach, no account manager, no preferences. If anything
+    gets built here, that's the gap.
+  - **No core/official HA BOINC integration found.** Caveat: the home-assistant.io integrations
+    listing renders client-side and returned nothing useful when fetched, so this rests on web
+    search, not on a direct check of the listing. Re-verify before relying on it.
+  - Also found, same author, superseded: <https://github.com/SpuelMett/Boinc-Home-Assistant-Control>
+    — a Flask sidecar exposing `/start`, `/stop`, `/soft_stop` on top of PyBoinc (3 stars).
+  - **Maturity caveat before depending on any of it:** 12 and 8 stars, single maintainer, v0.0.7,
+    not in HACS. Linking to it is free; taking a dependency on it is a risk decision.
+
+- [ ] **Python GUI RPC libraries already exist — pick one rather than writing one.**
+  - <https://pypi.org/project/boinc-client/> (Lewis England) — v1.12.1, May 2024, synchronous,
+    advertises "consistent response types", Python >=3.9.
+  - <https://github.com/nielstron/pyboinc> — MIT, asyncio, 8 stars; the one SpuelMett's integration
+    uses. Its own README admits it is "very basic" and does not cover the whole protocol.
+  - Both are small and lightly maintained, so vendoring vs. depending is a real call. Either way
+    this removes "write a GUI RPC client from scratch" from the critical path of every item below.
 - [ ] **Prometheus metrics endpoint** — same data source as above, different consumer, for users
   who already run Prometheus/Grafana off their HA host.
+
+- [ ] **Graphical web UI to query and configure BOINC (a BOINC Manager equivalent) as an ingress
+  add-on.** Biggest item in this file by an order of magnitude; recorded with the constraints found
+  while thinking it through so the design isn't re-derived.
+
+  **Start from the honest baseline: `boinctui` already does this.** It is a full BOINC Manager,
+  through ingress, working today, built from ~20 lines of `run.sh` plus an apt package. A graphical
+  UI adds usability (mobile/touch, HA-companion-app users, people who won't use a TUI), not
+  capability. Valid reason, but the cost ratio is 10-50x — decide with that in view.
+
+  - **"Query" and "configure" are two different products.** Querying in HA is done with *entities*,
+    not an embedded page: sensors give dashboards, automations, mobile notifications, history and
+    long-term statistics for free, and an ingress UI gives none of that (it's an island inside HA).
+    Configuring is where a UI genuinely wins, since HA has no good declarative surface for "attach
+    this project" / "abort this task". Both halves need the same backend — a decent GUI RPC client.
+    **That backend, not the UI, is the real first deliverable**, and it's shared with the
+    HA-native-sensors item above.
+  - **Ingress compatibility is the hard gate that decides wrap-vs-build.** The app is served under
+    `/api/hassio_ingress/<token>/` with a token that changes, so it must emit relative URLs or accept
+    a base path **at runtime, not build time** — which rules out most third-party SPAs that bake
+    absolute `/assets/...` paths. It must also have no login of its own and trust the
+    `X-Remote-User-*` headers (the pattern `boinctui/run.sh:17` already uses via
+    `--auth-header X-Remote-User-Name`). WebSockets do work through ingress (`boinctui` proves it
+    here), so live task updates are viable. Usual breakage: absolute `Location:` redirects and
+    `Path=/` cookies. **Evaluating an existing web UI against this costs about an afternoon** (stand
+    it up, see if it survives the base path) and can save months — run that experiment before
+    committing to writing one. Candidates to test: BoincTasks Js and any other browser-based BOINC
+    manager (list unverified — search before assuming none exist).
+  - **Cross-add-on connectivity is the worst part of the current UX and would be inherited.** Today
+    `boinctui` → `boinc` needs three manual steps across two add-ons (`boinctui/DOCS.md:7-9`):
+    enable `allow_remote_gui_rpc` (`boinc/config.yaml:20` → `boinc.py:build_boinc_command`), add the
+    other add-on's hostname to `remote_hosts` (`boinc/config.yaml:18-20` → `remote_hosts.py`), and
+    copy the `gui_rpc_password` — i.e. **a second copy of the secret in another `options.json`**.
+    Worth explicitly considering the alternative: **run the UI inside the `boinc` add-on** as a
+    second process — localhost RPC, reads `gui_rpc_auth.cfg` straight from the data folder, no
+    `remote_hosts` entry, no duplicated password, zero setup friction *for the local host*. Price is
+    **not** loss of multi-host (a process in that container can still dial out to other hosts on
+    31416); it is loss of lifecycle independence — if the local BOINC client stops or crash-loops,
+    the UI you were using to watch the *other* machines goes with it. Real fork in the road, not a
+    detail.
+  - **`boinccmd` is not a viable backend for a UI.** The operator shells out and regex-parses
+    human-readable text (`boinccmd.py:58`, `re.search(r'URL: (\S+)')`) — fine for one field at
+    startup, unusable for a UI polling tasks every few seconds: one process spawn per call, against
+    output that is not a stable API. Security angle specific to a *separate* add-on: `boinccmd`
+    finds `gui_rpc_auth.cfg` only because it runs with `cwd=data_folder`; another add-on has no such
+    folder and would have to pass `--passwd <pw>` on the command line, putting the password in argv
+    — and `boinc` runs with `host_pid: true` (`config.yaml:13`), so that argv is more visible than
+    usual. Speak GUI RPC directly over TCP 31416 instead (XML, nonce+MD5 auth — **verify the exact
+    protocol against upstream BOINC docs**, not from memory).
+  - **A configuration UI is by definition a third external writer** — read the "State ownership"
+    section above as a prerequisite, not as parallel debt. The AM-silently-detached bug
+    (`boinccmd.py:84-88`) and the `global_prefs_override.xml` full-overwrite
+    (`global_prefs_override.py:39-40`) already bite `boinctui` users today; shipping a first-party
+    UI promotes them from edge case to broken main flow. And if the declarative `projects:` option
+    below also lands, declarative config and imperative UI end up fighting over the same state —
+    two controllers, one resource.
+  - **Multi-host is a stated requirement** (controlling other BOINC instances, not just the one in
+    the `boinc` add-on). Consequences, decided now because retrofitting multi-host is expensive
+    while designing it in from the start is nearly free:
+
+    - **Multi-host on its own is not a differentiator.** `boinctui` already connects to other BOINC
+      clients (`boinctui/DOCS.md:11-15`) and SpuelMett's integration already supports several hosts.
+      What neither offers is **cross-host aggregation** — one table of all tasks across all machines,
+      sortable by deadline, with bulk actions. That is the actual reason to build (it's what
+      BoincTasks is known for), so it should drive the design rather than being a later feature.
+      It also raises the value of the ingress wrap experiment: BoincTasks Js is multi-machine by
+      design, so if it survives the base path, multi-host comes for free.
+    - **Host + credential storage is a design fork, not a detail.** N × (host, port, password).
+      Either *in add-on options* (HA schema supports list-of-dict) — declarative, visible in the
+      Supervisor UI, covered by backups, but static (adding a machine means restarting the add-on)
+      and multiplying the plaintext-secret problem (`main.py:37`) by N; or *managed from the UI and
+      persisted under `/data`* — dynamic, but invisible to HA's config layer and needing its own
+      secret handling. Doing **both** recreates the two-writers problem from the "State ownership"
+      section, this time inside the UI itself.
+    - **Likely network gotcha — verify empirically.** Add-on ↔ add-on traffic stays on HA's Docker
+      network and the target sees the container hostname (hence `boinctui/DOCS.md:7`, "use the
+      hostname on the app info page"). Traffic to a LAN machine is masqueraded on the way out, so
+      the remote host most likely sees **the Home Assistant host's IP**, not the container's — i.e.
+      a remote PC's `remote_hosts.cfg` needs a *different* entry than a sibling add-on does. This is
+      inference about Docker NAT, **not verified**; confirm with `tcpdump` or a remote BOINC's
+      rejection log. If true it is the first support question this add-on will get, and both
+      recipes belong in the docs.
+    - **Security blast radius multiplies.** BOINC's GUI RPC has one password per client and no
+      users or roles — whoever connects has full control. A multi-host UI concentrates total control
+      of every BOINC machine on the network behind one ingress panel. **Verify whether HA can
+      restrict an ingress panel to admin users**; if it cannot, any HA account controls the whole
+      fleet.
+    - **Partial failure is the normal case.** One powered-off host must not stall the aggregate
+      view: per-host connection state, timeouts, partial render. Same requirement as the `projects:`
+      item below.
+    - **Version skew.** Different BOINC client versions expose different RPC fields; the aggregate
+      view has to tolerate a host missing data another one provides.
+  - **Scope, if it happens.** BOINC Manager's real surface is large (Projects, Tasks, Transfers,
+    Statistics, Disk, Notices, Event Log, Computing Preferences, add/remove project, account
+    manager). An MVP should be read-only tasks/projects/transfers plus a handful of actions
+    (global suspend/resume, per-project suspend/resume/update, abort task) and leave the rest to
+    `boinctui`.
+  - **Checked (2026-08-08): a third-party HA integration already covers part of the "query" half** —
+    see the prior-art item above. No core integration found. This materially narrows what a UI here
+    would add: the query half has an answer that exists, so anything built here should target the
+    *configure* half (project attach/detach, account manager, preferences), which nothing covers.
+  - **Suggested order:** (1) fix the ownership bugs; (2) link the existing integration from
+    `boinc/DOCS.md` — hours of work, closes the loop for users today; (3) pick an existing GUI RPC
+    library rather than writing one; (4) only then decide on the UI, with the ingress experiment
+    done and real demand data on whether users need to *configure* from a phone or `boinctui`
+    suffices.
+  - Packaging note: a new add-on directory slots into CI automatically (`find-changed-addons`
+    diffs per directory), and it should ship a **square** `icon.png` from day one — see the
+    aspect-ratio bug above, which both existing add-ons have.
 - [ ] Consider whether the missing config options above (work buffer, GPU toggle) are common
   enough support requests to justify scoping as a real change — check open GitHub issues before
   investing time.
