@@ -33,6 +33,28 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
             self.assertTrue(os.path.exists(f'{tmp_dir}/data/global_prefs_override.xml'))
             self.assertTrue(os.path.islink(f'{tmp_dir}/data/global_prefs_override.xml'))
 
+    def test_should_not_overwrite_a_linked_global_prefs_override(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            data_dir = f'{tmp_dir}/data'
+            os.makedirs(data_dir)
+            config_dir = f'{tmp_dir}/config'
+            os.makedirs(config_dir)
+
+            configured_preferences = '<global_preferences>\n  <disk_max_used_gb>100</disk_max_used_gb>\n</global_preferences>'
+            with open(f'{config_dir}/global_prefs_override.xml', 'w') as f:
+                f.write(configured_preferences)
+
+            link_global_prefs_override(data_dir, config_dir, {
+                'start_hour': '00:35',
+                'end_hour': '08:59'
+            })
+
+            with open(f'{config_dir}/global_prefs_override.xml', 'r') as f:
+                self.assertEqual(f.read(), configured_preferences)
+
+            with open(f'{data_dir}/global_prefs_override.xml', 'r') as f:
+                self.assertEqual(f.read(), configured_preferences)
+
     def test_should_create_global_prefs_override_with_configuration(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             data_dir = f'{tmp_dir}/data'

@@ -6,7 +6,10 @@ resolved or discarded.
 
 ## Bugs / correctness
 
-- [ ] **`global_prefs_override.py` clobbers a user-supplied override file on every start.**
+- [x] **Fixed in `boinc` 3.8.0** — early `return` after the symlink branch, plus
+  `test_should_not_overwrite_a_linked_global_prefs_override` asserting the content of both the
+  `/config` file and the data-folder path.
+  **`global_prefs_override.py` clobbers a user-supplied override file on every start.**
   `link_global_prefs_override` (`boinc/operator/global_prefs_override.py:9-40`) symlinks
   `/config/global_prefs_override.xml` into the data folder when it exists (lines 15-19), but
   then falls through unconditionally to lines 21-40, which build a `preferences` dict from
@@ -58,7 +61,11 @@ resolved or discarded.
   via `docker kill`/`SIGTERM` from another terminal. If the intent was "don't forward SIGINT to
   BOINC," the operator itself still needs to exit in that branch instead of silently continuing.
 
-- [ ] **The operator always exits with code 0, even when startup fails.**
+- [x] **Fixed in `boinc` 3.8.0** — `sys.exit(1)` when `configure_boinc_projects` fails, and the
+  BOINC client's own exit code is propagated when it is positive (a negative code means the client
+  was signaled, which is how both a Supervisor stop and `--exit-immediately` end it — still 0).
+  This unblocks the `watchdog:` item below.
+  **The operator always exits with code 0, even when startup fails.**
   `boinc/operator/main.py` never calls `sys.exit(...)` (no `import sys` at all). When
   `configure_boinc_projects` fails (e.g. wrong account-manager credentials) it stops the BOINC
   process (`main.py:80-82`) and the script then falls through the rest of main.py and ends
@@ -80,7 +87,12 @@ with its account manager on its own schedule, so a loop would mostly duplicate t
 half of the pattern is **field ownership**: an option the user never set is a field the operator
 does not own and must not touch. Both bugs below are that rule being missing.
 
-- [ ] **An account manager attached from `boinctui` is silently detached on the next restart.**
+- [x] **Fixed in `boinc` 3.8.0** — unset options now mean "not a field the operator owns": it logs
+  the externally-attached account manager and leaves it alone. New `test/test_boinccmd.py` covers
+  this and the four other branches. Follow-up left open: **there is now no way to express "detach
+  it" through the options**; `boinc/DOCS.md` documents `boinccmd --acct_mgr detach` as the manual
+  route, but an explicit gate (empty string, or `manage_account_manager: bool`) would be better.
+  **An account manager attached from `boinctui` is silently detached on the next restart.**
   `configure_boinc_projects` (`boinc/operator/boinccmd.py:84-88`) treats "all three
   `account_manager_*` options unset" as the desired state *no account manager*, and calls
   `detach_account_manager`. But all three are optional (`boinc/config.yaml:21-23`, `str?`/
@@ -110,7 +122,9 @@ does not own and must not touch. Both bugs below are that rule being missing.
 
 ## Security / permissions — needs documentation or review
 
-- [ ] **Secrets are logged in plaintext at `DEBUG` level.**
+- [x] **Fixed in `boinc` 3.8.0** — new `operator/redact.py` replaces `gui_rpc_password` and
+  `account_manager_password` with `***` before the dump, covered by `test/test_redact.py`.
+  **Secrets are logged in plaintext at `DEBUG` level.**
   `boinc/operator/main.py:37`: `logging.debug(f'Current configuration\n{json.dumps(options, indent=2)}')`
   dumps the entire parsed `options.json`, including `gui_rpc_password` and
   `account_manager_password` (both `password?` in the schema, `boinc/config.yaml:17,23`), verbatim
@@ -140,7 +154,9 @@ presentation pages, fetched 2026-08-08). Ordered roughly by impact.
 
 ### Broken / non-functional
 
-- [ ] **`boinc/translations/es.yaml` is entirely non-functional — the structural keys are
+- [x] **Fixed in `boinc` 3.8.0** — the four structural keys are back in English, all Spanish
+  strings kept. The `network:` caveat below is unchanged and still unverified.
+  **`boinc/translations/es.yaml` is entirely non-functional — the structural keys are
   translated too.** The file uses `configuración:` / `nombre:` / `descripción:` / `red:` where
   the format requires the literal English keys `configuration:` / `name:` / `description:`
   (`network:`). Per the configuration docs the shape is fixed:
@@ -205,14 +221,11 @@ presentation pages, fetched 2026-08-08). Ordered roughly by impact.
       read_only: false
   ```
   with "Defaults to read-only, which you can change by adding the property read_only: false".
-  **This interacts with the `global_prefs_override.py` clobber bug at the top of this file**: if
-  the mount is read-only (which is the default in both the legacy and documented forms), then the
-  unconditional `open(gui_rpc_auth, 'w')` writing *through* the symlink into `/config` doesn't
-  silently truncate the user's file — it raises `OSError`, uncaught, and the operator dies before
-  BOINC ever starts. So the documented "Preferences Override" feature (`boinc/README.md:152-154`)
-  may currently produce a **startup crash loop**, not just data loss. Needs verification on a real
-  Supervisor install to know which of the two failure modes users actually hit; either way the
-  early-`return` fix resolves both.
+  This used to interact with the `global_prefs_override.py` clobber bug at the top of this file —
+  a read-only mount turned the write-through-the-symlink into an uncaught `OSError` and a startup
+  crash loop rather than silent truncation. **The early-`return` fix in 3.8.0 removed both failure
+  modes**, so this item is now purely about modernizing the `map:` syntax and making the
+  `read_only` intent explicit rather than inherited from a default.
 
 - [ ] **`init: false` isn't justified by the documented reason, and `main.py` silently depends on
   it.** Docs: `init` defaults `true`; disable it "if the image has a custom init system (e.g.

@@ -56,6 +56,12 @@ There is a boinctui app available for this purpose [here](https://github.com/hec
   - Password for the configured user in the BOINC Account Manager
   - Required if `account_manager_url` is set
 
+When these three options are set, the app keeps the BOINC client attached to that account manager,
+replacing a different one if needed. When they are left empty, the app does not touch the account
+manager at all: an account manager you attached yourself — from the boinctui app, a remote BOINC
+Manager, or `boinccmd` — is left as it is. Detaching it is done the same way you attached it, for
+example `boinccmd --acct_mgr detach`.
+
 #### Remote Control Options
 
 - **gui_rpc_password** (optional)

@@ -81,10 +81,10 @@ def configure_boinc_projects(data_folder: str, account_manager_url: str | None, 
 
             return attach_account_manager(data_folder, account_manager_url, account_manager_username, account_manager_password)
 
-    elif current_account_manager_url is not None and account_manager_url is None and account_manager_username is None and account_manager_password is None:
-        logging.debug(f'Account manager {current_account_manager_url} not configured, detaching')
-        if not detach_account_manager(data_folder):
-            return False
-
+    elif current_account_manager_url is not None:
+        # No account manager is configured in the add-on options, so this is not a field the
+        # operator owns: the attachment was made outside it (boinctui, a remote GUI, boinccmd).
+        # Leaving it alone, detaching it here would silently undo the user's own configuration.
+        logging.info(f'Account manager {current_account_manager_url} was attached outside the add-on options, leaving it unchanged')
 
     return True
