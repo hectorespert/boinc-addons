@@ -67,6 +67,47 @@ resolved or discarded.
   "crashed"; a bad account-manager password currently looks identical, from the outside, to a
   deliberate stop. Only an *unhandled* Python exception produces a non-zero exit today.
 
+## State ownership — the operator vs. changes made outside it
+
+Root cause shared by the items below: the operator writes BOINC state at startup as if it were the
+only writer, but this repo ships a second writer (`boinctui`) and `boinc/config.yaml:11` exposes
+GUI RPC on `31416/tcp` for a third (desktop BOINC Manager, gated by `remote_hosts`). A fourth,
+the account manager, pushes changes by design. External modification is not hypothetical here —
+it's the advertised use case of the sibling add-on.
+
+The Kubernetes-operator answer to this is *not* "run a reconcile loop" — BOINC already re-syncs
+with its account manager on its own schedule, so a loop would mostly duplicate that. The useful
+half of the pattern is **field ownership**: an option the user never set is a field the operator
+does not own and must not touch. Both bugs below are that rule being missing.
+
+- [ ] **An account manager attached from `boinctui` is silently detached on the next restart.**
+  `configure_boinc_projects` (`boinc/operator/boinccmd.py:84-88`) treats "all three
+  `account_manager_*` options unset" as the desired state *no account manager*, and calls
+  `detach_account_manager`. But all three are optional (`boinc/config.yaml:21-23`, `str?`/
+  `password?`), so unset is also the default for a user who never intended the operator to manage
+  this at all and attached their account manager interactively through the TUI. Their attachment
+  survives until the next add-on restart/update, then disappears with only a `logging.debug` line.
+  Fix is the ownership rule: unset options → skip reconciliation entirely, don't detach. A real
+  "detach it" intent needs to be expressible separately (explicit empty string, or a
+  `manage_account_manager: bool` gate).
+
+- [ ] **Only the account-manager *host* is compared, so same-host URL changes are missed.**
+  `boinc/operator/boinccmd.py:70` compares `urlparse(...).netloc` of current vs. desired. Two
+  account managers on the same host but different paths compare equal, so the operator logs
+  "already attached, synchronizing" and syncs against the old one. Probably deliberate leniency
+  for `http`/`https` and trailing-slash differences — but netloc-only is a wider net than that
+  needs. Normalising scheme + path (strip trailing `/`) would keep the leniency without the
+  false match.
+
+- [ ] **Generated `global_prefs_override.xml` is a full overwrite, wiping TUI-set preferences.**
+  Distinct from the symlink bug above, and present even when no `/config` file exists.
+  `global_prefs_override.py:39-40` writes a freshly built dict containing *only* the four keys the
+  operator manages (`start_hour`, `end_hour`, `niu_max_ncpus_pct`, `niu_cpu_usage_limit`). BOINC
+  GUI clients write their "computing preferences" into this same file, so anything a user set from
+  `boinctui` outside those four keys (disk limits, memory, network) is dropped on the next
+  operator start. Reading the existing XML and merging only the managed keys would preserve them —
+  and would compose correctly with the early-`return` fix for the symlink bug.
+
 ## Security / permissions — needs documentation or review
 
 - [ ] **Secrets are logged in plaintext at `DEBUG` level.**
@@ -256,6 +297,44 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
 - [ ] Consider whether the missing config options above (work buffer, GPU toggle) are common
   enough support requests to justify scoping as a real change — check open GitHub issues before
   investing time.
+
+- [ ] **Declare projects to attach in the add-on options** (e.g. a `projects:` list, HA schema
+  supports list-of-dict). Attractive, but it is a much bigger design step than the existing
+  scalar options, because it turns reconciliation into set reconciliation with a destructive
+  removal branch. Design constraints found while thinking it through — read alongside the
+  "State ownership" section above:
+
+  - **Detach is destructive, unlike the account-manager detach the operator already does.**
+    `boinccmd --project <url> detach` aborts in-progress tasks and deletes downloaded project
+    files (potentially GBs, and lost partial credit). So `actual − desired` must *not* map to
+    detach. The BOINC-native soft equivalent is `--project <url> nomorework`: stop fetching new
+    work, let current tasks drain. Default to draining; hard detach only on explicit opt-in.
+  - **Ownership needs persisted state, because BOINC has nowhere to record it.** There are no
+    labels/annotations on a BOINC project. Without a marker, a project the user attached from
+    `boinctui` is indistinguishable from one the operator attached and the user then removed from
+    the options — and the removal branch would eat the former. Fix is the `kubectl apply`
+    last-applied-configuration trick: the operator keeps its own `managed_projects` file under
+    `/data`, and computes removals as `previously-managed − desired`, never `actual − desired`.
+    Anything the operator never attached is never touched.
+  - **Mutually exclusive with the account manager.** When an AM is attached it owns the project
+    list and re-asserts it on every sync (Science United especially), so a hand-declared
+    `projects:` list plus `account_manager_*` means two controllers fighting over the same state.
+    The operator should reject that combination at startup rather than let it oscillate.
+  - **Project URLs need canonicalising before diffing** — `http`/`https`, trailing slash, `www.`.
+    A false mismatch here means attaching a duplicate or draining the live one. Same bug class as
+    the `netloc`-only comparison at `boinc/operator/boinccmd.py:70`, but with worse consequences.
+  - **Credentials.** Attach takes an account key, not a password: `--lookup_account <url> <email>
+    <password>` first, then `--project_attach <url> <key>`. That is a *network call per project*
+    that can fail or rate-limit. It also multiplies the plaintext-secrets-at-DEBUG problem
+    (`main.py:37`) by the number of projects.
+  - **This is the first place a real retry loop earns its keep.** BOINC projects go offline for
+    days at a time; a one-shot attach at startup means "project was down at boot → silently never
+    attached until someone restarts the add-on". Additions want converge-with-backoff. Note the
+    asymmetry: retry the *additive* half, never police the removal half on a timer.
+  - **Partial failure becomes the normal case.** `configure_boinc_projects` returns a single bool
+    today; with N projects, per-project error isolation plus an aggregated result is needed — one
+    unreachable project must not block the other four, and the outcome has to reach the exit code
+    (see the always-exits-0 bug above).
 
 ## Housekeeping
 
