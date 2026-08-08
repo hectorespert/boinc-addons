@@ -1,6 +1,6 @@
 ---
 name: run-boinc-addons
-description: Build, run, and smoke-test the boinc and boinctui Home Assistant add-ons via plain Docker (no Supervisor needed). Use when asked to run boinc-addons, build/start the boinc or boinctui add-on, start the BOINC client in a container, talk to it via boinccmd, test the boinctui ttyd terminal UI, or run the operator's Python unit tests.
+description: Build, run, and smoke-test the boinc and boinctui Home Assistant add-ons, either via plain Docker or under a real Home Assistant Supervisor. Use when asked to run boinc-addons, build/start the boinc or boinctui add-on, start the BOINC client in a container, talk to it via boinccmd, test the boinctui ttyd terminal UI, test an add-on in Home Assistant/Supervisor/the devcontainer, or run the operator's Python unit tests.
 ---
 
 This repo ships two independent Home Assistant add-ons (`boinc/`, `boinctui/`), each
@@ -10,6 +10,12 @@ just a Dockerfile — no Supervisor is needed to build/run/drive them locally, p
 and verifies it's actually working (`boinccmd` RPC for `boinc`, an HTTP request to
 `ttyd` for `boinctui`), then tears everything down. All paths below are relative to
 the repo root.
+
+Plain Docker cannot see anything Supervisor does *around* the container: option
+schema validation, `config.yaml`/`build.yaml` conformance, translations, ingress,
+protection mode, watchdog. For those, use `supervisor.sh` (see "Run under a real
+Supervisor" below) — it is slower and heavier, so reach for `smoke.sh` first and
+escalate only when the question is about the add-on's Home Assistant surface.
 
 ## Prerequisites
 
@@ -62,6 +68,55 @@ request (no ingress header) gets a `407 Proxy Auth Required` from `ttyd`. This i
 only reachable through Home Assistant's Ingress in production, which injects the
 required header automatically.
 
+## Run under a real Supervisor
+
+Use this when the question is about the add-on's Home Assistant surface rather than
+its process: whether `config.yaml`/`build.yaml` are accepted, whether the option
+schema and `translations/*.yaml` render, whether ingress is wired, whether
+protection mode/watchdog behave. It boots the repo's `.devcontainer`
+(`ghcr.io/home-assistant/devcontainer:2-addons`) with a full Supervisor stack
+(`hassio_supervisor`, `cli`, `dns`, `audio`, `observer`, `multicast`,
+`homeassistant`) and installs the add-on from the local store, building it from
+your working tree.
+
+```bash
+./.claude/skills/run-boinc-addons/supervisor.sh up               # boot Supervisor (idempotent)
+./.claude/skills/run-boinc-addons/supervisor.sh install boinc    # stage + build + install + start
+./.claude/skills/run-boinc-addons/supervisor.sh install boinctui
+./.claude/skills/run-boinc-addons/supervisor.sh logs boinc       # the log as Supervisor sees it
+./.claude/skills/run-boinc-addons/supervisor.sh status
+./.claude/skills/run-boinc-addons/supervisor.sh down             # remove container + volumes (~5GB)
+```
+
+`install` prints the installed state, e.g.:
+
+```
+{"slug": "local_boinctui", "version": "2.4.1", "state": "started", "protected": true}
+```
+
+Cost: ~2GB of HA images on the first `up` (several minutes), plus a full add-on
+build per `install`. Everything lives inside the `ha-addons-dev` container and two
+named volumes; the repo is only ever read.
+
+Home Assistant's own UI is at `http://localhost:7123` once Core finishes starting,
+but you do not need it — add-ons install and run through Supervisor alone, which is
+why `up` waits on the Supervisor API rather than the UI.
+
+Useful probes once an add-on is installed (all through the CLI in `hassio_cli`):
+
+```bash
+docker exec ha-addons-dev bash -lc \
+  'docker exec hassio_cli ha apps info local_boinctui --raw-json' | jq -c '.data.ingress_url'
+# -> "/api/hassio_ingress/t8TZXaXBaLxQ9i9GCxhdl4e7yzqk0wrkOwIr3a3hsks/"
+
+docker exec ha-addons-dev bash -lc \
+  'docker exec hassio_cli ha apps info local_boinc --raw-json' | jq '.data.translations.es.configuration | length'
+# -> 10
+
+docker exec ha-addons-dev bash -lc 'docker logs hassio_supervisor 2>&1 | grep -i "apps.validate\|apps.build"'
+# config.yaml / build.yaml conformance warnings for your add-on land here
+```
+
 ## Test
 
 Operator unit tests (from `boinc/operator/`) need the `dict2xml` package, which
@@ -100,6 +155,30 @@ Gotchas.
   (`curl: (56) Recv failure: Connection reset by peer`) before it's actually
   listening — the driver retries with a short poll loop, so this only matters if
   you're curling it manually; retry once or two after a `sleep 0.5`.
+- **Supervisor mode, five traps, all handled by `supervisor.sh` — but you will hit
+  them the moment you drive it by hand:**
+  1. `supervisor_run` calls `stty sane` and runs under `set -e`, so without a TTY it
+     dies silently right after `Waiting for Docker to initialize...`. Use
+     `docker exec -dt`, never `-d` alone.
+  2. In docker-in-docker the `docker_gateway_unprotected` health check fails and
+     Supervisor refuses every install with `blocked from execution, system is not
+     healthy`. Clear it with `ha jobs options --ignore-conditions healthy`.
+  3. `devcontainer_bootstrap` bind-mounts the workspace into
+     `/mnt/supervisor/addons/local/`, but the current Supervisor reads its local
+     store from `/mnt/supervisor/apps/local/` (the add-on -> app rename). Stage
+     add-ons in `apps/local` or Supervisor silently uses the stale copy.
+  4. With `image:` present in `config.yaml`, Supervisor pulls the published image
+     instead of building your working tree — and 404s if that version isn't
+     released. Comment it out in the staged copy (the driver does).
+  5. Restarting `hassio_supervisor` by hand loses `/run/supervisor`, after which
+     Home Assistant Core fails to start with `bind source path does not exist`.
+     `mkdir -p /run/supervisor` before rebooting Supervisor fixes it.
+- **An installed add-on's metadata is a snapshot.** Supervisor stores the parsed
+  `config.yaml`/`translations` in `/mnt/supervisor/apps.json` at install time, so
+  `ha apps info` keeps serving the old values after you edit those files — even
+  across a Supervisor restart. Re-run `install` to re-read them.
+- **`ha apps logs local_boinctui` is legitimately empty** until something connects
+  through ingress: `ttyd` writes nothing on startup. `local_boinc` logs immediately.
 - **Operator unit tests silently under-report** if `dict2xml` isn't installed:
   `python -m unittest discover` still exits with a failure summary, but only 2 of
   the 5 test modules actually failed to import — read the `ModuleNotFoundError`,
@@ -117,3 +196,13 @@ Gotchas.
   `--workdir /data/boinc` on the `docker exec` call — see Gotchas.
 - **`curl` on boinctui's port → `407 Proxy Auth Required`**: missing the
   `X-Remote-User-Name` header — see Gotchas.
+- **Supervisor install fails with `Can't install ghcr.io/...:<version>: [404]
+  manifest unknown`**: it is pulling instead of building. Either `image:` is still
+  uncommented in the staged copy, or Supervisor is reading a stale copy from
+  `apps/local` — see Gotchas 3 and 4.
+- **Supervisor build fails with `/bin/bash: line 1: apt-get: command not found`**:
+  `build.yaml` was rejected and Supervisor fell back to its Alpine base. Check for
+  `Error parsing ... build config ... using defaults` in the Supervisor log; the
+  cause is a `build_from` value that doesn't match Supervisor's `owner/name` regex,
+  which is why both add-ons pin `docker.io/library/debian:...` rather than the bare
+  `debian:...`.

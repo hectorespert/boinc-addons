@@ -12,6 +12,8 @@ Redact passwords from the configuration dump written at DEBUG log level
 
 Fix the Spanish translation, which used translated structural keys and never applied
 
+Fix the base image in build.yaml being rejected by Supervisor, which broke building from source
+
 ## 3.7.0
 
 Update base from Debian 13.5 to Debian 13.6

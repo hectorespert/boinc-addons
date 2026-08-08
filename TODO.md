@@ -171,10 +171,11 @@ presentation pages, fetched 2026-08-08). Ordered roughly by impact.
   `es.yaml` is a faithful Spanish translation of the wrong thing, so Supervisor finds no
   `configuration:` block and silently falls back to English for every option label. Fix is
   mechanical: revert the four structural key names, keep all the Spanish strings.
-  (Side note: `network:` as a top-level translations key is used by `en.yaml` for the
-  `31416/tcp` port description — it did not appear in the docs pages fetched, so **verify it's a
-  supported key** rather than assuming; if it isn't, port descriptions need `ports_description:`
-  in `config.yaml` instead.)
+  (Side note, now resolved: `network:` **is** a supported top-level translations key. Verified
+  against a running Supervisor 2026-08-09 — it validates the key and rejects only bad *values*,
+  as seen on another add-on: `Can't read translations from .../adguard/translations/en.yaml -
+  expected str for dictionary value @ data['network']['53/udp']`. Our `31416/tcp` value is a
+  plain string, so it is fine. No `ports_description:` needed.)
 
 - [ ] **`icon.png` violates the documented aspect-ratio requirement in both apps.**
   Docs: "The aspect ratio of the icon must be 1x1 (square)", recommended 128x128px. Actual
@@ -214,18 +215,38 @@ presentation pages, fetched 2026-08-08). Ordered roughly by impact.
 ### Deprecated / template-copied config worth modernizing
 
 - [ ] **`map:` uses the legacy plain-string form.** `boinc/config.yaml:31-32` is
-  `map: [addon_config]`; the documented format is now structured:
-  ```yaml
-  map:
-    - type: addon_config
-      read_only: false
+  `map: [addon_config]`. **Corrected against a running Supervisor (2026-08-09): the
+  replacement is `app_config`, not the `type: addon_config` structured form recorded
+  here earlier.** Supervisor says so itself on every store scan:
   ```
-  with "Defaults to read-only, which you can change by adding the property read_only: false".
+  WARNING [supervisor.apps.validate] App 'BOINC' uses legacy map type 'addon_config';
+    use 'app_config' instead.
+  ```
+  The structured form with `read_only: false` is still how you opt out of the read-only
+  default ("Defaults to read-only, which you can change by adding the property read_only: false"),
+  so the target is presumably `- type: app_config` + `read_only: false` — verify the exact
+  accepted shape against Supervisor before changing it, the same way this was caught.
   This used to interact with the `global_prefs_override.py` clobber bug at the top of this file —
   a read-only mount turned the write-through-the-symlink into an uncaught `OSError` and a startup
   crash loop rather than silent truncation. **The early-`return` fix in 3.8.0 removed both failure
   modes**, so this item is now purely about modernizing the `map:` syntax and making the
   `read_only` intent explicit rather than inherited from a default.
+
+- [ ] **`build.yaml` itself is deprecated.** Supervisor, on every store scan:
+  `App local_boinc uses build.yaml which is deprecated. Move build parameters into the
+  Dockerfile directly.` Both add-ons still ship one. Note this does **not** compose with simply
+  deleting the file: Supervisor passes `--build-arg BUILD_FROM=<its default>` regardless, which
+  overrides the `ARG BUILD_FROM="docker.io/library/debian:13.6-slim"` default in the Dockerfile.
+  Work out what the supported replacement actually is before removing anything — the
+  `build_from` regex bug fixed in `boinc` 3.8.0 / `boinctui` 2.4.1 was found exactly here.
+
+- [ ] **`boinctui` sets `panel_icon` but never `ingress_panel: true`.**
+  `boinctui/config.yaml:10-12` has `ingress: true`, `ingress_port: 7681`, `panel_icon: mdi:console`.
+  Under a running Supervisor the installed add-on reports `"ingress_panel": false`, so the icon
+  configures a sidebar panel that is not enabled — ingress works (a real
+  `/api/hassio_ingress/<token>/` URL is issued), it just isn't in the sidebar. Check in the UI
+  whether a sidebar entry is wanted; if it is, add `ingress_panel: true`, if not, `panel_icon`
+  is dead config.
 
 - [ ] **`init: false` isn't justified by the documented reason, and `main.py` silently depends on
   it.** Docs: `init` defaults `true`; disable it "if the image has a custom init system (e.g.
@@ -286,9 +307,22 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
 
 ## Test coverage
 
-- [ ] `test_global_prefs_override.py` needs a case that supplies a config-dir override file
+- [x] **Done in `boinc` 3.8.0** — `test_should_not_overwrite_a_linked_global_prefs_override`.
+  `test_global_prefs_override.py` needs a case that supplies a config-dir override file
   *and* schedule/CPU options together, asserting the override file's original bytes survive —
   this is exactly the scenario the bug above breaks silently.
+
+- [ ] **Nothing exercises the Home Assistant surface in CI**, only the container. Everything under
+  "Conformance with the official HA apps docs" above is invisible to `docker build`/`docker run`:
+  `config.yaml`/`build.yaml` validation, option schema, translations, ingress, protection mode,
+  watchdog. There is now a local path for it —
+  `.claude/skills/run-boinc-addons/supervisor.sh` boots the repo's `.devcontainer` with a real
+  Supervisor and installs the add-on from the working tree — and it immediately paid for itself
+  (the `build_from` bug, the `app_config` correction, the `network:` verification, the
+  `ingress_panel` finding). Putting it in CI is a different question: Supervisor in
+  docker-in-docker needs `--privileged`, a TTY, a health-check override, and pulls ~2GB, so it is
+  slow and fragile. Realistic middle ground: keep it a documented manual step before releases that
+  touch `config.yaml`/`build.yaml`/`translations/`, and revisit a nightly (not per-PR) job later.
 - [ ] No test currently asserts on `gui_rpc_auth.py` logging behavior specifically (low
   priority — cosmetic — but flagging alongside the `venv.logger` import finding).
 - [ ] No test covers `main.py`'s exit-code/signal behavior (the `--exit-immediately` parsing bug,
