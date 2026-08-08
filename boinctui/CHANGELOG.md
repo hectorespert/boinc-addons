@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.0
+
+Update base from Debian 13.5 to Debian 13.6
+
 ## 2.3.4
 
 Maintenance update with minor improvements
