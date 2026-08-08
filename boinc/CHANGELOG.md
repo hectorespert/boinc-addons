@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.7.0
+
+Update base from Debian 13.5 to Debian 13.6
+
 ## 3.6.3
 
 Maintenance update with minor improvements
