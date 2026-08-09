@@ -4,7 +4,7 @@
 
 Let the BOINC client generate its own GUI RPC password when none is configured, instead of writing an empty one
 
-Write gui_rpc_auth.cfg with 0600 permissions, like the BOINC client does
+Write gui_rpc_auth.cfg with 0600 permissions, like the BOINC client does, and restrict an existing one written by an older version
 
 ## 3.8.1
 

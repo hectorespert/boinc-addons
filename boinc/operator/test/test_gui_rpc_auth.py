@@ -45,6 +45,18 @@ class GuiRpcAuthTestCase(unittest.TestCase):
         # rotate under anything that stored it.
         self.assertEqual(self.read_gui_rpc_auth(), 'b786c9882cdd189d4649a9a8430acb9d\n')
 
+    def test_should_restrict_a_kept_gui_rpc_auth_written_by_an_older_version(self):
+        with open(self.gui_rpc_auth, 'w') as f:
+            f.write('123456\n')
+        os.chmod(self.gui_rpc_auth, 0o644)
+
+        prepare_gui_rpc_auth(self.data_dir, None)
+
+        # Older versions wrote the file world-readable. Keeping the password is right, keeping the
+        # permissions is not.
+        self.assertEqual(self.read_gui_rpc_auth(), '123456\n')
+        self.assertEqual(stat.S_IMODE(os.stat(self.gui_rpc_auth).st_mode), 0o600)
+
     def test_should_create_an_empty_gui_rpc_auth_when_the_password_is_explicitly_empty(self):
         prepare_gui_rpc_auth(self.data_dir, '')
 
