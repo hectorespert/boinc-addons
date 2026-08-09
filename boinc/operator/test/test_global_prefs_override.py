@@ -89,7 +89,65 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
 
         self.assertFalse(os.path.islink(self.global_prefs_override))
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <niu_max_ncpus_pct>50</niu_max_ncpus_pct>\n  <niu_cpu_usage_limit>75.0</niu_cpu_usage_limit>\n</global_preferences>')
+                         '<global_preferences>\n  <max_ncpus_pct>50</max_ncpus_pct>\n  <cpu_usage_limit>75.0</cpu_usage_limit>\n</global_preferences>')
+
+    def test_should_create_global_prefs_override_with_idle_cpu_configurations(self):
+        link_global_prefs_override(self.data_dir, self.config_dir, {
+            'max_ncpus_idle': 10,
+            'cpu_usage_limit_idle': 20.0
+        })
+
+        self.assertFalse(os.path.islink(self.global_prefs_override))
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n  <niu_max_ncpus_pct>10</niu_max_ncpus_pct>\n  <niu_cpu_usage_limit>20.0</niu_cpu_usage_limit>\n</global_preferences>')
+
+    def test_should_write_all_managed_preferences_in_boinc_manager_order(self):
+        link_global_prefs_override(self.data_dir, self.config_dir, {
+            'start_hour': '00:35',
+            'end_hour': '08:59',
+            'max_ncpus': 50,
+            'cpu_usage_limit': 75.0,
+            'max_ncpus_idle': 10,
+            'cpu_usage_limit_idle': 20.0
+        })
+
+        # In-use pair, then not-in-use pair, the same order BOINC Manager's own preferences dialog
+        # presents them in.
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n'
+                         '  <start_hour>0.35</start_hour>\n'
+                         '  <end_hour>8.59</end_hour>\n'
+                         '  <max_ncpus_pct>50</max_ncpus_pct>\n'
+                         '  <cpu_usage_limit>75.0</cpu_usage_limit>\n'
+                         '  <niu_max_ncpus_pct>10</niu_max_ncpus_pct>\n'
+                         '  <niu_cpu_usage_limit>20.0</niu_cpu_usage_limit>\n'
+                         '</global_preferences>')
+
+    def test_should_migrate_a_stale_niu_preference_the_operator_wrote_to_the_in_use_key(self):
+        # An upgrading user who only ever set max_ncpus: their previous run wrote
+        # niu_max_ncpus_pct, both in the XML and in the managed-state file. With max_ncpus_idle
+        # still unset, the stale niu_ key must be removed -- BOINC then falls back to the new
+        # max_ncpus_pct for the not-in-use case too, so their effective idle limit is unchanged.
+        self.write_managed_state({'niu_max_ncpus_pct': 50})
+        self.write_preferences(self.global_prefs_override,
+                               '<global_preferences>\n  <niu_max_ncpus_pct>50</niu_max_ncpus_pct>\n</global_preferences>')
+
+        link_global_prefs_override(self.data_dir, self.config_dir, {'max_ncpus': 50})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n  <max_ncpus_pct>50</max_ncpus_pct>\n</global_preferences>')
+        self.assertEqual(self.read_managed_state(), {'max_ncpus_pct': 50})
+
+    def test_should_keep_a_niu_preference_set_from_boinctui_during_migration(self):
+        # Same starting XML as above, but the operator never wrote it (no managed state), meaning
+        # the user set it themselves from boinctui. It must survive untouched.
+        self.write_preferences(self.global_prefs_override,
+                               '<global_preferences>\n  <niu_max_ncpus_pct>50</niu_max_ncpus_pct>\n</global_preferences>')
+
+        link_global_prefs_override(self.data_dir, self.config_dir, {'max_ncpus': 50})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n  <niu_max_ncpus_pct>50</niu_max_ncpus_pct>\n  <max_ncpus_pct>50</max_ncpus_pct>\n</global_preferences>')
 
     def test_should_ignore_a_start_hour_without_an_end_hour(self):
         link_global_prefs_override(self.data_dir, self.config_dir, {'start_hour': '22:00'})
@@ -125,7 +183,7 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
         })
 
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <niu_max_ncpus_pct>50</niu_max_ncpus_pct>\n</global_preferences>')
+                         '<global_preferences>\n  <max_ncpus_pct>50</max_ncpus_pct>\n</global_preferences>')
 
     def test_should_withdraw_a_window_it_wrote_when_the_schedule_becomes_incomplete(self):
         link_global_prefs_override(self.data_dir, self.config_dir, {
@@ -146,7 +204,7 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
         link_global_prefs_override(self.data_dir, self.config_dir, {'max_ncpus': 50})
 
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <disk_max_used_gb>100</disk_max_used_gb>\n  <niu_max_ncpus_pct>50</niu_max_ncpus_pct>\n</global_preferences>')
+                         '<global_preferences>\n  <disk_max_used_gb>100</disk_max_used_gb>\n  <max_ncpus_pct>50</max_ncpus_pct>\n</global_preferences>')
 
     def test_should_update_a_managed_preference_in_place(self):
         self.write_preferences(self.global_prefs_override,
@@ -185,7 +243,7 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
         self.assertFalse(os.path.exists(self.configured_global_prefs_override))
         self.assertFalse(os.path.islink(self.global_prefs_override))
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <niu_max_ncpus_pct>50</niu_max_ncpus_pct>\n</global_preferences>')
+                         '<global_preferences>\n  <max_ncpus_pct>50</max_ncpus_pct>\n</global_preferences>')
 
     def test_should_regenerate_an_unparseable_global_prefs_override(self):
         self.write_preferences(self.global_prefs_override, '<global_preferences>\n  <start_hour>0.35')
@@ -193,7 +251,7 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
         link_global_prefs_override(self.data_dir, self.config_dir, {'cpu_usage_limit': 75.0})
 
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <niu_cpu_usage_limit>75.0</niu_cpu_usage_limit>\n</global_preferences>')
+                         '<global_preferences>\n  <cpu_usage_limit>75.0</cpu_usage_limit>\n</global_preferences>')
 
     def test_should_regenerate_a_global_prefs_override_with_an_unexpected_root(self):
         self.write_preferences(self.global_prefs_override, '<cc_config>\n  <log_flags></log_flags>\n</cc_config>')
@@ -201,7 +259,7 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
         link_global_prefs_override(self.data_dir, self.config_dir, {'cpu_usage_limit': 75.0})
 
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <niu_cpu_usage_limit>75.0</niu_cpu_usage_limit>\n</global_preferences>')
+                         '<global_preferences>\n  <cpu_usage_limit>75.0</cpu_usage_limit>\n</global_preferences>')
 
     def test_should_ignore_an_unreadable_managed_state(self):
         self.write_preferences(f'{self.data_dir}/{MANAGED_STATE_FILE}', 'not json')

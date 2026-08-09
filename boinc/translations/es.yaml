@@ -25,9 +25,15 @@ configuration:
     description: "Hora en que BOINC deja de computar. Debe configurarse junto con Hora de Inicio; si solo se pone una, o si ambas son iguales, se ignora"
   max_ncpus:
     name: Porcentaje Máximo de CPUs
-    description: "Porcentaje máximo de CPUs a utilizar"
+    description: "Porcentaje máximo de CPUs a utilizar mientras el equipo está en uso. También se aplica cuando no está en uso, salvo que se indique lo contrario más abajo"
   cpu_usage_limit:
     name: Porcentaje Máximo de Uso de CPU
-    description: "Tiempo máximo de uso por CPU"
+    description: "Porcentaje máximo de tiempo de uso de cada CPU mientras el equipo está en uso. También se aplica cuando no está en uso, salvo que se indique lo contrario más abajo"
+  max_ncpus_idle:
+    name: Porcentaje Máximo de CPUs (Sin Usar)
+    description: "Porcentaje máximo de CPUs a utilizar mientras el equipo no está en uso, en lugar de Porcentaje Máximo de CPUs"
+  cpu_usage_limit_idle:
+    name: Porcentaje Máximo de Uso de CPU (Sin Usar)
+    description: "Porcentaje máximo de tiempo que puede usarse cada CPU mientras el equipo no está en uso, en lugar de Porcentaje Máximo de Uso de CPU"
 network:
   31416/tcp: Puerto GUI RPC del cliente BOINC (por defecto 31416)
