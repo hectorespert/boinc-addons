@@ -95,14 +95,36 @@ resolved or discarded.
   the operator should warn (and probably refuse to write a half-window) when exactly one of the two
   is set, and the docs should say what the missing half defaults to.
 
-- [ ] **`gui_rpc_password` left unset writes an *empty* `gui_rpc_auth.cfg`, which is not the same
-  as having no file.** `gui_rpc_auth.py` always creates the file and only writes content
-  `if password:`. BOINC generates a random password when the file is *absent*; an empty file means
-  an empty password. Combined with `allow_remote_gui_rpc: true` (`boinc/config.yaml:19`) that would
-  be full control of the client from any host with no credential at all. **Not verified** — this is
-  read from the operator's code plus how BOINC is understood to treat the file; confirm what the
-  client actually does with an empty `gui_rpc_auth.cfg` before treating it as a real hole. If it is
-  one, the fix is to not create the file when no password is configured.
+- [ ] **`gui_rpc_password` left unset writes an *empty* `gui_rpc_auth.cfg`, disabling BOINC's own
+  secure default.** `gui_rpc_auth.py` always creates the file and only writes content
+  `if password:`, so leaving the option blank — a legitimate and probably common configuration,
+  it is `password?` in `boinc/config.yaml:16` — produces a 0-byte file. That is not "no
+  authentication", it is *the empty password*. Verified end to end (2026-08-09) against the real
+  image with `allow_remote_gui_rpc: true`, connecting from a second container:
+
+  ```
+  boinccmd --host <ip> --passwd ""          -> full control (get_cc_status, and with it
+                                               set_run_mode, project detach, ...)
+  boinccmd --host <ip> --passwd "loquesea"  -> Authorization failure: -155
+  ```
+
+  The wrong password being rejected is the proof: auth is active and the empty string is the valid
+  credential. And the counterfactual, running `boinc` with no operator against an empty data dir:
+
+  ```
+  -rw------- 32 bytes  b786c9882cdd189d4649a9a8430acb9d
+  ```
+
+  BOINC generates a random 32-character password and creates the file 0600 when it is *absent*. So
+  the operator is not failing to add a protection, it is **removing one** by creating the file
+  first. Fix: do not create `gui_rpc_auth.cfg` at all when no password is configured (and delete a
+  previously written one, since a leftover empty file would keep the hole open).
+
+  Scope: with the defaults (`allow_remote_gui_rpc` unset, `remote_hosts` empty) only localhost can
+  connect, so there is no exposure. The dangerous combination is no password *plus* remote RPC —
+  which is exactly the path `boinctui/DOCS.md:7-9` walks users through to connect the two add-ons.
+
+  Related, smaller: the operator writes the file `-rw-r--r--` (0644) where BOINC writes it 0600.
 
 ## State ownership — the operator vs. changes made outside it
 
