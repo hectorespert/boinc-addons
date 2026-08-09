@@ -20,14 +20,19 @@ FAKE_BOINC = textwrap.dedent("""\
     #!/usr/bin/env bash
     set -u
 
-    touch "$BOINC_MARKER_FILE"
-
     if [ -n "${FAKE_BOINC_EXIT_CODE:-}" ]; then
+        touch "$BOINC_MARKER_FILE"
         exit "$FAKE_BOINC_EXIT_CODE"
     fi
 
     trap 'echo TERM > "$BOINC_SIGNAL_FILE"; exit 0' TERM
     trap 'echo INT > "$BOINC_SIGNAL_FILE"; exit 0' INT
+
+    # Written only once the traps above are armed: the marker is what the tests wait on before
+    # signalling, so it has to mean "this client can record a signal", not merely "it started".
+    # Touching it any earlier leaves a window where a forwarded signal hits bash's default
+    # disposition and the signal file is never written.
+    touch "$BOINC_MARKER_FILE"
 
     while true; do
         sleep 0.05
