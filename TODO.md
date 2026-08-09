@@ -111,7 +111,21 @@ does not own and must not touch. Both bugs below are that rule being missing.
   needs. Normalising scheme + path (strip trailing `/`) would keep the leniency without the
   false match.
 
-- [ ] **Generated `global_prefs_override.xml` is a full overwrite, wiping TUI-set preferences.**
+- [x] **Fixed in `boinc` 3.8.1** — three-way merge with the operator's own last-applied state
+  (`.managed_global_prefs.json` in the data folder), the `kubectl apply` pattern also proposed for
+  the `projects:` item below. Provenance *cannot* live in the XML: verified in BOINC's source that
+  `GLOBAL_PREFS::write_subset` (`lib/prefs.cpp`) serializes only masked known fields with no
+  "unparsed" buffer, and `handle_set_global_prefs_override` (`client/gui_rpc_server_ops.cpp`)
+  writes the GUI's blob verbatim (`fprintf(f, "%s\n", buf)`) — deleting the file outright when the
+  blob is empty. So any marker the operator embedded would be destroyed by the first edit from
+  `boinctui`. Rule now applied per managed key: option set → write it; option unset **and the
+  operator wrote it last run** → remove it; option unset and never written by the operator →
+  leave it alone. Also switched the module from `dict2xml` to `xml.etree.ElementTree` so element
+  order, repeated elements and unknown structure survive editing (`cc_config.py` still uses
+  `dict2xml`, so the dependency stays). Verified end to end against a real client: `work_buf_min_days`
+  and `disk_max_used_gb` injected into the file survive a restart and show up in BOINC's own
+  "Computing preferences" dump.
+  **Generated `global_prefs_override.xml` is a full overwrite, wiping TUI-set preferences.**
   Distinct from the symlink bug above, and present even when no `/config` file exists.
   `global_prefs_override.py:39-40` writes a freshly built dict containing *only* the four keys the
   operator manages (`start_hour`, `end_hour`, `niu_max_ncpus_pct`, `niu_cpu_usage_limit`). BOINC
@@ -119,6 +133,29 @@ does not own and must not touch. Both bugs below are that rule being missing.
   `boinctui` outside those four keys (disk limits, memory, network) is dropped on the next
   operator start. Reading the existing XML and merging only the managed keys would preserve them —
   and would compose correctly with the early-`return` fix for the symlink bug.
+
+- [x] **Fixed in `boinc` 3.8.1** — `os.path.lexists` for the removal check, plus an explicit branch
+  that drops a symlink whose target is gone.
+  **A stale symlink made the operator recreate the file it was meant to read.**
+  Found while fixing the merge bug above. `link_global_prefs_override` used `os.path.exists()` to
+  decide whether to remove the previous file, and `exists()` follows symlinks — a broken one reads
+  as missing. Sequence: the user supplies `/config/global_prefs_override.xml`, the operator leaves
+  a symlink in the data folder, the user deletes the config file. On the next start the symlink is
+  not removed (broken), the symlink branch is not taken (target gone), and `open(path, 'w')` writes
+  *through* the broken link, **recreating the file in `/config`**. From then on the operator sees a
+  config file again on every start and is stuck on the symlink branch permanently, freezing the
+  user's preferences with generated content they never wrote.
+
+- [ ] **The operator only ever writes the `niu_` ("not in use") CPU limits.**
+  `global_prefs_override.py` maps `max_ncpus` → `niu_max_ncpus_pct` and `cpu_usage_limit` →
+  `niu_cpu_usage_limit`. In BOINC those are the limits that apply **while the computer is idle**;
+  the unprefixed `max_ncpus_pct` / `cpu_usage_limit` are never written, so no limit applies when
+  the host counts as in use. Confirmed against a running client (2026-08-09) with
+  `max_ncpus: 75.0` set — BOINC's own preferences dump reads `When computer is in use ... Use at
+  most 100% of the CPU time` with no CPU cap, and `When computer is not in use ... max CPUs used: 10`.
+  On a headless HA host "not in use" is the normal state so it mostly works, but `boinc/DOCS.md:94-101`
+  documents both options as unconditional limits. Decide whether the `niu_` choice was deliberate
+  (and document it) or whether both variants should be written.
 
 ## Security / permissions — needs documentation or review
 
