@@ -2,7 +2,8 @@ import logging
 import re
 import subprocess
 from time import sleep
-from urllib.parse import urlparse
+
+from url import canonicalize_url
 
 
 def get_state(data_folder: str) -> bool:
@@ -71,7 +72,7 @@ def configure_boinc_projects(data_folder: str, account_manager_url: str | None, 
             logging.debug(f'Account manager {account_manager_url} configured but not attached, attaching')
             return attach_account_manager(data_folder, account_manager_url, account_manager_username, account_manager_password)
 
-        elif urlparse(current_account_manager_url).netloc == urlparse(account_manager_url).netloc:
+        elif canonicalize_url(current_account_manager_url) == canonicalize_url(account_manager_url):
             logging.info(f'Account manager {account_manager_url} already attached, synchronizing')
             return sync_account_manager(data_folder)
 

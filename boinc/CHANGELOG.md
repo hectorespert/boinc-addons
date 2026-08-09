@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.8.5
+
+Always stop BOINC when the app is asked to stop, instead of leaving it running in some cases
+
+Avoid reporting a misleading account manager failure when the app is stopped while BOINC is still starting up
+
+Re-attach to the account manager when you correct its address, instead of continuing to sync with the previous one
+
 ## 3.8.4
 
 Stop the app with an error, visible in the Log tab, when only some of the three account manager options are set

@@ -22,7 +22,7 @@ parser.add_argument('--options', type=argparse.FileType('r', encoding='UTF-8'), 
 parser.add_argument('--data', type=str, required=True, help='BOINC data folder')
 parser.add_argument('--config', type=str, required=True, help='Add-on config folder')
 parser.add_argument("--log-level", default=logging.INFO, type=lambda x: getattr(logging, x))
-parser.add_argument("--exit-immediately", type=bool, help="Exit immediately after BOINC client is started", default=False)
+parser.add_argument("--exit-immediately", action='store_true', help="Exit immediately after BOINC client is started")
 
 args = parser.parse_args()
 logging.basicConfig(level=args.log_level, format='%(asctime)s %(levelname)s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
@@ -62,16 +62,22 @@ stopping_boinc_process = False
 def signal_handler(number, frame):
     global stopping_boinc_process
     logging.debug(f'Caught signal {number}')
-    if  number != signal.SIGINT and boinc_process.poll() is None:
+    # BOINC's client treats SIGHUP/SIGINT/SIGQUIT/SIGTERM identically (a clean, checkpointed
+    # shutdown), so all four are forwarded the same way. Registering a handler for SIGINT already
+    # replaces Python's default disposition (which would otherwise raise KeyboardInterrupt), so
+    # excluding it here would swallow it instead of leaving it to that default.
+    if boinc_process.poll() is None:
         logging.debug(f'Stopping BOINC client with signal {number}')
         stopping_boinc_process = True
         boinc_process.send_signal(number)
 
-logging.info(f'BOINC Add-on Operator started')
 signal.signal(signal.SIGHUP, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGQUIT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
+# Only true once the handlers above are registered, so it doubles as a synchronization point for
+# tests that need to signal this process and know the signal will actually be handled.
+logging.info(f'BOINC Add-on Operator started')
 
 boinc_process_initialized = False
 while boinc_process.poll() is None and not boinc_process_initialized:
@@ -82,12 +88,16 @@ while boinc_process.poll() is None and not boinc_process_initialized:
     else:
         logging.debug(f'Waiting for BOINC client to initialize')
 
-projects_configured = configure_boinc_projects(data_folder, options.get('account_manager_url'), options.get('account_manager_username'), options.get('account_manager_password'))
-if not projects_configured:
-    boinc_process.send_signal(signal.SIGTERM)
-    boinc_process.wait()
-    logging.error(f'BOINC Add-on Operator stopped: failed to configure BOINC projects')
-    sys.exit(1)
+# A stop requested during initialization (a signal, or the client dying on its own) already means
+# there is nothing left to configure: skipping this avoids running boinccmd against a client that
+# is no longer there to answer it, which would otherwise be misreported as a configuration failure.
+if not stopping_boinc_process and boinc_process.poll() is None:
+    projects_configured = configure_boinc_projects(data_folder, options.get('account_manager_url'), options.get('account_manager_username'), options.get('account_manager_password'))
+    if not projects_configured:
+        boinc_process.send_signal(signal.SIGTERM)
+        boinc_process.wait()
+        logging.error(f'BOINC Add-on Operator stopped: failed to configure BOINC projects')
+        sys.exit(1)
 
 if args.exit_immediately:
     logging.warning(f'Exiting immediately after BOINC client is started')
