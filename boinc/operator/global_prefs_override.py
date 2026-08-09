@@ -5,10 +5,15 @@ import xml.etree.ElementTree as ElementTree
 
 ROOT_ELEMENT = 'global_preferences'
 
-# The preferences this operator owns, in the order they are written. Everything else in
-# global_prefs_override.xml belongs to whoever put it there (boinctui, a remote BOINC Manager)
-# and is preserved untouched.
-MANAGED_PREFERENCES = ('start_hour', 'end_hour', 'niu_max_ncpus_pct', 'niu_cpu_usage_limit')
+# The preferences this operator owns, in the order they are written: the computing schedule pair,
+# then the in-use CPU limits, then their not-in-use ("niu_") counterparts -- the same order BOINC
+# Manager uses in its own preferences dialog. Everything else in global_prefs_override.xml belongs
+# to whoever put it there (boinctui, a remote BOINC Manager) and is preserved untouched.
+MANAGED_PREFERENCES = (
+    'start_hour', 'end_hour',
+    'max_ncpus_pct', 'cpu_usage_limit',
+    'niu_max_ncpus_pct', 'niu_cpu_usage_limit',
+)
 
 # What the operator wrote on its last run. BOINC cannot record this for us: the client writes the
 # blob a GUI sends it verbatim and drops any tag it does not know, so a marker inside the XML would
@@ -46,13 +51,26 @@ def build_managed_preferences(data: dict) -> dict:
             preferences['start_hour'] = start_hour
             preferences['end_hour'] = end_hour
 
+    # These two apply while the computer is in use, and BOINC itself falls back to them for the
+    # not-in-use case below when its counterpart is not set (lib/prefs.cpp, GLOBAL_PREFS::parse_override,
+    # on the closing </global_preferences> tag: "if not-in-use prefs weren't specified, use in-use
+    # counterpart").
     max_num_cpus = data.get('max_ncpus')
     if max_num_cpus is not None:
-        preferences['niu_max_ncpus_pct'] = max_num_cpus
+        preferences['max_ncpus_pct'] = max_num_cpus
 
     max_cpu_usage = data.get('cpu_usage_limit')
     if max_cpu_usage is not None:
-        preferences['niu_cpu_usage_limit'] = max_cpu_usage
+        preferences['cpu_usage_limit'] = max_cpu_usage
+
+    # These two apply only while the computer is not in use, overriding the fallback above.
+    max_num_cpus_idle = data.get('max_ncpus_idle')
+    if max_num_cpus_idle is not None:
+        preferences['niu_max_ncpus_pct'] = max_num_cpus_idle
+
+    max_cpu_usage_idle = data.get('cpu_usage_limit_idle')
+    if max_cpu_usage_idle is not None:
+        preferences['niu_cpu_usage_limit'] = max_cpu_usage_idle
 
     return preferences
 

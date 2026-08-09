@@ -275,7 +275,16 @@ does not own and must not touch. Both bugs below are that rule being missing.
   config file again on every start and is stuck on the symlink branch permanently, freezing the
   user's preferences with generated content they never wrote.
 
-- [ ] **The operator only ever writes the `niu_` ("not in use") CPU limits.**
+- [x] **Fixed in `boinc` 3.9.0** — `max_ncpus`/`cpu_usage_limit` now write the unprefixed
+  `max_ncpus_pct`/`cpu_usage_limit` keys, so they apply while the computer is in use as
+  `boinc/DOCS.md` always documented. Two new options, `max_ncpus_idle`/`cpu_usage_limit_idle`,
+  write the `niu_` keys for the not-in-use case; BOINC itself falls back to the in-use pair when
+  they are unset (`lib/prefs.cpp:398-406`, `GLOBAL_PREFS::parse_override`), so an upgrading user
+  who only had the two original options keeps the same effective limit in both states. Migration
+  needed no new code: the `niu_` keys stay in `MANAGED_PREFERENCES`, so a stale `niu_max_ncpus_pct`
+  the operator itself wrote on a previous run falls into the removal branch that has existed since
+  3.8.1, while one set by the user from `boinctui` is untouched.
+  **The operator only ever writes the `niu_` ("not in use") CPU limits.**
   `global_prefs_override.py` maps `max_ncpus` → `niu_max_ncpus_pct` and `cpu_usage_limit` →
   `niu_cpu_usage_limit`. In BOINC those are the limits that apply **while the computer is idle**;
   the unprefixed `max_ncpus_pct` / `cpu_usage_limit` are never written, so no limit applies when

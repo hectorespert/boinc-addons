@@ -107,14 +107,25 @@ time, is ignored — BOINC computes all the time — and a warning explaining wh
 #### Resource Usage Options
 
 - **max_ncpus** (optional, range: 0-100)
-  - Maximum percentage of CPUs to use
+  - Maximum percentage of CPUs to use while the computer is in use
   - Value represents the percentage of available CPU cores
   - Example: `50` means use up to 50% of available cores
+  - Also applies while the computer is not in use, unless `max_ncpus_idle` is set below
 
 - **cpu_usage_limit** (optional, range: 0-100)
-  - Maximum CPU usage percentage per core
+  - Maximum CPU usage percentage per core while the computer is in use
   - Value represents the percentage of time each CPU can be used
   - Example: `75` means each CPU can be used up to 75% of the time
+  - Also applies while the computer is not in use, unless `cpu_usage_limit_idle` is set below
+
+- **max_ncpus_idle** (optional, range: 0-100)
+  - Maximum percentage of CPUs to use while the computer is **not** in use, instead of `max_ncpus`
+  - Leave unset to use the same limit in both cases
+
+- **cpu_usage_limit_idle** (optional, range: 0-100)
+  - Maximum CPU usage percentage per core while the computer is **not** in use, instead of
+    `cpu_usage_limit`
+  - Leave unset to use the same limit in both cases
 
 ### Example Configurations
 
@@ -144,6 +155,18 @@ account_manager_username: "youremail@example.com"
 account_manager_password: "your_password"
 max_ncpus: 50
 cpu_usage_limit: 75
+```
+
+#### Full Speed Only When the Computer Is Not in Use
+
+```yaml
+account_manager_url: "https://scienceunited.org"
+account_manager_username: "youremail@example.com"
+account_manager_password: "your_password"
+max_ncpus: 25
+cpu_usage_limit: 25
+max_ncpus_idle: 100
+cpu_usage_limit_idle: 100
 ```
 
 #### Remote Control Setup
@@ -177,11 +200,11 @@ file — see [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOve
 format. Place it in this app's config folder, which appears as `addon_configs/…_boinc` in the
 File editor and Samba apps.
 
-When that file is present, the app uses it as-is and the `start_hour`, `end_hour`, `max_ncpus` and
-`cpu_usage_limit` options are ignored.
+When that file is present, the app uses it as-is and the `start_hour`, `end_hour`, `max_ncpus`,
+`cpu_usage_limit`, `max_ncpus_idle` and `cpu_usage_limit_idle` options are ignored.
 
-Otherwise, the app only manages those four settings. Anything else you set from boinctui or a
+Otherwise, the app only manages those six settings. Anything else you set from boinctui or a
 remote BOINC Manager — disk limits, memory, network, work buffer, even a schedule using the same
-start/end time fields — is preserved across restarts and updates. Setting one of the four options
+start/end time fields — is preserved across restarts and updates. Setting one of the six options
 applies it, and removing it from the options clears it again, without touching preferences you set
 yourself elsewhere.

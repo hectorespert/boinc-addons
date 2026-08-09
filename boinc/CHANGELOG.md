@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.9.0
+
+`max_ncpus` and `cpu_usage_limit` now also limit CPU usage while the computer is in use, instead of only while it is not in use
+
+Added `max_ncpus_idle` and `cpu_usage_limit_idle` to set a different CPU limit for while the computer is not in use
+
 ## 3.8.5
 
 Always stop BOINC when the app is asked to stop, instead of leaving it running in some cases
