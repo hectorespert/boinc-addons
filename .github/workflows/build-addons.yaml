@@ -113,7 +113,7 @@ jobs:
             -v $(pwd)/operator/options.json:/data/options.json:ro \
             "${IMAGE_TAG}" \
             --log-level DEBUG \
-            --exit-immediately true
+            --exit-immediately
 
   manifest:
     name: Publish multi-arch manifest

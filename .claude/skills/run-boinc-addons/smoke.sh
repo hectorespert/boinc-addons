@@ -17,14 +17,14 @@ boinc_smoke() {
   echo "== boinc: build =="
   ( cd "$REPO_ROOT/boinc" && docker build -t boinc-addon-test:local . )
 
-  echo "== boinc: CI-style smoke test (--exit-immediately true) =="
+  echo "== boinc: CI-style smoke test (--exit-immediately) =="
   docker volume rm -f boinc_test_local >/dev/null 2>&1 || true
   docker run --uts=host --pid=host --rm \
     -v boinc_test_local:/data \
     -v "$REPO_ROOT/boinc/operator/options.json:/data/options.json:ro" \
     boinc-addon-test:local \
     --log-level DEBUG \
-    --exit-immediately true
+    --exit-immediately
   echo "-> exit-immediately smoke test passed (exit code 0, see log above for 'BOINC client initialized')"
 
   echo "== boinc: persistent run + boinccmd exec check =="

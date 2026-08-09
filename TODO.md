@@ -32,7 +32,14 @@ resolved or discarded.
   it's not guaranteed stable across Python versions. Looks like an autocomplete/typo accident
   rather than an intentional import.
 
-- [ ] **`--exit-immediately` is parsed with `type=bool`, so any non-empty string is truthy.**
+- [x] **Fixed in `boinc` 3.8.5** — `action='store_true'`, so the flag now takes no value at all
+  (default `False`, present means `True`), which removes the possibility of a truthy string
+  entirely instead of guarding against one. Updated the three call sites that passed the literal
+  `true` to just pass the bare flag: `build-addons.yaml:116`,
+  `.claude/skills/run-boinc-addons/smoke.sh:27`, `.claude/skills/run-boinc-addons/SKILL.md:44`.
+  No live incident either before or after, as the write-up below already noted — this closes the
+  landmine, not a bug anyone hit.
+  **`--exit-immediately` is parsed with `type=bool`, so any non-empty string is truthy.**
   `boinc/operator/main.py:23`: `parser.add_argument("--exit-immediately", type=bool, ...)`.
   Verified in-session:
   ```
@@ -52,7 +59,24 @@ resolved or discarded.
   this flag from a variable that can be `"false"`. Fix is `action=argparse.BooleanOptionalAction`
   or explicit string parsing.
 
-- [ ] **`SIGINT` is caught but neither forwarded nor acted on — Ctrl-C hangs the container.**
+- [x] **Fixed in `boinc` 3.8.5** — the `number != signal.SIGINT` exclusion is gone; all four
+  signals are now forwarded identically. Verified against BOINC's own client source
+  (`client/main.cpp:157-175`): it treats `SIGINT` exactly like `SIGTERM`, a clean shutdown with
+  checkpointing, so forwarding it is correct and idempotent even if something else already
+  delivered the signal to the whole process group.
+  **Correction to the write-up below, measured against a container built from `main` before this
+  fix — the claimed symptom was backwards.** Interactive Ctrl-C (`docker run -it`, a real pty)
+  already worked, by accident: the terminal delivers `SIGINT` to the whole foreground process
+  group, so the BOINC client receives it directly and shuts down cleanly regardless of what the
+  operator does with its own copy of the signal. The real failure was any `SIGINT` that reaches
+  *only* the operator process — `docker kill -s INT`, a bare `kill -INT <pid>`, an orchestrator
+  signalling the container's PID 1 without a foreground pty in the mix. In that case the operator
+  logs that it caught the signal and then does nothing else: BOINC is never signaled (no matching
+  line in its own log) and the container runs forever. So "Ctrl-C hangs the container" below is
+  not what was actually observed; "a `SIGINT` delivered to the operator alone is swallowed and
+  BOINC is never asked to stop" is. The fix is correct either way, since forwarding is what both
+  cases need.
+  **`SIGINT` is caught but neither forwarded nor acted on — Ctrl-C hangs the container.**
   `boinc/operator/main.py:58-68` registers `signal_handler` for `SIGHUP`/`SIGINT`/`SIGQUIT`/`SIGTERM`,
   but the handler body (`main.py:60`) explicitly skips forwarding when
   `number == signal.SIGINT`, and does nothing else (no exit, no re-raise). Because
@@ -188,7 +212,27 @@ does not own and must not touch. Both bugs below are that rule being missing.
   "detach it" intent needs to be expressible separately (explicit empty string, or a
   `manage_account_manager: bool` gate).
 
-- [ ] **Only the account-manager *host* is compared, so same-host URL changes are missed.**
+- [x] **Fixed in `boinc` 3.8.5** — rather than inventing a new normalisation, the fix mirrors
+  BOINC's own `canonicalize_master_url` (`lib/url.cpp`), which the client already applies to the
+  account manager URL before storing it (`client/acct_mgr.cpp`) — so what `boinccmd --acct_mgr
+  info` reports is already in this form, and comparing through the same function compares URLs
+  exactly the way the client itself would. New module `boinc/operator/url.py`,
+  `canonicalize_url()`, not a private helper in `boinccmd.py`, because the `projects:` item below
+  needs the same function. Rules: no scheme, or any scheme other than `https`, becomes `http`;
+  repeated slashes collapse to one; a trailing slash is always appended; only the host is
+  lower-cased, never the path.
+
+  | configured | stored by the client | before | after |
+  |---|---|---|---|
+  | `https://scienceunited.org` | `https://scienceunited.org/` | sync | sync |
+  | `scienceunited.org` (no scheme) | `http://scienceunited.org/` | **detach+attach on every start** | sync |
+  | `https://host/a` vs. `https://host/b` | — | **sync against the old one** | detach+attach |
+  | `http://x` vs. `https://x` | — | sync | detach+attach |
+
+  The last two rows are deliberate behavior changes; the last one is in the CHANGELOG, since
+  correcting an account manager's scheme now re-attaches instead of silently staying on the old
+  one.
+  **Only the account-manager *host* is compared, so same-host URL changes are missed.**
   `boinc/operator/boinccmd.py:70` compares `urlparse(...).netloc` of current vs. desired. Two
   account managers on the same host but different paths compare equal, so the operator logs
   "already attached, synchronizing" and syncs against the old one. Probably deliberate leniency
@@ -494,7 +538,13 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
   0600 permissions, and both upgrade paths (empty file removed, generated password kept).
   No test currently asserts on `gui_rpc_auth.py` logging behavior specifically (low
   priority — cosmetic — but flagging alongside the `venv.logger` import finding).
-- [ ] No test covers `main.py`'s exit-code/signal behavior (the `--exit-immediately` parsing bug,
+- [x] **Fixed in `boinc` 3.8.5** — `test/test_main.py`, a subprocess-based suite: two fake
+  executables (`boinc`, `boinccmd`) written into a temp dir prepended to `PATH`, exercising the
+  real script end to end. Covers: `--exit-immediately` stopping the client; `SIGINT` and `SIGTERM`
+  sent to the operator both reaching the client; the operator exiting 1 when the client exits
+  non-zero on its own; and `SIGTERM` during initialization exiting cleanly without the misleading
+  "failed to configure" message (the extras fix above).
+  No test covers `main.py`'s exit-code/signal behavior (the `--exit-immediately` parsing bug,
   the SIGINT swallow, and the always-exits-0 issue above) — reasonable since `main.py` is a script
   with no functions to import, but worth a lightweight subprocess-based test if any of those get
   fixed, so they don't regress silently.
