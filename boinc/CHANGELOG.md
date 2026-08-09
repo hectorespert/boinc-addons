@@ -2,43 +2,43 @@
 
 ## 3.8.4
 
-Stop with an error when the account manager is only partially configured, instead of starting and contributing to nothing
+Stop the app with an error, visible in the Log tab, when only some of the three account manager options are set
 
 ## 3.8.3
 
-Ignore an incomplete computing schedule instead of letting BOINC fill the missing hour with midnight
+Ignore an incomplete computing schedule instead of silently starting it at midnight
 
-Ignore a computing schedule whose start and end hours are equal, which BOINC reads as no restriction
+Ignore a computing schedule whose start and end hours are equal, since BOINC treats that as no restriction at all
 
 ## 3.8.2
 
-Let the BOINC client generate its own GUI RPC password when none is configured, instead of writing an empty one
+Let the BOINC client generate its own GUI RPC password when none is configured, instead of leaving it blank
 
-Write gui_rpc_auth.cfg with 0600 permissions, like the BOINC client does, and restrict an existing one written by an older version
+Restrict access to the file that stores the GUI RPC password, matching what the BOINC client itself does, including one written by an older version of the app
 
-Stop writing the GUI RPC password through a symlinked gui_rpc_auth.cfg, which would put it outside the data folder
+Guarantee the GUI RPC password is always written inside the app's own data, never followed out through a symlink
 
 ## 3.8.1
 
-Keep preferences set from boinctui or a remote BOINC Manager instead of overwriting global_prefs_override.xml on every start
+Keep preferences set from boinctui or a remote BOINC Manager instead of resetting them on every restart
 
-Stop recreating a deleted global_prefs_override.xml in the config folder through a stale symlink
+Fix a deleted custom preferences override file being silently recreated, so removing it now works and the app's own scheduling and CPU options apply again
 
-Fix the documented filename for a custom preferences override, which was global_preferences_override.xml
+Fix the documented filename for a custom preferences override, which was wrong
 
 ## 3.8.0
 
-Fix a custom global_prefs_override.xml being overwritten on every start
+Fix a custom preferences override file being overwritten on every start
 
-Keep an account manager attached outside the app options instead of detaching it
+Keep an account manager attached when it was set up outside the app's configuration, instead of detaching it
 
-Exit with a non-zero code when startup fails, so a crash is no longer reported as a clean stop
+Report app startup failures clearly instead of showing them as a normal stop
 
-Redact passwords from the configuration dump written at DEBUG log level
+Stop passwords from appearing in the app's logs
 
-Fix the Spanish translation, which used translated structural keys and never applied
+Fix the Spanish translation not applying
 
-Fix the base image in build.yaml being rejected by Supervisor, which broke building from source
+Fix the app failing to build from source
 
 ## 3.7.0
 

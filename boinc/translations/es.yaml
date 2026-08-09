@@ -1,7 +1,7 @@
 configuration:
   gui_rpc_password:
     name: "Contraseña GUI RPC"
-    description: "Definir una contraseña GUI RPC para conectarse de forma remota"
+    description: "Contraseña para controlar este cliente BOINC de forma remota, por ejemplo desde boinctui. Configúrala si vas a conectarte de forma remota — consulta la documentación de la app para saber qué ocurre si la dejas vacía"
   remote_hosts:
     name: Hosts remotos
     description: Lista de hosts remotos para permitir la conexión remota
@@ -10,22 +10,22 @@ configuration:
     description: Permitir todas las conexiones GUI RPC remotas (Anula los hosts remotos)
   account_manager_url:
     name: URL del Gestor de Cuentas
-    description: "URL de un Gestor de Cuentas BOINC, por ejemplo: https://scienceunited.org"
+    description: "URL de un Gestor de Cuentas BOINC, por ejemplo https://scienceunited.org. Configura las tres opciones del Gestor de Cuentas a la vez, o ninguna: si solo configuras algunas, la app no arranca"
   account_manager_username:
     name: Nombre de Usuario del Gestor de Cuentas
-    description: "Nombre de usuario registrado en el Gestor de Cuentas BOINC"
+    description: "Nombre de usuario registrado en el Gestor de Cuentas BOINC. Obligatorio junto con las otras dos opciones del Gestor de Cuentas, o la app no arrancará"
   account_manager_password:
     name: Contraseña del Gestor de Cuentas
-    description: "Contraseña del usuario configurado en el Gestor de Cuentas BOINC"
+    description: "Contraseña del usuario configurado en el Gestor de Cuentas BOINC. Obligatoria junto con las otras dos opciones del Gestor de Cuentas, o la app no arrancará"
   start_hour:
     name: Hora de Inicio
-    description: "Hora en que BOINC comienza a computar"
+    description: "Hora en que BOINC comienza a computar. Debe configurarse junto con Hora de Fin; si solo se pone una, o si ambas son iguales, se ignora"
   end_hour:
     name: Hora de Fin
-    description: "Hora en que BOINC deja de computar"
+    description: "Hora en que BOINC deja de computar. Debe configurarse junto con Hora de Inicio; si solo se pone una, o si ambas son iguales, se ignora"
   max_ncpus:
     name: Porcentaje Máximo de CPUs
-    description: "Número máximo de CPUs a utilizar"
+    description: "Porcentaje máximo de CPUs a utilizar"
   cpu_usage_limit:
     name: Porcentaje Máximo de Uso de CPU
     description: "Tiempo máximo de uso por CPU"

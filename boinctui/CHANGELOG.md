@@ -2,7 +2,7 @@
 
 ## 2.4.1
 
-Fix the base image in build.yaml being rejected by Supervisor, which broke building from source
+Fix the app failing to build from source
 
 ## 2.4.0
 
