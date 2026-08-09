@@ -157,4 +157,10 @@ cpu_usage_limit: 75
 
 ### Global Preferences Override
 
-To override the preferences of the BOINC client, a `global_preferences_override.xml` file can be defined in the app config folder: [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOverride)
+To override the preferences of the BOINC client, a `global_prefs_override.xml` file can be defined in the app config folder: [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOverride)
+
+When that file is present the app uses it as-is, and the `start_hour`, `end_hour`, `max_ncpus` and `cpu_usage_limit` options are ignored.
+
+Otherwise the app writes those four preferences into BOINC's own `global_prefs_override.xml`, and leaves every other preference in that file alone. Anything you set from `boinctui` or a remote BOINC Manager — disk limits, memory, network, work buffer — is preserved across restarts and updates.
+
+Those four preferences follow the options: setting one applies it, and removing it from the options clears it again. A preference the app never wrote is treated as yours and is never removed, so a schedule set from `boinctui` survives even though it uses the same fields.

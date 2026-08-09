@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.8.1
+
+Keep preferences set from boinctui or a remote BOINC Manager instead of overwriting global_prefs_override.xml on every start
+
+Stop recreating a deleted global_prefs_override.xml in the config folder through a stale symlink
+
+Fix the documented filename for a custom preferences override, which was global_preferences_override.xml
+
 ## 3.8.0
 
 Fix a custom global_prefs_override.xml being overwritten on every start

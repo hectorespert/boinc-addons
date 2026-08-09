@@ -74,6 +74,58 @@ resolved or discarded.
   "crashed"; a bad account-manager password currently looks identical, from the outside, to a
   deliberate stop. Only an *unhandled* Python exception produces a non-zero exit today.
 
+- [ ] **`start_hour` and `end_hour` are documented as a pair but nothing enforces it, and setting
+  one alone silently creates a different schedule than the user asked for.**
+  `boinc/DOCS.md:90` says end_hour "Must be used together with `start_hour`", but
+  `global_prefs_override.py` writes whichever option is set and BOINC fills the missing one with
+  its default of 0 — midnight. Neither the schema (`boinc/config.yaml:23-24`, both plain
+  `match(...)?`) nor the operator validates the pair or warns. Verified against a live client with
+  `boinccmd --get_cc_status` at 09:02 UTC (2026-08-09):
+
+  | options | effective window | status at 09:02 |
+  |---|---|---|
+  | neither | always | `suspended: CPU is busy` (no time restriction) |
+  | `start_hour: 22:00` alone | **22:00 → 00:00** | `suspended: time of day` |
+  | `start_hour: 08:00` alone | **08:00 → 00:00** | no time-of-day suspension |
+  | `end_hour: 20:00` alone | **00:00 → 20:00** | no time-of-day suspension |
+
+  So a user who sets only `start_hour: 22:00`, meaning "compute from 22:00 onwards", gets computing
+  that **stops at midnight** — no error, no warning in the log, nothing visible in the Supervisor
+  UI. This is the most likely of the open bugs to bite a normal configuration. Fix has two halves:
+  the operator should warn (and probably refuse to write a half-window) when exactly one of the two
+  is set, and the docs should say what the missing half defaults to.
+
+- [ ] **`gui_rpc_password` left unset writes an *empty* `gui_rpc_auth.cfg`, disabling BOINC's own
+  secure default.** `gui_rpc_auth.py` always creates the file and only writes content
+  `if password:`, so leaving the option blank — a legitimate and probably common configuration,
+  it is `password?` in `boinc/config.yaml:16` — produces a 0-byte file. That is not "no
+  authentication", it is *the empty password*. Verified end to end (2026-08-09) against the real
+  image with `allow_remote_gui_rpc: true`, connecting from a second container:
+
+  ```
+  boinccmd --host <ip> --passwd ""          -> full control (get_cc_status, and with it
+                                               set_run_mode, project detach, ...)
+  boinccmd --host <ip> --passwd "loquesea"  -> Authorization failure: -155
+  ```
+
+  The wrong password being rejected is the proof: auth is active and the empty string is the valid
+  credential. And the counterfactual, running `boinc` with no operator against an empty data dir:
+
+  ```
+  -rw------- 32 bytes  b786c9882cdd189d4649a9a8430acb9d
+  ```
+
+  BOINC generates a random 32-character password and creates the file 0600 when it is *absent*. So
+  the operator is not failing to add a protection, it is **removing one** by creating the file
+  first. Fix: do not create `gui_rpc_auth.cfg` at all when no password is configured (and delete a
+  previously written one, since a leftover empty file would keep the hole open).
+
+  Scope: with the defaults (`allow_remote_gui_rpc` unset, `remote_hosts` empty) only localhost can
+  connect, so there is no exposure. The dangerous combination is no password *plus* remote RPC —
+  which is exactly the path `boinctui/DOCS.md:7-9` walks users through to connect the two add-ons.
+
+  Related, smaller: the operator writes the file `-rw-r--r--` (0644) where BOINC writes it 0600.
+
 ## State ownership — the operator vs. changes made outside it
 
 Root cause shared by the items below: the operator writes BOINC state at startup as if it were the
@@ -111,7 +163,21 @@ does not own and must not touch. Both bugs below are that rule being missing.
   needs. Normalising scheme + path (strip trailing `/`) would keep the leniency without the
   false match.
 
-- [ ] **Generated `global_prefs_override.xml` is a full overwrite, wiping TUI-set preferences.**
+- [x] **Fixed in `boinc` 3.8.1** — three-way merge with the operator's own last-applied state
+  (`.managed_global_prefs.json` in the data folder), the `kubectl apply` pattern also proposed for
+  the `projects:` item below. Provenance *cannot* live in the XML: verified in BOINC's source that
+  `GLOBAL_PREFS::write_subset` (`lib/prefs.cpp`) serializes only masked known fields with no
+  "unparsed" buffer, and `handle_set_global_prefs_override` (`client/gui_rpc_server_ops.cpp`)
+  writes the GUI's blob verbatim (`fprintf(f, "%s\n", buf)`) — deleting the file outright when the
+  blob is empty. So any marker the operator embedded would be destroyed by the first edit from
+  `boinctui`. Rule now applied per managed key: option set → write it; option unset **and the
+  operator wrote it last run** → remove it; option unset and never written by the operator →
+  leave it alone. Also switched the module from `dict2xml` to `xml.etree.ElementTree` so element
+  order, repeated elements and unknown structure survive editing (`cc_config.py` still uses
+  `dict2xml`, so the dependency stays). Verified end to end against a real client: `work_buf_min_days`
+  and `disk_max_used_gb` injected into the file survive a restart and show up in BOINC's own
+  "Computing preferences" dump.
+  **Generated `global_prefs_override.xml` is a full overwrite, wiping TUI-set preferences.**
   Distinct from the symlink bug above, and present even when no `/config` file exists.
   `global_prefs_override.py:39-40` writes a freshly built dict containing *only* the four keys the
   operator manages (`start_hour`, `end_hour`, `niu_max_ncpus_pct`, `niu_cpu_usage_limit`). BOINC
@@ -119,6 +185,29 @@ does not own and must not touch. Both bugs below are that rule being missing.
   `boinctui` outside those four keys (disk limits, memory, network) is dropped on the next
   operator start. Reading the existing XML and merging only the managed keys would preserve them —
   and would compose correctly with the early-`return` fix for the symlink bug.
+
+- [x] **Fixed in `boinc` 3.8.1** — `os.path.lexists` for the removal check, plus an explicit branch
+  that drops a symlink whose target is gone.
+  **A stale symlink made the operator recreate the file it was meant to read.**
+  Found while fixing the merge bug above. `link_global_prefs_override` used `os.path.exists()` to
+  decide whether to remove the previous file, and `exists()` follows symlinks — a broken one reads
+  as missing. Sequence: the user supplies `/config/global_prefs_override.xml`, the operator leaves
+  a symlink in the data folder, the user deletes the config file. On the next start the symlink is
+  not removed (broken), the symlink branch is not taken (target gone), and `open(path, 'w')` writes
+  *through* the broken link, **recreating the file in `/config`**. From then on the operator sees a
+  config file again on every start and is stuck on the symlink branch permanently, freezing the
+  user's preferences with generated content they never wrote.
+
+- [ ] **The operator only ever writes the `niu_` ("not in use") CPU limits.**
+  `global_prefs_override.py` maps `max_ncpus` → `niu_max_ncpus_pct` and `cpu_usage_limit` →
+  `niu_cpu_usage_limit`. In BOINC those are the limits that apply **while the computer is idle**;
+  the unprefixed `max_ncpus_pct` / `cpu_usage_limit` are never written, so no limit applies when
+  the host counts as in use. Confirmed against a running client (2026-08-09) with
+  `max_ncpus: 75.0` set — BOINC's own preferences dump reads `When computer is in use ... Use at
+  most 100% of the CPU time` with no CPU cap, and `When computer is not in use ... max CPUs used: 10`.
+  On a headless HA host "not in use" is the normal state so it mostly works, but `boinc/DOCS.md:94-101`
+  documents both options as unconditional limits. Decide whether the `niu_` choice was deliberate
+  (and document it) or whether both variants should be written.
 
 ## Security / permissions — needs documentation or review
 
