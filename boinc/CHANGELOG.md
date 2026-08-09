@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.8.4
+
+Stop with an error when the account manager is only partially configured, instead of starting and contributing to nothing
+
 ## 3.8.3
 
 Ignore an incomplete computing schedule instead of letting BOINC fill the missing hour with midnight

@@ -61,7 +61,11 @@ def configure_boinc_projects(data_folder: str, account_manager_url: str | None, 
         current_account_manager_read = True
 
     if any([account_manager_url, account_manager_username, account_manager_password]) and not all([account_manager_url, account_manager_username, account_manager_password]):
-        logging.warning(f'To configure an Account manager the URL, username and password must be all set')
+        # Half an account manager has no safe reading: attaching is impossible, and carrying on
+        # would leave the app looking healthy while contributing to nothing at all. Stop instead,
+        # so the mistake reaches the exit code rather than scrolling past in the log.
+        logging.error(f'Incomplete account manager configuration: account_manager_url, account_manager_username and account_manager_password must all be set, or all be empty')
+        return False
     elif account_manager_url is not None and account_manager_username is not None and account_manager_password is not None:
         if current_account_manager_url is None:
             logging.debug(f'Account manager {account_manager_url} configured but not attached, attaching')

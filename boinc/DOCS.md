@@ -62,6 +62,10 @@ manager at all: an account manager you attached yourself — from the boinctui a
 Manager, or `boinccmd` — is left as it is. Detaching it is done the same way you attached it, for
 example `boinccmd --acct_mgr detach`.
 
+Setting only some of the three is a configuration error and **the app stops with an error in the
+log** rather than starting. Attaching is impossible without all three, and starting anyway would
+leave the app looking healthy while it contributes to nothing at all.
+
 #### Remote Control Options
 
 - **gui_rpc_password** (optional)

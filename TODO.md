@@ -674,7 +674,16 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
   functional impact, but it would need a full rewrite — not just re-enabling — before it could
   ever be turned on. Either rewrite it to match the real process tree or delete it so it doesn't
   mislead a future contributor into thinking AppArmor support is closer than it is.
-- [ ] `configure_boinc_projects` (`boinc/operator/boinccmd.py:45-90`) logs a warning and returns
+- [x] **Fixed in `boinc` 3.8.4** — it now logs an error and returns `False`, which `main.py` turns
+  into a stopped client and `sys.exit(1)`. This is the one place in the add-on where the official
+  hard-fail pattern fits: `home-assistant/addons` uses `bashio::exit.nok` in 17 places, and the
+  closest precedent is `zwave_js/rootfs/etc/cont-init.d/config.sh`, which refuses to start when
+  `network_key` and `s0_legacy_key` disagree — *"we are unsure which one to use. One needs to be
+  removed from the configuration in order to start the app"*. Half an account manager is the same
+  shape: no safe reading, and continuing leaves the app looking healthy while contributing to
+  nothing. Contrast with the schedule pair in 3.8.3, which degrades instead precisely because it
+  *does* have a documented safe reading ("if not set, BOINC computes all the time").
+  `configure_boinc_projects` (`boinc/operator/boinccmd.py:45-90`) logs a warning and returns
   `True` (success) when account-manager options are partially set (e.g. URL without
   username/password) — `boinccmd.py:63-64`. That's arguably the right runtime behavior (don't
   tear down a running client over a config typo), but it means an invalid partial config is
@@ -682,3 +691,11 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
   surfacing it as an error in the Supervisor UI. Low priority; noting since it compounds the
   "always exits 0" issue above — there's currently no path from *misconfigured account manager*
   to *visible failure state*.
+
+  Caveat worth knowing, measured on a running Supervisor (2026-08-09): a hard failure is **not**
+  loud. The add-on container runs with Docker restart policy `no`, so with the Watchdog toggle off
+  — the default — the app simply reports `state: stopped`, indistinguishable from a stop the user
+  asked for; the only trace is the log line. With Watchdog on, Supervisor restarts it within five
+  seconds (`Watchdog found app BOINC is stopped, restarting...`), so a permanent config error
+  becomes a restart loop. Exiting non-zero is still the right call here — a silent healthy-looking
+  app that computes nothing is worse — but do not assume the user will see an error in the UI.
