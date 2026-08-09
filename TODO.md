@@ -411,6 +411,51 @@ presentation pages, fetched 2026-08-08). Ordered roughly by impact.
 - `boinctui` has no `translations/` dir, but its `config.yaml` declares no `schema:` at all, so
   there is nothing to translate. Not a gap.
 
+## Config schema — breaking redesign, for a future major
+
+- [ ] **Collapse `start_hour` + `end_hour` into a single `computing_window` option.** Breaking
+  change to the option schema, so it belongs in the next major (`4.0.0`), not a patch.
+
+  **Why.** There are three tiers of configuration validation available here, and only the first
+  one is visible to a user who does not read logs:
+
+  1. *The schema.* An option without `?` is required, and a value that fails its `match(...)` is
+     rejected by Supervisor **before the container starts**, with the error surfaced in the UI.
+  2. *A runtime hard failure.* `bashio::exit.nok` in the official add-ons, `sys.exit(1)` here.
+     Measured on a running Supervisor (2026-08-09): with the Watchdog toggle off — the default —
+     the app just reports `state: stopped`, indistinguishable from a stop the user asked for.
+     With Watchdog on it becomes a restart loop. Either way the explanation is only in the log.
+  3. *Degrade and warn.* A log line, nothing more.
+
+  The schedule bugs fixed in 3.8.3 (half a window, and an equal pair) can only be caught at
+  tier 3 today, because HA's option schema validates field by field and cannot express "these two
+  go together". A single string makes the illegal state unrepresentable, moving the whole class up
+  to tier 1:
+
+  ```yaml
+  computing_window: "match(^(?:[01]\\d|2[0-3]):[0-5]\\d-(?:[01]\\d|2[0-3]):[0-5]\\d$)?"
+  ```
+
+  **What it does not fix.** `22:00-22:00` still matches that regex, and BOINC reads an equal pair
+  as no restriction at all. The runtime check from 3.8.3 has to stay; only the half-window class
+  disappears.
+
+  **Migration is the hard part, and the obvious assumption is wrong.** Supervisor does *not*
+  reject an option that is missing from the schema — it drops it and logs a warning nobody reads.
+  Verified by POSTing an unknown option to a running Supervisor:
+
+  ```
+  WARNING [supervisor.apps.options] Option 'computing_window' does not exist in the schema
+    for BOINC (local_boinc)
+  ```
+
+  The add-on then started normally with `options.json` = `{}`. So a straight rename would make
+  every existing user's schedule **silently vanish**, and BOINC would quietly start computing
+  24/7 — the exact failure mode 3.8.3 was written to prevent, reintroduced by the migration.
+  The transition therefore needs at least: keep all three keys in the schema for a full minor
+  release, prefer `computing_window` when set, log a deprecation warning when the old pair is
+  used, and only drop `start_hour`/`end_hour` in the major after that.
+
 ## Config schema — feature gaps vs. upstream BOINC preferences
 
 `boinc/config.yaml:16-27` covers account manager, remote RPC, a computing time window, and two
