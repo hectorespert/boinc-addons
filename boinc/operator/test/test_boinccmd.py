@@ -89,6 +89,8 @@ class ConfigureBoincProjectsTestCase(unittest.TestCase):
 
         self.assertFalse(configure_boinc_projects('a data folder', ACCOUNT_MANAGER_URL, ACCOUNT_MANAGER_USERNAME, None))
 
+        self.assertEqual(executed_commands(run), [['--acct_mgr', 'info']])
+
     @patch('boinccmd.subprocess.run')
     def test_should_fail_an_incomplete_account_manager_without_detaching_the_attached_one(self, run):
         run.return_value = account_manager_info(ACCOUNT_MANAGER_URL)
