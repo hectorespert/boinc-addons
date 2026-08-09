@@ -137,3 +137,12 @@ editing files outside a changed add-on's directory does not trigger its pipeline
   `config.yaml`/directory names/internal code still say "addon"/"add-on".
 - When Claude Code creates a commit in this repo, use an `Assisted-by:` trailer instead of the
   default `Co-Authored-By:` trailer.
+- Everything Home Assistant shows on an app's page is end-user documentation: `DOCS.md`
+  (Documentation tab), `CHANGELOG.md` (Changelog tab and the GitHub Release body) and
+  `translations/*.yaml` (the text under each field in the Configuration tab). The reader is
+  configuring an app in a UI, not reading code: write what to set, what happens if you set it
+  wrong, and where to see it. Keep out internal filenames, container paths, permissions, exit
+  codes, and BOINC/operator implementation details; that reasoning belongs in `TODO.md`, code
+  comments, or the PR description. Never point a user at a file or command they can't reach from
+  the Home Assistant UI, the File editor add-on, or Samba. When an option's behavior changes,
+  update its text in `translations/` too.

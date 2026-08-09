@@ -6,11 +6,13 @@ The BOINC app, running on your Home Assistant, downloads scientific computing jo
 
 ## ⚠️ Important: Protection Mode
 
-**This app requires Protection Mode to be disabled.**
+**This app requires Protection Mode to be disabled** so it can see CPU usage across your whole
+Home Assistant host and pause BOINC computing whenever other apps need the CPU.
 
-Protection Mode must be turned off because the app needs to monitor system-wide CPU usage across all processes on the host system. This functionality is essential to automatically suspend BOINC computations when other applications need CPU resources, preventing BOINC from interfering with your Home Assistant instance or other critical services.
+To disable it: **Settings → Add-ons → BOINC → Info**, then turn off **Protection mode**.
 
-**Security Note:** Disabling Protection Mode grants the container elevated access to host resources. Only enable this app if you understand and accept the security implications.
+**Security Note:** Disabling Protection Mode grants this app elevated access to host resources.
+Only install it if you understand and accept that.
 
 ## How to use
 
@@ -56,25 +58,24 @@ There is a boinctui app available for this purpose [here](https://github.com/hec
   - Password for the configured user in the BOINC Account Manager
   - Required if `account_manager_url` is set
 
-When these three options are set, the app keeps the BOINC client attached to that account manager,
-replacing a different one if needed. When they are left empty, the app does not touch the account
-manager at all: an account manager you attached yourself — from the boinctui app, a remote BOINC
-Manager, or `boinccmd` — is left as it is. Detaching it is done the same way you attached it, for
-example `boinccmd --acct_mgr detach`.
+Set all three and the app keeps the BOINC client attached to that account manager, replacing a
+different one if needed. Leave all three empty and the app leaves the account manager alone: one
+you attached yourself — from the boinctui app, a remote BOINC Manager, or a command-line tool —
+stays attached. Detach it the same way you attached it.
 
-Setting only some of the three is a configuration error and **the app stops with an error in the
-log** rather than starting. Attaching is impossible without all three, and starting anyway would
-leave the app looking healthy while it contributes to nothing at all.
+**Set only one or two of the three and the app will not start.** Open the app's **Log** tab to see
+why.
 
 #### Remote Control Options
 
 - **gui_rpc_password** (optional)
-  - Define a GUI RPC password to connect remotely
-  - Leave it unset and the BOINC client generates a random password of its own on first start,
-    which you can read from `gui_rpc_auth.cfg` in the BOINC data folder. It stays the same across
-    restarts, so you can copy it into the boinctui app
-  - Set it to an empty string (`gui_rpc_password: ""`) to deliberately use *no* password. Only do
-    this if remote access is off, since it lets any host allowed by `remote_hosts` or
+  - Password required to control this BOINC client remotely, for example from the boinctui app
+  - If you plan to connect from the boinctui app, set a password here and use that same password
+    there
+  - Leave it unset and the client makes up its own private password on first start — Home
+    Assistant gives you no way to see it, so set your own here instead
+  - Set it to an explicit empty string (`gui_rpc_password: ""`) to use *no* password at all. Only
+    do this while remote access is off, since it would let any host allowed by `remote_hosts` or
     `allow_remote_gui_rpc` take full control of the client with no credential
 
 - **remote_hosts** (optional)
@@ -99,14 +100,9 @@ leave the app looking healthy while it contributes to nothing at all.
   - Format: 24-hour time (e.g., `18:00`, `06:00`)
   - Must be used together with `start_hour`
 
-Both hours define a single window and only work as a pair, the same way BOINC Manager always sets
-them together. Setting just one of them, or setting both to the same time, is ignored with a
-warning in the log, and BOINC computes all the time:
-
-- The app does not guess a missing half, because BOINC's own default for it is midnight and that
-  would silently produce a window you never asked for.
-- BOINC reads an equal pair as no restriction at all, so `22:00`–`22:00` is not a 24-hour window;
-  BOINC Manager rejects that combination outright for the same reason.
+Both hours must be set together, or neither. Setting just one of them, or setting both to the same
+time, is ignored — BOINC computes all the time — and a warning explaining why appears in the app's
+**Log** tab.
 
 #### Resource Usage Options
 
@@ -176,10 +172,16 @@ cpu_usage_limit: 75
 
 ### Global Preferences Override
 
-To override the preferences of the BOINC client, a `global_prefs_override.xml` file can be defined in the app config folder: [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOverride)
+For full control over BOINC's preferences, you can supply your own `global_prefs_override.xml`
+file — see [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOverride) for the
+format. Place it in this app's config folder, which appears as `addon_configs/…_boinc` in the
+File editor and Samba apps.
 
-When that file is present the app uses it as-is, and the `start_hour`, `end_hour`, `max_ncpus` and `cpu_usage_limit` options are ignored.
+When that file is present, the app uses it as-is and the `start_hour`, `end_hour`, `max_ncpus` and
+`cpu_usage_limit` options are ignored.
 
-Otherwise the app writes those four preferences into BOINC's own `global_prefs_override.xml`, and leaves every other preference in that file alone. Anything you set from `boinctui` or a remote BOINC Manager — disk limits, memory, network, work buffer — is preserved across restarts and updates.
-
-Those four preferences follow the options: setting one applies it, and removing it from the options clears it again. A preference the app never wrote is treated as yours and is never removed, so a schedule set from `boinctui` survives even though it uses the same fields.
+Otherwise, the app only manages those four settings. Anything else you set from boinctui or a
+remote BOINC Manager — disk limits, memory, network, work buffer, even a schedule using the same
+start/end time fields — is preserved across restarts and updates. Setting one of the four options
+applies it, and removing it from the options clears it again, without touching preferences you set
+yourself elsewhere.

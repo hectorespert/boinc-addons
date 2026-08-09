@@ -1,7 +1,7 @@
 configuration:
   gui_rpc_password:
     name: "GUI RPC password"
-    description: "Define a GUI RPC password to connect remotely"
+    description: "Password to control this BOINC client remotely, e.g. from boinctui. Set one if you plan to connect remotely — see the app documentation for what leaving it empty does"
   remote_hosts:
     name: Remote hosts
     description: List of remote hosts to allow remote connection
@@ -10,22 +10,22 @@ configuration:
     description: Allow all remote GUI RPC connections (overrides remote hosts)
   account_manager_url:
     name: Account Manager URL
-    description: "A URL for a BOINC Account Manager, for example: https://scienceunited.org"
+    description: "A URL for a BOINC Account Manager, e.g. https://scienceunited.org. Set all three account manager options together, or leave all three empty — setting only some stops the app from starting"
   account_manager_username:
     name: Account Manager Username
-    description: "A username for a user registered in the BOINC Account Manager"
+    description: "A username for a user registered in the BOINC Account Manager. Required together with the other two account manager options, or the app will not start"
   account_manager_password:
     name: Account Manager Password
-    description: "Password for the configured user in the BOINC Account Manager"
+    description: "Password for the configured user in the BOINC Account Manager. Required together with the other two account manager options, or the app will not start"
   start_hour:
     name: Start Hour
-    description: "Configure the hour when BOINC starts computing"
+    description: "Configure the hour when BOINC starts computing. Must be set together with End Hour; setting only one of them, or setting both to the same time, is ignored"
   end_hour:
     name: End Hour
-    description: "Configure the hour when BOINC stops computing"
+    description: "Configure the hour when BOINC stops computing. Must be set together with Start Hour; setting only one of them, or setting both to the same time, is ignored"
   max_ncpus:
     name: Max CPUs Percentage
-    description: "Maximum number of CPUs to use"
+    description: "Maximum percentage of CPUs to use"
   cpu_usage_limit:
     name: Max CPU Usage Percentage
     description: "Maximum time of usage per CPU"
