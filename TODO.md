@@ -74,6 +74,36 @@ resolved or discarded.
   "crashed"; a bad account-manager password currently looks identical, from the outside, to a
   deliberate stop. Only an *unhandled* Python exception produces a non-zero exit today.
 
+- [ ] **`start_hour` and `end_hour` are documented as a pair but nothing enforces it, and setting
+  one alone silently creates a different schedule than the user asked for.**
+  `boinc/DOCS.md:90` says end_hour "Must be used together with `start_hour`", but
+  `global_prefs_override.py` writes whichever option is set and BOINC fills the missing one with
+  its default of 0 — midnight. Neither the schema (`boinc/config.yaml:23-24`, both plain
+  `match(...)?`) nor the operator validates the pair or warns. Verified against a live client with
+  `boinccmd --get_cc_status` at 09:02 UTC (2026-08-09):
+
+  | options | effective window | status at 09:02 |
+  |---|---|---|
+  | neither | always | `suspended: CPU is busy` (no time restriction) |
+  | `start_hour: 22:00` alone | **22:00 → 00:00** | `suspended: time of day` |
+  | `start_hour: 08:00` alone | **08:00 → 00:00** | no time-of-day suspension |
+  | `end_hour: 20:00` alone | **00:00 → 20:00** | no time-of-day suspension |
+
+  So a user who sets only `start_hour: 22:00`, meaning "compute from 22:00 onwards", gets computing
+  that **stops at midnight** — no error, no warning in the log, nothing visible in the Supervisor
+  UI. This is the most likely of the open bugs to bite a normal configuration. Fix has two halves:
+  the operator should warn (and probably refuse to write a half-window) when exactly one of the two
+  is set, and the docs should say what the missing half defaults to.
+
+- [ ] **`gui_rpc_password` left unset writes an *empty* `gui_rpc_auth.cfg`, which is not the same
+  as having no file.** `gui_rpc_auth.py` always creates the file and only writes content
+  `if password:`. BOINC generates a random password when the file is *absent*; an empty file means
+  an empty password. Combined with `allow_remote_gui_rpc: true` (`boinc/config.yaml:19`) that would
+  be full control of the client from any host with no credential at all. **Not verified** — this is
+  read from the operator's code plus how BOINC is understood to treat the file; confirm what the
+  client actually does with an empty `gui_rpc_auth.cfg` before treating it as a real hole. If it is
+  one, the fix is to not create the file when no password is configured.
+
 ## State ownership — the operator vs. changes made outside it
 
 Root cause shared by the items below: the operator writes BOINC state at startup as if it were the
