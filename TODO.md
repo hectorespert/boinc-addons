@@ -411,6 +411,51 @@ presentation pages, fetched 2026-08-08). Ordered roughly by impact.
 - `boinctui` has no `translations/` dir, but its `config.yaml` declares no `schema:` at all, so
   there is nothing to translate. Not a gap.
 
+## Config schema — breaking redesign, for a future major
+
+- [ ] **Collapse `start_hour` + `end_hour` into a single `computing_window` option.** Breaking
+  change to the option schema, so it belongs in the next major (`4.0.0`), not a patch.
+
+  **Why.** There are three tiers of configuration validation available here, and only the first
+  one is visible to a user who does not read logs:
+
+  1. *The schema.* An option without `?` is required, and a value that fails its `match(...)` is
+     rejected by Supervisor **before the container starts**, with the error surfaced in the UI.
+  2. *A runtime hard failure.* `bashio::exit.nok` in the official add-ons, `sys.exit(1)` here.
+     Measured on a running Supervisor (2026-08-09): with the Watchdog toggle off — the default —
+     the app just reports `state: stopped`, indistinguishable from a stop the user asked for.
+     With Watchdog on it becomes a restart loop. Either way the explanation is only in the log.
+  3. *Degrade and warn.* A log line, nothing more.
+
+  The schedule bugs fixed in 3.8.3 (half a window, and an equal pair) can only be caught at
+  tier 3 today, because HA's option schema validates field by field and cannot express "these two
+  go together". A single string makes the illegal state unrepresentable, moving the whole class up
+  to tier 1:
+
+  ```yaml
+  computing_window: "match(^(?:[01]\\d|2[0-3]):[0-5]\\d-(?:[01]\\d|2[0-3]):[0-5]\\d$)?"
+  ```
+
+  **What it does not fix.** `22:00-22:00` still matches that regex, and BOINC reads an equal pair
+  as no restriction at all. The runtime check from 3.8.3 has to stay; only the half-window class
+  disappears.
+
+  **Migration is the hard part, and the obvious assumption is wrong.** Supervisor does *not*
+  reject an option that is missing from the schema — it drops it and logs a warning nobody reads.
+  Verified by POSTing an unknown option to a running Supervisor:
+
+  ```
+  WARNING [supervisor.apps.options] Option 'computing_window' does not exist in the schema
+    for BOINC (local_boinc)
+  ```
+
+  The add-on then started normally with `options.json` = `{}`. So a straight rename would make
+  every existing user's schedule **silently vanish**, and BOINC would quietly start computing
+  24/7 — the exact failure mode 3.8.3 was written to prevent, reintroduced by the migration.
+  The transition therefore needs at least: keep all three keys in the schema for a full minor
+  release, prefer `computing_window` when set, log a deprecation warning when the old pair is
+  used, and only drop `start_hour`/`end_hour` in the major after that.
+
 ## Config schema — feature gaps vs. upstream BOINC preferences
 
 `boinc/config.yaml:16-27` covers account manager, remote RPC, a computing time window, and two
@@ -674,7 +719,16 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
   functional impact, but it would need a full rewrite — not just re-enabling — before it could
   ever be turned on. Either rewrite it to match the real process tree or delete it so it doesn't
   mislead a future contributor into thinking AppArmor support is closer than it is.
-- [ ] `configure_boinc_projects` (`boinc/operator/boinccmd.py:45-90`) logs a warning and returns
+- [x] **Fixed in `boinc` 3.8.4** — it now logs an error and returns `False`, which `main.py` turns
+  into a stopped client and `sys.exit(1)`. This is the one place in the add-on where the official
+  hard-fail pattern fits: `home-assistant/addons` uses `bashio::exit.nok` in 17 places, and the
+  closest precedent is `zwave_js/rootfs/etc/cont-init.d/config.sh`, which refuses to start when
+  `network_key` and `s0_legacy_key` disagree — *"we are unsure which one to use. One needs to be
+  removed from the configuration in order to start the app"*. Half an account manager is the same
+  shape: no safe reading, and continuing leaves the app looking healthy while contributing to
+  nothing. Contrast with the schedule pair in 3.8.3, which degrades instead precisely because it
+  *does* have a documented safe reading ("if not set, BOINC computes all the time").
+  `configure_boinc_projects` (`boinc/operator/boinccmd.py:45-90`) logs a warning and returns
   `True` (success) when account-manager options are partially set (e.g. URL without
   username/password) — `boinccmd.py:63-64`. That's arguably the right runtime behavior (don't
   tear down a running client over a config typo), but it means an invalid partial config is
@@ -682,3 +736,11 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
   surfacing it as an error in the Supervisor UI. Low priority; noting since it compounds the
   "always exits 0" issue above — there's currently no path from *misconfigured account manager*
   to *visible failure state*.
+
+  Caveat worth knowing, measured on a running Supervisor (2026-08-09): a hard failure is **not**
+  loud. The add-on container runs with Docker restart policy `no`, so with the Watchdog toggle off
+  — the default — the app simply reports `state: stopped`, indistinguishable from a stop the user
+  asked for; the only trace is the log line. With Watchdog on, Supervisor restarts it within five
+  seconds (`Watchdog found app BOINC is stopped, restarting...`), so a permanent config error
+  becomes a restart loop. Exiting non-zero is still the right call here — a silent healthy-looking
+  app that computes nothing is worse — but do not assume the user will see an error in the UI.

@@ -74,10 +74,28 @@ class ConfigureBoincProjectsTestCase(unittest.TestCase):
         ])
 
     @patch('boinccmd.subprocess.run')
-    def test_should_not_configure_a_partially_configured_account_manager(self, run):
+    def test_should_fail_when_only_the_account_manager_url_is_configured(self, run):
         run.return_value = account_manager_info(None)
 
-        self.assertTrue(configure_boinc_projects('a data folder', ACCOUNT_MANAGER_URL, None, None))
+        # Half an account manager cannot be attached, and a warning would let the app look healthy
+        # while contributing to nothing.
+        self.assertFalse(configure_boinc_projects('a data folder', ACCOUNT_MANAGER_URL, None, None))
+
+        self.assertEqual(executed_commands(run), [['--acct_mgr', 'info']])
+
+    @patch('boinccmd.subprocess.run')
+    def test_should_fail_when_the_account_manager_password_is_missing(self, run):
+        run.return_value = account_manager_info(None)
+
+        self.assertFalse(configure_boinc_projects('a data folder', ACCOUNT_MANAGER_URL, ACCOUNT_MANAGER_USERNAME, None))
+
+        self.assertEqual(executed_commands(run), [['--acct_mgr', 'info']])
+
+    @patch('boinccmd.subprocess.run')
+    def test_should_fail_an_incomplete_account_manager_without_detaching_the_attached_one(self, run):
+        run.return_value = account_manager_info(ACCOUNT_MANAGER_URL)
+
+        self.assertFalse(configure_boinc_projects('a data folder', None, ACCOUNT_MANAGER_USERNAME, None))
 
         self.assertEqual(executed_commands(run), [['--acct_mgr', 'info']])
 
