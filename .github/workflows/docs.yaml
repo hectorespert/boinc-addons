@@ -14,10 +14,6 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -46,6 +42,13 @@ jobs:
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Scoped to this job, not the whole workflow: pull request runs never deploy, so sharing the
+    # group with them only let them evict main's queued deployment. Newer commits cancel older
+    # deployments instead of queueing behind them, so a deploy that hangs waiting for the
+    # github-pages environment cannot block every later run.
+    concurrency:
+      group: "pages"
+      cancel-in-progress: true
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
