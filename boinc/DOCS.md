@@ -95,6 +95,11 @@ example `boinccmd --acct_mgr detach`.
   - Format: 24-hour time (e.g., `18:00`, `06:00`)
   - Must be used together with `start_hour`
 
+Both hours define a single window and only work as a pair. Setting just one of them is ignored,
+with a warning in the log, and BOINC computes all the time — the app does not guess the missing
+half, because BOINC's own default for it is midnight and that would silently produce a window you
+never asked for.
+
 #### Resource Usage Options
 
 - **max_ncpus** (optional, range: 0-100)

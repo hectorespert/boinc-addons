@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.8.3
+
+Ignore an incomplete computing schedule instead of letting BOINC fill the missing hour with midnight
+
 ## 3.8.2
 
 Let the BOINC client generate its own GUI RPC password when none is configured, instead of writing an empty one

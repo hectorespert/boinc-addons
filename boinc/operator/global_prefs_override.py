@@ -23,10 +23,19 @@ def build_managed_preferences(data: dict) -> dict:
     preferences = {}
 
     start_hour = data.get('start_hour')
+    end_hour = data.get('end_hour')
+
+    if (start_hour is None) != (end_hour is None):
+        # BOINC fills the missing half with its own default of 0, midnight, so writing only one of
+        # them produces a window nobody asked for: start_hour alone stops computing at midnight,
+        # end_hour alone never starts before it. Drop the pair and let BOINC compute all the time,
+        # which is what an unset schedule means.
+        logging.warning(f'Ignoring the computing schedule: start_hour and end_hour must both be set to define a window')
+        start_hour = end_hour = None
+
     if start_hour is not None:
         preferences['start_hour'] = convert_time_to_boinc_format(start_hour)
 
-    end_hour = data.get('end_hour')
     if end_hour is not None:
         preferences['end_hour'] = convert_time_to_boinc_format(end_hour)
 
