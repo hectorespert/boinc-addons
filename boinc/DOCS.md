@@ -66,6 +66,12 @@ example `boinccmd --acct_mgr detach`.
 
 - **gui_rpc_password** (optional)
   - Define a GUI RPC password to connect remotely
+  - Leave it unset and the BOINC client generates a random password of its own on first start,
+    which you can read from `gui_rpc_auth.cfg` in the BOINC data folder. It stays the same across
+    restarts, so you can copy it into the boinctui app
+  - Set it to an empty string (`gui_rpc_password: ""`) to deliberately use *no* password. Only do
+    this if remote access is off, since it lets any host allowed by `remote_hosts` or
+    `allow_remote_gui_rpc` take full control of the client with no credential
 
 - **remote_hosts** (optional)
   - List of remote hosts to allow remote connection

@@ -22,7 +22,9 @@ resolved or discarded.
   only asserts the symlink exists — it never checks file content, so the bug has no test
   coverage catching it. Needs an early `return` after the symlink branch.
 
-- [ ] **`gui_rpc_auth.py` imports `logger` from the stdlib `venv` module.**
+- [x] **Fixed in `boinc` 3.8.2** — the module was rewritten for the empty-password fix above and
+  now uses `logging` throughout.
+  **`gui_rpc_auth.py` imports `logger` from the stdlib `venv` module.**
   `boinc/operator/gui_rpc_auth.py:3` does `from venv import logger` and calls `logger.debug(...)`
   at line 9, instead of using its own `logging.getLogger(__name__)` like every other module in
   `operator/`. It happens to work because CPython's `venv` package exposes a module-level
@@ -95,7 +97,16 @@ resolved or discarded.
   the operator should warn (and probably refuse to write a half-window) when exactly one of the two
   is set, and the docs should say what the missing half defaults to.
 
-- [ ] **`gui_rpc_password` left unset writes an *empty* `gui_rpc_auth.cfg`, disabling BOINC's own
+- [x] **Fixed in `boinc` 3.8.2** — three states instead of two, which a real Supervisor confirms
+  are distinguishable (2026-08-09): an unset option arrives as `{}` while `gui_rpc_password: ""`
+  reaches `options.json` intact as an empty string. Unset → the operator does not create the file
+  and BOINC generates its own password; explicitly empty → an empty file, opting into no password
+  on purpose; set → written as before, now with 0600 permissions. An empty file left by an older
+  version is removed so upgrading closes the hole, while a password BOINC generated itself is kept
+  so it does not rotate on every restart. `test_gui_rpc_auth.py` grew from 3 cases to 8, and the
+  `from venv import logger` import at the top of the module (its own open item below) went with the
+  rewrite.
+  **`gui_rpc_password` left unset writes an *empty* `gui_rpc_auth.cfg`, disabling BOINC's own
   secure default.** `gui_rpc_auth.py` always creates the file and only writes content
   `if password:`, so leaving the option blank — a legitimate and probably common configuration,
   it is `password?` in `boinc/config.yaml:16` — produces a 0-byte file. That is not "no
@@ -103,13 +114,21 @@ resolved or discarded.
   image with `allow_remote_gui_rpc: true`, connecting from a second container:
 
   ```
-  boinccmd --host <ip> --passwd ""          -> full control (get_cc_status, and with it
-                                               set_run_mode, project detach, ...)
-  boinccmd --host <ip> --passwd "loquesea"  -> Authorization failure: -155
+  attacker: boinccmd --host <ip> --passwd "" --set_run_mode never 300
+
+  empty gui_rpc_auth.cfg   -> no error, and the target's own get_cc_status then reports
+                              `current mode: never` -- the attacker really did take control
+  BOINC-generated password -> Operation failed: authentication error, target unchanged
+  configured password      -> Operation failed: authentication error, target unchanged
   ```
 
-  The wrong password being rejected is the proof: auth is active and the empty string is the valid
-  credential. And the counterfactual, running `boinc` with no operator against an empty data dir:
+  Measure this with a *privileged* RPC and check the effect on the target. `--get_cc_status` is
+  answered without authentication by design, so it shows "success" against a password-protected
+  client and proves nothing; `boinccmd` also exits 0 on an auth failure, and the message is
+  `Operation failed: authentication error`, not the `Authorization failure: -155` that a *wrong*
+  password produces. Two false positives to avoid when re-checking this.
+
+  And the counterfactual, running `boinc` with no operator against an empty data dir:
 
   ```
   -rw------- 32 bytes  b786c9882cdd189d4649a9a8430acb9d
@@ -412,7 +431,9 @@ adding (each is a `dict2xml` key away, same pattern as `global_prefs_override.py
   docker-in-docker needs `--privileged`, a TTY, a health-check override, and pulls ~2GB, so it is
   slow and fragile. Realistic middle ground: keep it a documented manual step before releases that
   touch `config.yaml`/`build.yaml`/`translations/`, and revisit a nightly (not per-PR) job later.
-- [ ] No test currently asserts on `gui_rpc_auth.py` logging behavior specifically (low
+- [x] **Done in `boinc` 3.8.2** — `test_gui_rpc_auth.py` now covers all three password states, the
+  0600 permissions, and both upgrade paths (empty file removed, generated password kept).
+  No test currently asserts on `gui_rpc_auth.py` logging behavior specifically (low
   priority — cosmetic — but flagging alongside the `venv.logger` import finding).
 - [ ] No test covers `main.py`'s exit-code/signal behavior (the `--exit-immediately` parsing bug,
   the SIGINT swallow, and the always-exits-0 issue above) — reasonable since `main.py` is a script
