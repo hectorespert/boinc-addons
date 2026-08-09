@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import subprocess
+import sys
 from time import sleep
 
 from boinc import build_boinc_command
@@ -12,6 +13,7 @@ from cc_config import prepare_cc_config
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
 from gui_rpc_auth import prepare_gui_rpc_auth
+from redact import redact_secrets
 from remote_hosts import prepare_remote_hosts
 
 parser = argparse.ArgumentParser(prog='operator')
@@ -34,7 +36,7 @@ if current_pid == 1:
 logging.info(f'Configuration loaded from {args.options.name}')
 
 options = json.load(args.options)
-logging.debug(f'Current configuration\n{json.dumps(options, indent=2)}')
+logging.debug(f'Current configuration\n{json.dumps(redact_secrets(options), indent=2)}')
 
 data_folder = args.data
 logging.info(f'BOINC data folder {data_folder}')
@@ -55,10 +57,14 @@ logging.debug(f'BOINC client command {boinc_command}')
 boinc_process = subprocess.Popen(boinc_command)
 logging.debug(f'BOINC client started with pid {boinc_process.pid}')
 
+stopping_boinc_process = False
+
 def signal_handler(number, frame):
+    global stopping_boinc_process
     logging.debug(f'Caught signal {number}')
     if  number != signal.SIGINT and boinc_process.poll() is None:
         logging.debug(f'Stopping BOINC client with signal {number}')
+        stopping_boinc_process = True
         boinc_process.send_signal(number)
 
 logging.info(f'BOINC Add-on Operator started')
@@ -80,9 +86,12 @@ projects_configured = configure_boinc_projects(data_folder, options.get('account
 if not projects_configured:
     boinc_process.send_signal(signal.SIGTERM)
     boinc_process.wait()
+    logging.error(f'BOINC Add-on Operator stopped: failed to configure BOINC projects')
+    sys.exit(1)
 
 if args.exit_immediately:
     logging.warning(f'Exiting immediately after BOINC client is started')
+    stopping_boinc_process = True
     boinc_process.send_signal(signal.SIGTERM)
     boinc_process.wait()
 
@@ -90,4 +99,11 @@ while boinc_process.poll() is None:
     sleep(0.5)
 
 logging.debug(f'BOINC client stopped with code {boinc_process.returncode}')
+
+# Only a client that stopped on its own is a failure: the operator asking it to stop is how both a
+# Supervisor stop and --exit-immediately end, whatever code the client reports for that.
+if not stopping_boinc_process and boinc_process.returncode != 0:
+    logging.error(f'BOINC Add-on Operator stopped: BOINC client exited with code {boinc_process.returncode}')
+    sys.exit(1)
+
 logging.info(f'BOINC Add-on Operator stopped')

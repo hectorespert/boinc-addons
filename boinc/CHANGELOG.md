@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.8.0
+
+Fix a custom global_prefs_override.xml being overwritten on every start
+
+Keep an account manager attached outside the app options instead of detaching it
+
+Exit with a non-zero code when startup fails, so a crash is no longer reported as a clean stop
+
+Redact passwords from the configuration dump written at DEBUG log level
+
+Fix the Spanish translation, which used translated structural keys and never applied
+
+Fix the base image in build.yaml being rejected by Supervisor, which broke building from source
+
 ## 3.7.0
 
 Update base from Debian 13.5 to Debian 13.6

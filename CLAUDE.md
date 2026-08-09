@@ -81,6 +81,13 @@ See [boinc/DEVELOPMENT.md](boinc/DEVELOPMENT.md) for the `docker build`/`docker 
 `boinc/operator/options.json` is the sample options file those commands (and CI's smoke test)
 mount in.
 
+Plain Docker only exercises the container. Anything Supervisor does *around* it —
+`config.yaml`/`build.yaml` validation, the option schema, `translations/`, ingress, protection
+mode, watchdog — needs a real Supervisor, which nothing in CI covers. The repo's `.devcontainer`
+provides one; `.claude/skills/run-boinc-addons/supervisor.sh` drives it from the command line
+(`up` / `install <addon>` / `logs` / `status` / `down`). Worth running before releasing a change
+to any of those files.
+
 ### Docs site
 
 ```bash

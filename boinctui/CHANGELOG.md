@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.1
+
+Fix the base image in build.yaml being rejected by Supervisor, which broke building from source
+
 ## 2.4.0
 
 Update base from Debian 13.5 to Debian 13.6

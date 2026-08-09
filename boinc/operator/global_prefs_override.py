@@ -17,6 +17,7 @@ def link_global_prefs_override(data_folder: str, config_folder: str, data: dict)
         os.symlink(configured_gui_rpc_auth, gui_rpc_auth)
         logging.debug(f'Linked global_prefs_override.xml to {configured_gui_rpc_auth}')
         logging.info(f'Using global_prefs_override.xml to configure BOINC client')
+        return
 
     preferences = {}
 
