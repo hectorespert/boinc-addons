@@ -76,12 +76,20 @@ resolved or discarded.
   "crashed"; a bad account-manager password currently looks identical, from the outside, to a
   deliberate stop. Only an *unhandled* Python exception produces a non-zero exit today.
 
-- [x] **Fixed in `boinc` 3.8.3** — when exactly one of the two is set the operator logs a warning
-  and writes neither, so BOINC computes all the time, which is what an unset schedule already
-  means and what `DOCS.md` already promised. Deliberately *not* a startup failure: a soft config
-  mistake should not crash-loop the app now that exit codes propagate (3.8.0). It composes with
-  the three-way merge from 3.8.1 — a window the operator previously wrote is withdrawn when the
-  config becomes incomplete, rather than leaving half of it behind.
+- [x] **Fixed in `boinc` 3.8.3** — the two hours are now written as a pair or not at all, which is
+  what BOINC Manager does (`clientgui/DlgAdvPreferences.cpp` sets
+  `mask.start_hour = mask.end_hour = true`, so a half window is unreachable from its UI). An
+  incomplete pair, *and* an equal pair, are ignored with a warning and BOINC computes all the
+  time — which is what an unset schedule already means and what `DOCS.md` already promised.
+  The equal-pair case was found while answering "what does BOINC Manager do here?": BOINC reads
+  `start_hour == end_hour` as no restriction at all (`TIME_SPAN::suspended` returns false), so
+  `22:00`–`22:00` is not a 24-hour window but the opposite of a schedule. Confirmed against a
+  live client, and BOINC Manager rejects that combination outright with an error dialog
+  (`if (startTime == endTime) ShowErrorMessage(invMsgTimeSpan, ...)`).
+  Deliberately *not* a startup failure: a soft config mistake should not crash-loop the app now
+  that exit codes propagate (3.8.0). It composes with the three-way merge from 3.8.1 — a window
+  the operator previously wrote is withdrawn when the config becomes incomplete, rather than
+  leaving half of it behind.
   **`start_hour` and `end_hour` are documented as a pair but nothing enforces it, and setting
   one alone silently creates a different schedule than the user asked for.**
   `boinc/DOCS.md:90` says end_hour "Must be used together with `start_hour`", but

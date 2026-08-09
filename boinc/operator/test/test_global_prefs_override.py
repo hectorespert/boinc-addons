@@ -106,6 +106,18 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
                          '<global_preferences>\n</global_preferences>')
         self.assertEqual(self.read_managed_state(), {})
 
+    def test_should_ignore_a_schedule_whose_hours_are_equal(self):
+        link_global_prefs_override(self.data_dir, self.config_dir, {
+            'start_hour': '22:00',
+            'end_hour': '22:00'
+        })
+
+        # BOINC reads an equal pair as no restriction at all, so writing it would silently mean the
+        # opposite of a schedule.
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n</global_preferences>')
+        self.assertEqual(self.read_managed_state(), {})
+
     def test_should_keep_the_other_managed_preferences_when_the_schedule_is_incomplete(self):
         link_global_prefs_override(self.data_dir, self.config_dir, {
             'start_hour': '22:00',

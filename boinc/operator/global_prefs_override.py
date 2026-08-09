@@ -25,19 +25,26 @@ def build_managed_preferences(data: dict) -> dict:
     start_hour = data.get('start_hour')
     end_hour = data.get('end_hour')
 
+    # The two hours are written as a pair or not at all, the same way BOINC Manager always sets
+    # both in its preferences mask. Anything else is a window the user did not ask for.
     if (start_hour is None) != (end_hour is None):
         # BOINC fills the missing half with its own default of 0, midnight, so writing only one of
         # them produces a window nobody asked for: start_hour alone stops computing at midnight,
-        # end_hour alone never starts before it. Drop the pair and let BOINC compute all the time,
-        # which is what an unset schedule means.
+        # end_hour alone never starts before it. Let BOINC compute all the time instead, which is
+        # what an unset schedule means.
         logging.warning(f'Ignoring the computing schedule: start_hour and end_hour must both be set to define a window')
-        start_hour = end_hour = None
+    elif start_hour is not None:
+        start_hour = convert_time_to_boinc_format(start_hour)
+        end_hour = convert_time_to_boinc_format(end_hour)
 
-    if start_hour is not None:
-        preferences['start_hour'] = convert_time_to_boinc_format(start_hour)
-
-    if end_hour is not None:
-        preferences['end_hour'] = convert_time_to_boinc_format(end_hour)
+        if start_hour == end_hour:
+            # BOINC reads an equal pair as no restriction at all (TIME_SPAN::suspended returns
+            # false when start_hour == end_hour), so it silently means the opposite of a schedule.
+            # BOINC Manager rejects this outright in its own preferences dialog.
+            logging.warning(f'Ignoring the computing schedule: start_hour and end_hour are both {start_hour}, which BOINC reads as no restriction')
+        else:
+            preferences['start_hour'] = start_hour
+            preferences['end_hour'] = end_hour
 
     max_num_cpus = data.get('max_ncpus')
     if max_num_cpus is not None:
