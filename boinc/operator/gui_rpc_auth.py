@@ -13,6 +13,14 @@ def restrict_gui_rpc_auth(gui_rpc_auth: str) -> None:
 def prepare_gui_rpc_auth(data_folder: str, password: str | None) -> None:
     gui_rpc_auth = f'{data_folder}/gui_rpc_auth.cfg'
 
+    if os.path.islink(gui_rpc_auth):
+        # Nothing creates a symlink here, and every path below either writes the file or hands it
+        # to the BOINC client -- both of which follow the link and would put the password wherever
+        # it points, outside the data folder. A broken link is worse still: os.path.exists reads it
+        # as missing, so the write silently creates the target.
+        os.remove(gui_rpc_auth)
+        logging.warning(f'Removed a symlinked BOINC GUI RPC auth file, the password belongs in the data folder')
+
     if password is None:
         # No password configured. BOINC generates a random one, with 0600 permissions, when the
         # file is missing, so the secure thing to do is stay out of its way.

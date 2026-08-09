@@ -6,6 +6,8 @@ Let the BOINC client generate its own GUI RPC password when none is configured, 
 
 Write gui_rpc_auth.cfg with 0600 permissions, like the BOINC client does, and restrict an existing one written by an older version
 
+Stop writing the GUI RPC password through a symlinked gui_rpc_auth.cfg, which would put it outside the data folder
+
 ## 3.8.1
 
 Keep preferences set from boinctui or a remote BOINC Manager instead of overwriting global_prefs_override.xml on every start

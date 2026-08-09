@@ -57,6 +57,28 @@ class GuiRpcAuthTestCase(unittest.TestCase):
         self.assertEqual(self.read_gui_rpc_auth(), '123456\n')
         self.assertEqual(stat.S_IMODE(os.stat(self.gui_rpc_auth).st_mode), 0o600)
 
+    def test_should_not_write_the_password_through_a_symlink(self):
+        elsewhere = f'{self.tmp_dir.name}/elsewhere'
+        os.makedirs(elsewhere)
+        os.symlink(f'{elsewhere}/secret.cfg', self.gui_rpc_auth)
+
+        prepare_gui_rpc_auth(self.data_dir, '123456')
+
+        # A broken symlink reads as missing to os.path.exists, so the write would have created the
+        # target and put the password outside the data folder.
+        self.assertFalse(os.path.exists(f'{elsewhere}/secret.cfg'))
+        self.assertFalse(os.path.islink(self.gui_rpc_auth))
+        self.assertEqual(self.read_gui_rpc_auth(), '123456\n')
+
+    def test_should_not_leave_a_symlink_for_the_boinc_client_to_write_through(self):
+        elsewhere = f'{self.tmp_dir.name}/elsewhere'
+        os.makedirs(elsewhere)
+        os.symlink(f'{elsewhere}/secret.cfg', self.gui_rpc_auth)
+
+        prepare_gui_rpc_auth(self.data_dir, None)
+
+        self.assertFalse(os.path.lexists(self.gui_rpc_auth))
+
     def test_should_create_an_empty_gui_rpc_auth_when_the_password_is_explicitly_empty(self):
         prepare_gui_rpc_auth(self.data_dir, '')
 
