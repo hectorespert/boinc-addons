@@ -42,7 +42,7 @@ findings measured directly against the Supervisor in `.devcontainer`.
 - [ ] **`icon.png` violates the documented 1x1 aspect ratio in both add-ons.** `boinc/icon.png` and
   `boinctui/icon.png` are byte-identical and **256 x 245**, so they are letterboxed or distorted in
   the store. `logo.png` at 600x305 is fine — the docs explicitly allow other logo ratios. Padding to
-  256 x 256 with transparency (not rescaling) is the fix; `boincui` already ships that way.
+  256 x 256 with transparency (not rescaling) is the fix.
   `docs/icon.png` is a symlink to `boinc/icon.png` and follows automatically.
 
 - [ ] **`map:` uses the legacy plain-string form.** `boinc/config.yaml` has `map: [addon_config]`,
@@ -70,7 +70,7 @@ findings measured directly against the Supervisor in `.devcontainer`.
   before changing it to `- "str"`.
 
 - [ ] **`build.yaml` itself is deprecated.** Supervisor, on every store scan: `App local_boinc uses
-  build.yaml which is deprecated. Move build parameters into the Dockerfile directly.` All three
+  build.yaml which is deprecated. Move build parameters into the Dockerfile directly.` Both
   add-ons still ship one. This does **not** compose with simply deleting the file: Supervisor passes
   `--build-arg BUILD_FROM=<its default>` regardless, overriding the `ARG BUILD_FROM` default in the
   Dockerfile. Work out the supported replacement before removing anything — the `build_from` regex
@@ -106,8 +106,8 @@ findings measured directly against the Supervisor in `.devcontainer`.
 - `network:` **is** a supported top-level translations key (verified against a running Supervisor
   2026-08-09: it validates the key and rejects only bad values). Our `31416/tcp` value is a plain
   string, so no `ports_description:` is needed.
-- `boinctui` and `boincui` have no `translations/` dir, but neither declares a `schema:`, so there
-  is nothing to translate. Not a gap.
+- `boinctui` has no `translations/` dir, but it declares no `schema:` either, so there is nothing
+  to translate. Not a gap.
 - **`boinctui`'s `panel_icon` is not dead config, and `ingress_panel` cannot be declared.** An
   earlier note here proposed adding `ingress_panel: true` because the installed add-on reports it as
   false. That is impossible: `ATTR_INGRESS_PANEL` lives in `SCHEMA_APP_USER`
@@ -215,8 +215,8 @@ Common BOINC global preferences not exposed, each roughly one key away in
 
 - [ ] **Prometheus metrics endpoint** — same data source, different consumer.
 
-- [ ] **Graphical web UI (`boincui/`)** — the add-on directory now exists as a scaffold; this is the
-  design work still ahead. Biggest item in this file by an order of magnitude.
+- [ ] **Graphical web UI** — biggest item in this file by an order of magnitude. What follows is the
+  design work, independent of where the code ends up living.
 
   **Honest baseline: `boinctui` already does this.** It is a full BOINC Manager through ingress,
   working today, built from ~20 lines of `run.sh` plus an apt package. A graphical UI adds usability
@@ -315,8 +315,7 @@ Common BOINC global preferences not exposed, each roughly one key away in
   "Hector Espert" in one and "Home Assistant Boinc Add-ons" in the other; `image.licenses` is
   "Apache 2.0", "Apache2" and "Apache License 2.0" depending on where you look, counting the
   `build.yaml` files; and `image.url` points at the repo in one and the docs site in the other.
-  `boincui` was created with a single consistent set (`Apache-2.0`, vendor "Hector Espert", docs
-  site); align the other two.
+  Pick one set — SPDX `Apache-2.0`, vendor "Hector Espert", the docs site — and apply it to both.
 
 ---
 
