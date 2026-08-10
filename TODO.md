@@ -62,12 +62,6 @@ findings measured directly against the Supervisor in `.devcontainer`.
   optional element types, so on a list element it likely means nothing — verify against Supervisor
   before changing it to `- "str"`.
 
-- [ ] **`boinctui` sets `panel_icon` but never `ingress_panel: true`.** The installed add-on reports
-  `"ingress_panel": false`, so the icon configures a sidebar panel that is not enabled. Ingress
-  itself works (a real `/api/hassio_ingress/<token>/` URL is issued), it just is not in the sidebar.
-  Decide in the UI whether a sidebar entry is wanted: if yes add `ingress_panel: true`, if no
-  `panel_icon` is dead config.
-
 - [ ] **`build.yaml` itself is deprecated.** Supervisor, on every store scan: `App local_boinc uses
   build.yaml which is deprecated. Move build parameters into the Dockerfile directly.` All three
   add-ons still ship one. This does **not** compose with simply deleting the file: Supervisor passes
@@ -107,6 +101,15 @@ findings measured directly against the Supervisor in `.devcontainer`.
   string, so no `ports_description:` is needed.
 - `boinctui` and `boincui` have no `translations/` dir, but neither declares a `schema:`, so there
   is nothing to translate. Not a gap.
+- **`boinctui`'s `panel_icon` is not dead config, and `ingress_panel` cannot be declared.** An
+  earlier note here proposed adding `ingress_panel: true` because the installed add-on reports it as
+  false. That is impossible: `ATTR_INGRESS_PANEL` lives in `SCHEMA_APP_USER`
+  (`supervisor/apps/validate.py:623`) next to `watchdog` and `protected`, it is absent from the
+  config schema, and that schema uses `extra=vol.REMOVE_EXTRA` — so the key is silently dropped.
+  Verified end to end (2026-08-10): installing with the key present left Supervisor's persisted
+  `system.ingress_panel: None` while `system.panel_icon: 'mdi:console'` was read correctly, and
+  `POST /addons/local_boinctui/options` with `ingress_panel: true` flipped `user.ingress_panel`.
+  It is the user's "show in sidebar" toggle, and `panel_icon` is the icon that toggle uses.
 
 ## Test coverage
 
