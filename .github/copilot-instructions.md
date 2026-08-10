@@ -15,10 +15,11 @@ Quick reference (see `CLAUDE.md` for the full explanation of each):
 - Three independent Home Assistant add-ons, each self-contained: `boinc/` (runs the
   BOINC client, via a Python "operator" in `boinc/operator/`), `boinctui/` (a
   `ttyd` + `boinctui` terminal UI) and `boincui/` (an experimental graphical web
-  interface, still a placeholder). They're versioned and released independently.
+  interface, server-rendered Flask behind ingress, not yet talking to BOINC). They're
+  versioned and released independently.
 - Operator unit tests: `cd boinc/operator && python -m unittest discover -s test -t test`
   (needs `pip install dict2xml`); `boincui`'s are `cd boincui/server && python -m unittest
-  discover -s test -t test`, stdlib only.
+  discover -s test -t test` (needs `pip install flask waitress`).
 - Build/run an add-on locally: see [`boinc/DEVELOPMENT.md`](../boinc/DEVELOPMENT.md),
   or use the agent-facing driver at
   [`.claude/skills/run-boinc-addons/`](../.claude/skills/run-boinc-addons/SKILL.md)

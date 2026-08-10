@@ -96,7 +96,9 @@ cd boincui/server
 python -m unittest discover -s test -t test
 ```
 
-Stdlib only, no dependencies. CI runs this as a second job in `operator.yaml`.
+Dependencies: `flask` and `waitress` (`pip install flask waitress`, in a venv rather than
+system-wide). The image installs them from Debian as `python3-flask`/`python3-waitress`; the tests
+just need them importable. CI runs this as a second job in `operator.yaml`.
 
 ### Build/run an add-on image locally
 
