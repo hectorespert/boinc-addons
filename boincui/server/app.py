@@ -71,7 +71,9 @@ class Refresher(threading.Thread):
         super().__init__(name='refresher', daemon=True)
         self._snapshot = snapshot
         self._options = options
-        self._stop = stop
+        # Not `self._stop`: threading.Thread already uses that name for a private method, and
+        # shadowing it makes join() raise TypeError.
+        self._stop_requested = stop
         self._wake = threading.Event()
 
     def request_refresh(self) -> None:
@@ -96,7 +98,7 @@ class Refresher(threading.Thread):
             self._snapshot.fail(error)
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._stop_requested.is_set():
             self.refresh_once()
             self._wake.clear()
             self._wake.wait(REFRESH_SECONDS)
