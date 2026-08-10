@@ -1,5 +1,5 @@
 name: BOINC
-version: "3.9.0"
+version: "3.9.1"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
@@ -18,7 +18,7 @@ schema:
   remote_hosts:
     - "str?"
   allow_remote_gui_rpc: "bool?"
-  account_manager_url: "str?"
+  account_manager_url: "url?"
   account_manager_username: "str?"
   account_manager_password: "password?"
   start_hour: "match(^(?:[01]\\d|2[0-3]):[0-5]\\d$)?"
@@ -31,4 +31,4 @@ image: "ghcr.io/hectorespert/addon-boinc"
 apparmor: false
 backup: cold
 map:
-  - addon_config
+  - app_config

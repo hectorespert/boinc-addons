@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.9.1
+
+The Account Manager URL field now rejects an address that is not a valid URL as you type it, instead of failing later when the app starts
+
+The app icon is no longer slightly squashed in the app store
+
 ## 3.9.0
 
 `max_ncpus` and `cpu_usage_limit` now also limit CPU usage while the computer is in use, instead of only while it is not in use

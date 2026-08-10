@@ -58,9 +58,9 @@ LABEL \
     maintainer="Hector Espert <hectorespertpardo@gmail.com>" \
     org.opencontainers.image.title="Home Assistant Boinc Add-on" \
     org.opencontainers.image.description="Home Assistant Boinc Add-on" \
-    org.opencontainers.image.vendor="Home Assistant Boinc Add-ons" \
+    org.opencontainers.image.vendor="Hector Espert" \
     org.opencontainers.image.authors="Hector Espert <hectorespertpardo@gmail.com>" \
-    org.opencontainers.image.licenses="Apache2" \
+    org.opencontainers.image.licenses="Apache-2.0" \
     org.opencontainers.image.url="https://hectorespert.github.io/boinc-addons" \
     org.opencontainers.image.source="https://github.com/${BUILD_REPOSITORY}" \
     org.opencontainers.image.documentation="https://github.com/${BUILD_REPOSITORY}/blob/main/README.md" \

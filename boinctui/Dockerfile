@@ -64,8 +64,8 @@ LABEL \
     org.opencontainers.image.description="Home Assistant boinctui Add-on" \
     org.opencontainers.image.vendor="Hector Espert" \
     org.opencontainers.image.authors="Hector Espert <hectorespertpardo@gmail.com>" \
-    org.opencontainers.image.licenses="Apache 2.0" \
-    org.opencontainers.image.url="https://github.com/hectorespert/boinc-addons" \
+    org.opencontainers.image.licenses="Apache-2.0" \
+    org.opencontainers.image.url="https://hectorespert.github.io/boinc-addons" \
     org.opencontainers.image.source="https://github.com/${BUILD_REPOSITORY}" \
     org.opencontainers.image.documentation="https://github.com/${BUILD_REPOSITORY}/blob/main/README.md" \
     org.opencontainers.image.created=${BUILD_DATE} \
