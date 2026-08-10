@@ -7,8 +7,9 @@ import waitress
 
 from app import Snapshot, create_app
 
-# Must match `ingress_port` in config.yaml: Home Assistant proxies to this port on the container's
-# own address, so it is never published to the host and never reached directly by a user.
+# Supervisor's own default for `ingress_port`, which is why config.yaml does not set it -- the
+# add-on linter rejects redeclaring a default. Home Assistant proxies to this port on the
+# container's own address, so it is never published to the host nor reached directly by a user.
 INGRESS_PORT = 8099
 
 parser = argparse.ArgumentParser(prog='boincui')
