@@ -27,7 +27,7 @@ jobs:
     needs: test
     uses: ./.github/workflows/find-changed-addons.yaml
     with:
-      monitored_files: 'build.yaml config.yaml Dockerfile operator'
+      monitored_files: 'build.yaml config.yaml Dockerfile operator server'
 
   check_version:
     needs: find_changed
@@ -143,12 +143,19 @@ jobs:
         run: |
           VERSION=$(yq e '.version' ${{ matrix.addon }}/config.yaml)
           ADDON_NAME=$(yq e '.name' ${{ matrix.addon }}/config.yaml)
+          # Absent from config.yaml means stable: Supervisor supplies that default from its schema,
+          # so yq reports null here for every add-on that does not opt into another stage.
+          STAGE=$(yq e '.stage' ${{ matrix.addon }}/config.yaml)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=${{ matrix.addon }}-v$VERSION" >> $GITHUB_OUTPUT
           echo "name=$ADDON_NAME" >> $GITHUB_OUTPUT
+          echo "stage=$STAGE" >> $GITHUB_OUTPUT
 
+      # Experimental add-ons still get an image and a GitHub Release, because both are needed to
+      # install them at all -- they just are not announced until they do something worth announcing.
       - name: Prepare Bluesky post
         id: bluesky_post
+        if: steps.version.outputs.stage != 'experimental'
         run: |
           ADDON_NAME="${{ steps.version.outputs.name }}"
           VERSION="${{ steps.version.outputs.version }}"
@@ -177,6 +184,7 @@ jobs:
           echo "release_url=${RELEASE_URL}" >> $GITHUB_OUTPUT
 
       - name: Post to Bluesky
+        if: steps.version.outputs.stage != 'experimental'
         uses: myConsciousness/bluesky-post@v6
         with:
           text: ${{ steps.bluesky_post.outputs.post_text }}

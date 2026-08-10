@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Driver for the run-boinc-addons skill: build, run, verify, and tear down
-# the boinc and boinctui Home Assistant add-on images via plain Docker.
+# the boinc, boinctui and boincui Home Assistant add-on images via plain Docker.
 #
 # Usage:
 #   ./smoke.sh boinc      # build boinc image, run CI-style smoke test +
 #                          # a persistent run/boinccmd exec check
 #   ./smoke.sh boinctui   # build boinctui image, run it, curl the ttyd UI
-#   ./smoke.sh all        # both, in sequence
+#   ./smoke.sh boincui    # build boincui image, run it, check it logs hello world
+#   ./smoke.sh all        # all three, in sequence
 #
 # Run from anywhere; paths are resolved relative to this script.
 set -euo pipefail
@@ -78,12 +79,60 @@ boinctui_smoke() {
   echo "== boinctui: cleaned up =="
 }
 
+boincui_smoke() {
+  echo "== boincui: build =="
+  ( cd "$REPO_ROOT/boincui" && docker build -t boincui-addon-test:local . )
+
+  echo "== boincui: one-shot run (--exit-immediately) =="
+  docker run --rm boincui-addon-test:local --log-level DEBUG --exit-immediately \
+    >/tmp/boincui-run.log 2>&1
+  grep -q "hello world" /tmp/boincui-run.log || {
+    echo "boincui did not log the expected line:"
+    cat /tmp/boincui-run.log
+    exit 1
+  }
+  echo "-> exit-immediately run exited 0 and logged 'hello world'"
+
+  echo "== boincui: persistent run + clean stop =="
+  # The add-on has no interface to probe yet, so what matters is the lifecycle: it must stay up
+  # until asked to stop, or Supervisor reports it as stopped seconds after the user starts it.
+  docker rm -f boincui-driver-test >/dev/null 2>&1 || true
+  docker run -d --name boincui-driver-test boincui-addon-test:local --log-level DEBUG >/dev/null
+
+  for _ in $(seq 1 20); do
+    docker logs boincui-driver-test 2>&1 | grep -q "BOINC UI started" && break
+    sleep 0.5
+  done
+  [ "$(docker inspect -f '{{.State.Running}}' boincui-driver-test)" = "true" ] || {
+    echo "boincui exited on its own instead of waiting to be stopped:"
+    docker logs boincui-driver-test
+    docker rm -f boincui-driver-test >/dev/null
+    exit 1
+  }
+  echo "-> still running after startup"
+
+  docker stop -t 10 boincui-driver-test >/dev/null
+  code=$(docker inspect -f '{{.State.ExitCode}}' boincui-driver-test)
+  if [ "$code" != "0" ]; then
+    echo "boincui did not stop cleanly on SIGTERM (exit code $code)"
+    docker logs boincui-driver-test
+    docker rm -f boincui-driver-test >/dev/null
+    exit 1
+  fi
+  docker logs boincui-driver-test 2>&1 | grep -q "BOINC UI stopped"
+  echo "-> stopped cleanly on SIGTERM (exit code 0)"
+
+  docker rm -f boincui-driver-test >/dev/null
+  echo "== boincui: cleaned up =="
+}
+
 case "${1:-}" in
   boinc) boinc_smoke ;;
   boinctui) boinctui_smoke ;;
-  all) boinc_smoke; boinctui_smoke ;;
+  boincui) boincui_smoke ;;
+  all) boinc_smoke; boinctui_smoke; boincui_smoke ;;
   *)
-    echo "Usage: $0 {boinc|boinctui|all}" >&2
+    echo "Usage: $0 {boinc|boinctui|boincui|all}" >&2
     exit 1
     ;;
 esac

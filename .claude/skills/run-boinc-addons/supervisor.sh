@@ -23,7 +23,7 @@ usage() {
 Usage: $(basename "$0") <command> [addon]
 
   up                 start the devcontainer and boot Supervisor (idempotent)
-  install <addon>    stage boinc|boinctui into the local store, build it, install and start it
+  install <addon>    stage boinc|boinctui|boincui into the local store, build it, install and start it
   logs <addon>       tail that add-on's log as Supervisor sees it
   status             list installed apps and the Supervisor container states
   down               remove the devcontainer and its volumes (frees ~5GB)
@@ -34,9 +34,9 @@ EOF
 
 require_addon() {
     case "${1:-}" in
-        boinc | boinctui) ;;
+        boinc | boinctui | boincui) ;;
         *)
-            echo "error: expected 'boinc' or 'boinctui', got '${1:-}'" >&2
+            echo "error: expected 'boinc', 'boinctui' or 'boincui', got '${1:-}'" >&2
             exit 1
             ;;
     esac
