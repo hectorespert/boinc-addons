@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.4.2
+
+The app icon is no longer slightly squashed in the app store
+
 ## 2.4.1
 
 Fix the app failing to build from source

@@ -5,4 +5,4 @@ labels:
   org.opencontainers.image.title: "Boinc add-on"
   org.opencontainers.image.description: "Home Assistant Boinc add-on."
   org.opencontainers.image.source: "https://github.com/hectorespert/boinc-addons"
-  org.opencontainers.image.licenses: "Apache License 2.0"
+  org.opencontainers.image.licenses: "Apache-2.0"

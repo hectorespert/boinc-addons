@@ -30,6 +30,10 @@ logging.basicConfig(level=args.log_level, format='%(asctime)s %(levelname)s %(me
 current_pid = os.getpid()
 logging.info(f'Starting BOINC Add-on Operator with pid {current_pid}')
 
+# This heuristic depends on `init: false` in config.yaml: with no init system in the image, the
+# operator is PID 1 exactly when Protection Mode confines the container to its own PID namespace,
+# and `host_pid: true` gives it the host's namespace (so a much higher PID) when it does not.
+# Setting `init: true` would put Docker's init at PID 1 and silently disable this warning.
 if current_pid == 1:
     logging.warning('Protection Mode is enabled. BOINC requires system-wide usage monitoring to function properly.')
 
