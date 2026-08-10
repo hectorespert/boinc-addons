@@ -44,7 +44,7 @@ What each subcommand actually does (all verified in this session):
 |---|---|---|---|
 | `boinc` | `docker build -t boinc-addon-test:local boinc/` | CI-style one-shot run with `--exit-immediately`, then a second persistent run | `--exit-immediately` run exits 0; then `docker exec --workdir /data/boinc <container> boinccmd --get_state` returns a real state dump (`Time stats` section) |
 | `boinctui` | `docker build -t boinctui-addon-test:local boinctui/` | `docker run -d -p 17681:7681 boinctui-addon-test:local` | `curl -H "X-Remote-User-Name: test" http://localhost:17681/` returns HTTP 200 with the ttyd terminal HTML page |
-| `boincui` | `docker build -t boincui-addon-test:local boincui/` | `docker run --rm boincui-addon-test:local --log-level DEBUG` | the run exits 0 and its output contains `hello world` — the add-on has no interface yet, so there is nothing else to probe |
+| `boincui` | `docker build -t boincui-addon-test:local boincui/` | a one-shot `docker run --rm boincui-addon-test:local --log-level DEBUG --exit-immediately`, then a detached run without the flag | the one-shot run exits 0 having logged `hello world`; the detached one is still running after startup and exits 0 on `docker stop`. The add-on has no interface yet, so its lifecycle is all there is to probe — and **without `--exit-immediately` it blocks until signalled**, so a foreground `docker run` will appear to hang |
 
 ## Run (human path)
 

@@ -3,11 +3,11 @@
 ## This app is not ready to use
 
 BOINC UI is marked **experimental** in the app store, and this first version is a placeholder. It
-starts, writes `hello world` to its log and keeps running. There is nothing to open, nothing to
-configure, and no sidebar entry.
+starts, says hello in its log and then just sits there until you stop it. There is nothing to open,
+nothing to configure, and no sidebar entry.
 
-You can install it and start it to confirm it runs — the Log tab shows the line it writes — but it
-does not talk to BOINC and it will not show you anything about your tasks or projects.
+You can install it and start it to confirm it runs — the Log tab shows it starting and stopping —
+but it does not talk to BOINC and it will not show you anything about your tasks or projects.
 
 ## What to use instead, for now
 

@@ -24,7 +24,9 @@ Three independent Home Assistant add-ons, each self-contained with its own `conf
 - **`boinctui/`** — a terminal UI (via `ttyd` + `boinctui`) for monitoring/controlling the BOINC
   client, exposed through Home Assistant ingress.
 - **`boincui/`** — a graphical web interface, intended to become a BOINC Manager equivalent served
-  through ingress. Currently a scaffold: `boincui/server/main.py` logs one line and exits, and
+  through ingress. Currently a scaffold: `boincui/server/main.py` says hello and then blocks until
+  it is signalled — deliberately, because an entrypoint that returns leaves Supervisor reporting the
+  app as stopped seconds after the user started it. `--exit-immediately` is the one-shot path. It
   `config.yaml` declares `stage: experimental` (which also suppresses its Bluesky release
   announcement, see CI section). See `TODO.md` for the design constraints already worked out —
   in particular that the cheapest next step is testing whether an existing web UI survives

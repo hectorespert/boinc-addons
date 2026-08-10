@@ -10,8 +10,8 @@ your browser, as an alternative to the text mode interface the boinctui app prov
 
 ## Status
 
-This app is **experimental and does not do anything useful yet**. Installing it gives you a
-container that starts, writes one line to its log and keeps running. There is no interface to open.
+This app is **experimental and does not do anything useful yet**. Installing it gives you an app
+that starts, says hello in its log and then just sits there. There is no interface to open.
 
 Use the **boinctui** app if you want to manage BOINC today.
 
