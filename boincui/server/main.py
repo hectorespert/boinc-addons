@@ -22,7 +22,7 @@ parser.add_argument("--exit-immediately", action='store_true', help="Exit immedi
 args = parser.parse_args()
 logging.basicConfig(level=args.log_level, format='%(asctime)s %(levelname)s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
 
-logging.info('hello world')
+logging.info('Starting BOINC UI')
 
 options = {}
 if args.options:

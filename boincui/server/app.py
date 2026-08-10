@@ -72,6 +72,16 @@ class Refresher(threading.Thread):
         self._snapshot = snapshot
         self._options = options
         self._stop = stop
+        self._wake = threading.Event()
+
+    def request_refresh(self) -> None:
+        """Ask for a poll now, and return without waiting for it.
+
+        Running the poll inline would block the request for as long as the BOINC host takes to
+        answer -- up to the connect timeout when it is unreachable -- which is exactly what this
+        class exists to keep out of request handling.
+        """
+        self._wake.set()
 
     def refresh_once(self) -> None:
         try:
@@ -88,7 +98,8 @@ class Refresher(threading.Thread):
     def run(self) -> None:
         while not self._stop.is_set():
             self.refresh_once()
-            self._stop.wait(REFRESH_SECONDS)
+            self._wake.clear()
+            self._wake.wait(REFRESH_SECONDS)
 
 
 def create_app(snapshot: Snapshot | None = None) -> Flask:
@@ -104,7 +115,7 @@ def create_app(snapshot: Snapshot | None = None) -> Flask:
     def refresh():
         refresher = app.config.get('REFRESHER')
         if refresher is not None:
-            refresher.refresh_once()
+            refresher.request_refresh()
         return redirect(SELF)
 
     return app

@@ -27,7 +27,7 @@ class TestMain(unittest.TestCase):
         )
 
         self.assertEqual(0, result.returncode)
-        self.assertIn('hello world', result.stderr)
+        self.assertIn('Starting BOINC UI', result.stderr)
         self.assertIn('BOINC UI stopped', result.stderr)
         # Without a server to run there is nothing to wait for, so this run must not have blocked.
         self.assertNotIn(STARTED_MARKER, result.stderr)
@@ -58,7 +58,7 @@ class TestMain(unittest.TestCase):
                 # returns what came after them.
                 stderr = consumed + remaining
                 self.assertEqual(0, process.returncode)
-                self.assertIn('hello world', stderr)
+                self.assertIn('Starting BOINC UI', stderr)
                 self.assertIn('BOINC UI stopped', stderr)
 
     def test_should_serve_the_page_while_it_is_running(self):

@@ -1,11 +1,13 @@
 import sys
+import threading
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app import Snapshot, create_app  # noqa: E402
+import app as app_module  # noqa: E402
+from app import Refresher, Snapshot, create_app  # noqa: E402
 from boinc import AuthenticationFailed, BoincError, CannotConnect, NotConfigured  # noqa: E402
 
 # An URL that is fine to emit absolutely: it leaves the panel on purpose, or does not navigate.
@@ -158,18 +160,47 @@ class TestIngressConstraint(unittest.TestCase):
 
 class TestRefreshButton(unittest.TestCase):
 
-    def test_should_poll_on_demand_when_a_refresher_is_wired_in(self):
+    def test_should_ask_for_a_poll_without_waiting_for_it(self):
+        # Polling inline would hold the request for as long as the BOINC host takes to answer, which
+        # is the very thing the background refresher exists to avoid.
         calls = []
         app = create_app(Snapshot())
-        app.config['REFRESHER'] = type('FakeRefresher', (), {'refresh_once': lambda self: calls.append(1)})()
+        app.config['REFRESHER'] = type('FakeRefresher', (), {
+            'request_refresh': lambda self: calls.append('requested'),
+            'refresh_once': lambda self: calls.append('polled inline'),
+        })()
 
         app.test_client().post('/refresh')
 
-        self.assertEqual(1, len(calls))
+        self.assertEqual(['requested'], calls)
 
     def test_should_still_redirect_when_no_refresher_is_wired_in(self):
         # The app is created without one in the unit tests, and must not fall over because of it.
         self.assertEqual(302, client_for(Snapshot()).post('/refresh').status_code)
+
+
+class TestRefresher(unittest.TestCase):
+
+    def test_should_poll_again_promptly_when_a_refresh_is_requested(self):
+        # Without this the button would do nothing visible until the next scheduled poll, which is a
+        # minute away.
+        polls = threading.Semaphore(0)
+        original = app_module.read_state
+        app_module.read_state = lambda *args: polls.release() or {'cc_status': {}, 'projects': [], 'results': []}
+        stop = threading.Event()
+        refresher = Refresher(Snapshot(), {}, stop)
+        try:
+            refresher.start()
+            self.assertTrue(polls.acquire(timeout=10), 'the refresher never polled on startup')
+
+            refresher.request_refresh()
+
+            self.assertTrue(polls.acquire(timeout=10), 'requesting a refresh did not wake the poller')
+        finally:
+            stop.set()
+            refresher.request_refresh()
+            refresher.join(timeout=10)
+            app_module.read_state = original
 
 
 if __name__ == '__main__':

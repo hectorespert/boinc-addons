@@ -40,8 +40,8 @@ The page tells you which of the three usual problems it hit:
 - **The BOINC client rejected the password** — the two passwords do not match. They have to be
   identical, and the BOINC app needs a restart after changing its own.
 
-The page checks the client once a minute. **Refresh now** checks immediately, which is the quickest
-way to see whether a change you just made worked.
+The page checks the client once a minute. **Refresh now** asks for a check straight away instead of
+waiting for the next one — the result appears within a few seconds, when the page next reloads.
 
 ## What this app cannot do yet
 
