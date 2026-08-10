@@ -51,9 +51,16 @@ findings measured directly against the Supervisor in `.devcontainer`.
   `^(…|app_config|addon_config)(?::(rw|ro))?$` (`supervisor/apps/validate.py:137`) — with an
   explicit `ADDON_CONFIG → APP_CONFIG` migration and warning (`validate.py:263-270`). So the plain
   string `app_config` is enough; the structured `type:`/`read_only:` form is not required.
-  **Check the effective mount mode before changing it**: the docs say read-only is the default, and
-  since 3.8.0 removed the write-through-the-symlink path the add-on only reads from `/config`, but
-  that should be confirmed by inspecting the container mount rather than assumed.
+
+  **Blocked on the linter, tried and reverted 2026-08-10.** `frenck/action-addon-linter` accepts
+  only the old spelling and fails the add-on with `['app_config'] is not valid under any of the
+  given schemas`; v2.21.0 (Nov 2025) is the latest release and still does. Supervisor wants the new
+  name, CI rejects it, and the two cannot be satisfied at once — so the warning stays until the
+  linter catches up. Recheck when a newer linter release appears.
+
+  The other half of the item is settled: the effective mount is already read-only (`docker inspect`
+  on the running add-on reports `/config rw=false`), so the switch would not change access when it
+  eventually happens.
 
 - [ ] **`account_manager_url` is typed `str?` when the schema language has a `url` type.**
   `boinc/config.yaml:21`. The `url` type exists (`supervisor/apps/options.py:25`) and gives
