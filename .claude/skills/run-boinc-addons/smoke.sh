@@ -6,7 +6,7 @@
 #   ./smoke.sh boinc      # build boinc image, run CI-style smoke test +
 #                          # a persistent run/boinccmd exec check
 #   ./smoke.sh boinctui   # build boinctui image, run it, curl the ttyd UI
-#   ./smoke.sh boincui    # build boincui image, run it, check it logs hello world
+#   ./smoke.sh boincui    # build boincui image, run it, curl its page
 #   ./smoke.sh all        # all three, in sequence
 #
 # Run from anywhere; paths are resolved relative to this script.
@@ -86,12 +86,12 @@ boincui_smoke() {
   echo "== boincui: one-shot run (--exit-immediately) =="
   docker run --rm boincui-addon-test:local --log-level DEBUG --exit-immediately \
     >/tmp/boincui-run.log 2>&1
-  grep -q "hello world" /tmp/boincui-run.log || {
+  grep -q "Starting BOINC UI" /tmp/boincui-run.log || {
     echo "boincui did not log the expected line:"
     cat /tmp/boincui-run.log
     exit 1
   }
-  echo "-> exit-immediately run exited 0 and logged 'hello world'"
+  echo "-> exit-immediately run exited 0 and logged its startup line"
 
   echo "== boincui: persistent run + serve + clean stop =="
   # It must stay up until asked to stop, or Supervisor reports it as stopped seconds after the user

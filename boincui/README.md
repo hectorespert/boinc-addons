@@ -10,11 +10,12 @@ your browser, as an alternative to the text mode interface the boinctui app prov
 
 ## Status
 
-This app is **experimental and does not do anything useful yet**. It opens a web page inside Home
-Assistant, but that page only reports that no BOINC client is connected — it cannot show tasks,
-projects or credit.
+It opens a page inside Home Assistant showing the tasks a BOINC client is running and the projects
+it is attached to, whether that client is the BOINC app on this machine or one elsewhere on your
+network.
 
-Use the **boinctui** app if you want to manage BOINC today.
+This app is **experimental and read-only**: it can show you what BOINC is doing, but not change it.
+Use the **boinctui** app to suspend tasks, attach projects or anything else.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg

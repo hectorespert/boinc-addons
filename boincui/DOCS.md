@@ -1,27 +1,49 @@
 # Home Assistant BOINC UI App
 
-## This app is not ready to use
+BOINC UI shows what a BOINC client is doing — its tasks and the projects it is attached to — on a
+page inside Home Assistant. It is **experimental**, and this version can only look: it cannot
+suspend, resume or abort anything yet.
 
-BOINC UI is marked **experimental** in the app store. It now has a web page, but that page cannot
-show you anything about BOINC yet: it says that no client is connected, and that is all it will ever
-say in this version.
+## Connecting it to the BOINC app
 
-Install it and start it if you want to see where this is going. It does not talk to BOINC, so it
-will not show your tasks, projects or credit.
+Two apps have to agree, so there are settings on both sides.
 
-## Opening it
+**First, in the BOINC app's configuration:**
 
-Once the app is started, use the **Open Web UI** button on its page.
+1. Set `gui_rpc_password` to a password of your choice.
+2. Allow the connection: either turn on `allow_remote_gui_rpc`, or add this app's hostname — shown
+   on **this** app's Info page — to `remote_hosts`.
+3. Restart the BOINC app so the changes take effect.
 
-If you would rather reach it from the Home Assistant menu, turn on **Show in sidebar** on the same
-page and it will appear there.
+**Then, in this app's configuration:**
 
-## What to use instead, for now
+1. **BOINC client address** — the hostname shown on the **BOINC app's** Info page.
+2. **BOINC client password** — the same password you set in step 1 above.
+3. **BOINC client port** — leave it empty.
 
-Install the **boinctui** app. It gives you a full BOINC manager inside Home Assistant today, and its
-Documentation tab explains how to connect it to the BOINC app.
+Start this app and open it with **Open Web UI**. If you would rather reach it from the Home
+Assistant menu, turn on **Show in sidebar** on this app's page.
 
-## Configuration
+## Connecting to BOINC on another machine
 
-There is nothing to configure. The Configuration tab is empty on purpose, and the settings for
-reaching a BOINC client will appear there in a later version.
+The same fields work for a BOINC client running anywhere else on your network: use its address, and
+the password from its own configuration. That machine also has to be set up to accept remote
+connections, which is a setting in BOINC itself rather than in Home Assistant.
+
+## When something is wrong
+
+The page tells you which of the three usual problems it hit:
+
+- **No BOINC client is configured** — the address or the password is still empty.
+- **Cannot reach the BOINC client** — the address is wrong, the BOINC app is stopped, or it has not
+  been told to accept connections from this app.
+- **The BOINC client rejected the password** — the two passwords do not match. They have to be
+  identical, and the BOINC app needs a restart after changing its own.
+
+The page checks the client once a minute. **Refresh now** asks for a check straight away instead of
+waiting for the next one — the result appears within a few seconds, when the page next reloads.
+
+## What this app cannot do yet
+
+Change anything. Suspending a task, resuming it or attaching a project all have to be done from the
+**boinctui** app for now.

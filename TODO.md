@@ -215,6 +215,30 @@ Common BOINC global preferences not exposed, each roughly one key away in
 
 - [ ] **Prometheus metrics endpoint** — same data source, different consumer.
 
+- [ ] **Publish a maintained fork of `pyboinc` to PyPI.** Deferred deliberately; `boincui` vendors it
+  instead (see `boincui/server/pyboinc/VENDOR.md`). What is already established, so it is not
+  re-derived:
+  - Upstream is dormant: last commit 2022-10-16, **PR #4 — from the author of the HACS integration —
+    open since 2023-05-22**, issue #5 unanswered since 2023-09. Two forks already exist.
+  - MIT permits it, keeping the copyright and licence. The name `pyboinc` is **free on PyPI** (its
+    `setup.py` declares `name='PyBOINC'`), as are `aioboinc`, `boinc-rpc` and `boinc-gui-rpc`.
+  - Its `setup.py` **already declares `license='MIT'` and the OSI classifier** — exactly the metadata
+    `boinc-client` lacks, which would otherwise fail Home Assistant's licence check and need an entry
+    in `script/licenses.py`'s `EXCEPTIONS`.
+  - Work: `setup.py` → `pyproject.toml`, a real version (it is `0.0.1`), a meaningful
+    `python_requires`, GitHub Actions instead of the dead `.travis.yml`, and PyPI Trusted Publishing
+    (OIDC) so there is no long-lived token. Plus folding in the fixes that already exist but are
+    stranded upstream: SpuelMett's `str(duration)`, PR #1's Windows buffer fix, PR #2's typo, our
+    `close()` and the `"\n"` normalisation.
+  - **This is what a Home Assistant core integration would require**, since core only accepts
+    dependencies pinned as `<package>==<version>` from PyPI (`script/hassfest/requirements.py`).
+  - Cost: a public package to maintain. Courtesy first: offer upstream to take over maintenance.
+
+- [ ] **Discover the BOINC add-on's hostname through the Supervisor API**, instead of making the user
+  copy it from the Info page into `boincui`'s configuration. It would remove the worst half of the
+  cross-add-on setup friction, but requires granting `hassio_api`, i.e. widening this add-on's
+  permissions. Needs its own analysis before anyone reaches for it.
+
 - [ ] **Graphical web UI** — biggest item in this file by an order of magnitude. What follows is the
   design work, independent of where the code ends up living.
 
