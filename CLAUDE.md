@@ -111,6 +111,21 @@ Dependencies: `flask` and `waitress` (`pip install flask waitress`, in a venv ra
 system-wide). The image installs them from Debian as `python3-flask`/`python3-waitress`; the tests
 just need them importable. CI runs this as a second job in `operator.yaml`.
 
+### Python version
+
+The images run whatever `python3` Debian 13 ships — **3.13** at the time of writing; nothing pins it.
+Both jobs in `operator.yaml` are set to the same version deliberately: they used to run 3.12, which
+meant the tests never executed on the version being published. That is not theoretical, a
+`threading.Thread._stop` shadowing bug in `boincui` passed on one version and failed on another.
+When Debian moves, move `operator.yaml` with it.
+
+To run a suite on exactly the version that ships, mount it into the built image:
+
+```bash
+docker run --rm -v "$PWD/boincui/server:/src" -w /src \
+  --entrypoint python3 boincui-addon-test:local -m unittest discover -s test -t test
+```
+
 ### Build/run an add-on image locally
 
 See [boinc/DEVELOPMENT.md](boinc/DEVELOPMENT.md) for the `docker build`/`docker run` commands.

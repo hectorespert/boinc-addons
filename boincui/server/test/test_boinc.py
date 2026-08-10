@@ -63,8 +63,19 @@ class FakeBoincClient:
         return self
 
     def __exit__(self, *exc):
+        # Stopping the loop outright leaves the per-connection handler pending, which asyncio then
+        # complains about at collection time -- noise in the test output that looks like a failure.
+        asyncio.run_coroutine_threadsafe(self._shutdown(), self._loop).result(timeout=10)
         self._loop.call_soon_threadsafe(self._loop.stop)
         self._thread.join(timeout=10)
+
+    async def _shutdown(self):
+        self._server.close()
+        await self._server.wait_closed()
+        pending = [task for task in asyncio.all_tasks(self._loop) if task is not asyncio.current_task()]
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
 
     def _serve(self, ready):
         self._loop = asyncio.new_event_loop()
