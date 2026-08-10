@@ -24,13 +24,19 @@ Three independent Home Assistant add-ons, each self-contained with its own `conf
 - **`boinctui/`** — a terminal UI (via `ttyd` + `boinctui`) for monitoring/controlling the BOINC
   client, exposed through Home Assistant ingress.
 - **`boincui/`** — a graphical web interface, intended to become a BOINC Manager equivalent served
-  through ingress. Currently a scaffold: `boincui/server/main.py` says hello and then blocks until
-  it is signalled — deliberately, because an entrypoint that returns leaves Supervisor reporting the
-  app as stopped seconds after the user started it. `--exit-immediately` is the one-shot path. It
-  `config.yaml` declares `stage: experimental` (which also suppresses its Bluesky release
-  announcement, see CI section). See `TODO.md` for the design constraints already worked out —
-  in particular that the cheapest next step is testing whether an existing web UI survives
-  ingress's `/api/hassio_ingress/<token>/` base path, before writing one.
+  through ingress. It does not talk to BOINC yet: `boincui/server/` is a Flask app rendered entirely
+  on the server (`app.py` holds the routes, `main.py` runs it under waitress and owns the process
+  lifecycle), serving one page that reports no client is connected. `--exit-immediately` is the
+  one-shot path used by CI; otherwise it blocks until signalled, because an entrypoint that returns
+  leaves Supervisor reporting the app as stopped seconds after the user started it. `config.yaml`
+  declares `stage: experimental`, which also suppresses its Bluesky release announcement (see CI
+  section). See `TODO.md` for the design constraints already worked out.
+
+  Two rules that are easy to break and are covered by tests in `boincui/server/test/test_app.py`:
+  **every emitted URL must be relative** (ingress strips its prefix and does not pass it on — see
+  the Gotchas in `.claude/skills/run-boinc-addons/SKILL.md`), and **views must never contact a
+  BOINC host during a request** — a background refresher writes a snapshot, views only read it, so
+  a host that is switched off cannot stall the page.
 
 Add-ons are versioned and released independently: each has its own semver in `config.yaml`, and CI
 only builds/releases an add-on when files inside its directory change (see CI section below).

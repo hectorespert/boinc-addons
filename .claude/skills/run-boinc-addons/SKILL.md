@@ -8,7 +8,7 @@ This repo ships three independent Home Assistant add-ons (`boinc/`, `boinctui/`,
 locally, plain `docker build`/`docker run` is enough. Drive all three via
 `.claude/skills/run-boinc-addons/smoke.sh`, which builds each image, launches it,
 and verifies it's actually working (`boinccmd` RPC for `boinc`, an HTTP request to
-`ttyd` for `boinctui`, a log line for `boincui`), then tears everything down. All
+`ttyd` for `boinctui`, an HTTP request for `boincui`), then tears everything down. All
 paths below are relative to the repo root.
 
 Plain Docker cannot see anything Supervisor does *around* the container: option
@@ -44,7 +44,7 @@ What each subcommand actually does (all verified in this session):
 |---|---|---|---|
 | `boinc` | `docker build -t boinc-addon-test:local boinc/` | CI-style one-shot run with `--exit-immediately`, then a second persistent run | `--exit-immediately` run exits 0; then `docker exec --workdir /data/boinc <container> boinccmd --get_state` returns a real state dump (`Time stats` section) |
 | `boinctui` | `docker build -t boinctui-addon-test:local boinctui/` | `docker run -d -p 17681:7681 boinctui-addon-test:local` | `curl -H "X-Remote-User-Name: test" http://localhost:17681/` returns HTTP 200 with the ttyd terminal HTML page |
-| `boincui` | `docker build -t boincui-addon-test:local boincui/` | a one-shot `docker run --rm boincui-addon-test:local --log-level DEBUG --exit-immediately`, then a detached run without the flag | the one-shot run exits 0 having logged `hello world`; the detached one is still running after startup and exits 0 on `docker stop`. The add-on has no interface yet, so its lifecycle is all there is to probe — and **without `--exit-immediately` it blocks until signalled**, so a foreground `docker run` will appear to hang |
+| `boincui` | `docker build -t boincui-addon-test:local boincui/` | a one-shot `docker run --rm boincui-addon-test:local --log-level DEBUG --exit-immediately`, then a detached `docker run -d -p 18099:8099` without the flag | the one-shot run exits 0 having logged `hello world`; the detached one is still running after startup, `curl http://localhost:18099/` returns HTTP 200, the page contains **no root-relative URL** (see Gotchas), and it exits 0 on `docker stop`. **Without `--exit-immediately` it blocks until signalled**, so a foreground `docker run` will appear to hang |
 
 ## Run (human path)
 
@@ -150,6 +150,17 @@ Gotchas.
   `--auth-header X-Remote-User-Name`, which is how it trusts Home Assistant
   Ingress's identity header instead of doing its own login. Any direct HTTP check
   needs `-H "X-Remote-User-Name: <anything>"`.
+- **Ingress does not tell an add-on the path it is served under, so every URL it emits
+  must be relative.** Verified in the Supervisor source: `_create_url` in
+  `supervisor/api/ingress.py` forwards to `http://<addon-ip>:<ingress_port>/<path>`,
+  having stripped `/api/hassio_ingress/<token>`, and the only headers it adds are
+  `X-Remote-User-*` and `X-Forwarded-For` — there is no `X-Ingress-Path`. The token is
+  generated at install time, so it is unknown at build and at start. A root-relative
+  `href`, `action` or `Location: /` therefore sends the browser to the Home Assistant
+  root and out of the panel. In Flask this means **not** using `url_for` for links or
+  redirects: `redirect(url_for('index'))` emits `Location: /`. `boincui`'s
+  `test_app.py` asserts this for href/src/action and for the redirect, and `smoke.sh`
+  greps the served HTML for the same thing.
 - **The `boinc` client itself logs `Docker found but 'hello-world' test failed`
   on every startup inside the container** — it's BOINC probing whether it can run
   nested Docker-based science apps (needs the host's Docker socket mounted in,

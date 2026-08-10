@@ -3,6 +3,14 @@ import logging
 import signal
 import threading
 
+import waitress
+
+from app import Snapshot, create_app
+
+# Must match `ingress_port` in config.yaml: Home Assistant proxies to this port on the container's
+# own address, so it is never published to the host and never reached directly by a user.
+INGRESS_PORT = 8099
+
 parser = argparse.ArgumentParser(prog='boincui')
 
 parser.add_argument("--log-level", default=logging.INFO, type=lambda x: getattr(logging, x))
@@ -27,12 +35,15 @@ signal.signal(signal.SIGTERM, signal_handler)
 if args.exit_immediately:
     logging.warning('Exiting immediately instead of waiting to be stopped')
 else:
-    # There is no server to run yet, but the add-on still has to behave like one: an entrypoint that
-    # returned here would leave Supervisor reporting the app as stopped seconds after the user
-    # started it, which is indistinguishable from a crash. Block until Supervisor asks us to stop.
-    # Logged only once the handlers above are registered, so it doubles as a synchronization point
-    # for tests that need to signal this process and know the signal will actually be handled.
-    logging.info('BOINC UI started')
+    server = waitress.create_server(create_app(Snapshot()), host='0.0.0.0', port=INGRESS_PORT)
+    threading.Thread(target=server.run, daemon=True).start()
+    # Logged only once the server is listening and the handlers above are registered, so it doubles
+    # as a synchronization point for tests that need to connect, or to signal this process and know
+    # the signal will actually be handled.
+    logging.info(f'BOINC UI started on port {INGRESS_PORT}')
     stop_requested.wait()
+    # Closes the listening socket deterministically, so the stop below means the port is really gone
+    # rather than merely that this thread stopped waiting.
+    server.close()
 
 logging.info('BOINC UI stopped')
