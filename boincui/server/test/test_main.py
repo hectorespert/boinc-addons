@@ -11,8 +11,8 @@ SERVER_DIR = Path(__file__).resolve().parent.parent
 MAIN_PY = SERVER_DIR / 'main.py'
 
 STARTED_MARKER = 'BOINC UI started'
-# Fixed rather than injectable, because it has to match `ingress_port` in config.yaml; Home Assistant
-# reaches it on the container's own address, so nothing else on the host competes for it in practice.
+# Supervisor's default for `ingress_port`, which config.yaml therefore does not declare. Home
+# Assistant reaches it on the container's own address, so nothing else competes for it in practice.
 INGRESS_PORT = 8099
 
 
@@ -78,6 +78,9 @@ class TestMain(unittest.TestCase):
 
         self.assertEqual(200, status)
         self.assertIn('BOINC UI', body)
+        # Serving the page once is not enough: shutting the server down has to stay clean, or
+        # Supervisor would report a crash every time the user stops the app.
+        self.assertEqual(0, process.returncode)
 
     def test_should_release_the_port_once_it_is_stopped(self):
         process = subprocess.Popen(
@@ -95,6 +98,9 @@ class TestMain(unittest.TestCase):
         process.terminate()
         process.communicate(timeout=30)
 
+        # A crash also frees the port, so the exit code is what makes the next assertion mean
+        # "shut down cleanly" rather than merely "is no longer there".
+        self.assertEqual(0, process.returncode)
         # The listening socket is closed explicitly on shutdown, so a stopped app really is gone
         # rather than lingering long enough to make the next start fail on a bound port.
         with self.assertRaises(urllib.error.URLError):
