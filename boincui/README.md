@@ -10,9 +10,9 @@ your browser, as an alternative to the text mode interface the boinctui app prov
 
 ## Status
 
-It opens a page inside Home Assistant showing the tasks a BOINC client is running and the projects
-it is attached to, whether that client is the BOINC app on this machine or one elsewhere on your
-network.
+It opens a page inside Home Assistant showing what each of your BOINC machines is computing and the
+projects it is attached to — the BOINC app on this machine, other computers on your network, or
+both.
 
 This app is **experimental and read-only**: it can show you what BOINC is doing, but not change it.
 Use the **boinctui** app to suspend tasks, attach projects or anything else.

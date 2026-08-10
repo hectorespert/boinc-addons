@@ -1,10 +1,25 @@
 configuration:
+  clients:
+    name: Clientes BOINC
+    description: "Las máquinas que ejecutan BOINC y quieres vigilar. Añade una entrada por máquina; cada una tiene que estar configurada además para aceptar la conexión"
+  name:
+    name: Nombre
+    description: "Cómo se llama esta máquina en la página. Opcional: si lo dejas vacío se usa su dirección"
+  host:
+    name: Dirección
+    description: "Nombre de host o dirección IP de la máquina que ejecuta BOINC. Si es la aplicación BOINC de este mismo Home Assistant, usa el nombre de host de su página de información"
+  port:
+    name: Puerto
+    description: "Puerto en el que este cliente escucha las conexiones de control remoto. Déjalo vacío salvo que lo hayas cambiado; BOINC usa el 31416"
+  password:
+    name: Contraseña
+    description: "Tiene que coincidir con la contraseña de GUI RPC de esa máquina. Sin ella el cliente rechaza la conexión"
   boinc_host:
-    name: Dirección del cliente BOINC
-    description: "Nombre de host o dirección IP de la máquina que ejecuta BOINC. Si es la aplicación BOINC de este mismo Home Assistant, usa el nombre de host que aparece en su página de información"
+    name: Dirección del cliente BOINC (ajuste antiguo)
+    description: "Sustituido por la lista de clientes de arriba. Mueve ahí tus ajustes; esto dejará de funcionar en una versión futura"
   boinc_port:
-    name: Puerto del cliente BOINC
-    description: "Puerto en el que el cliente BOINC escucha las conexiones de control remoto. Déjalo vacío salvo que lo hayas cambiado; BOINC usa el 31416"
+    name: Puerto del cliente BOINC (ajuste antiguo)
+    description: "Sustituido por la lista de clientes de arriba. Mueve ahí tus ajustes; esto dejará de funcionar en una versión futura"
   gui_rpc_password:
-    name: Contraseña del cliente BOINC
-    description: "Tiene que coincidir con la contraseña de GUI RPC configurada en la aplicación BOINC. Sin ella el cliente rechaza la conexión"
+    name: Contraseña del cliente BOINC (ajuste antiguo)
+    description: "Sustituido por la lista de clientes de arriba. Mueve ahí tus ajustes; esto dejará de funcionar en una versión futura"

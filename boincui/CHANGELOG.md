@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0
+
+You can now watch several BOINC machines at once, each with its own section on the page. Add them under BOINC clients in the Configuration tab
+
+Each machine now says whether it is computing and, when it is not, why — usually the time of day or a busy processor
+
+The table lists the tasks running right now and counts the ones waiting and finished, instead of every task at once
+
+A machine that cannot be reached no longer hides the ones that can
+
+Your previous settings keep working and appear as one machine. Move them to the client list when convenient, since the old fields will be removed later
+
 ## 0.3.0
 
 The page now shows the tasks a BOINC client is running and the projects it is attached to

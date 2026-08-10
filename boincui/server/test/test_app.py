@@ -1,29 +1,51 @@
 import sys
 import threading
 import unittest
+from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import app as app_module  # noqa: E402
-from app import Refresher, Snapshot, create_app  # noqa: E402
-from boinc import AuthenticationFailed, BoincError, CannotConnect, NotConfigured  # noqa: E402
+from app import Refresher, Snapshot, clients_from, create_app, format_due  # noqa: E402
 
 # An URL that is fine to emit absolutely: it leaves the panel on purpose, or does not navigate.
 EXTERNAL_PREFIXES = ('http://', 'https://', 'mailto:', '#')
 
 URL_ATTRIBUTES = ('href', 'src', 'action', 'formaction')
 
-CONNECTED_STATE = {
-    'cc_status': {'task_mode': 2},
-    'projects': [{'master_url': 'https://example.org/', 'project_name': 'Example'}],
-    'results': [{
-        'name': 'task_one',
-        'project_url': 'https://example.org/',
-        'active_task': {'active_task_state': 1, 'fraction_done': 0.25},
-    }],
-}
+
+def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=0,
+            projects=(('Example Project', 'https://example.org/'),), activity='Computing — always computing'):
+    return {
+        'name': name,
+        'host': 'pc.local',
+        'error': error,
+        'error_kind': error_kind,
+        'state': None if error else {
+            'activity': activity,
+            'running': list(running),
+            'queued': queued,
+            'ready_to_report': ready,
+            'projects': [{'name': n, 'url': u} for n, u in projects],
+        },
+    }
+
+
+def task(name='task_one', project='Example Project', fraction_done=0.25, deadline=None):
+    return {
+        'name': name,
+        'project': project,
+        'fraction_done': fraction_done,
+        'deadline': deadline if deadline is not None else datetime.now() + timedelta(days=2),
+    }
+
+
+def snapshot_of(*machines):
+    snapshot = Snapshot()
+    snapshot.store(list(machines))
+    return snapshot
 
 
 class UrlCollector(HTMLParser):
@@ -45,18 +67,6 @@ def client_for(snapshot):
     return app.test_client()
 
 
-def snapshot_failing_with(error):
-    snapshot = Snapshot()
-    snapshot.fail(error)
-    return snapshot
-
-
-def snapshot_connected():
-    snapshot = Snapshot()
-    snapshot.store(CONNECTED_STATE)
-    return snapshot
-
-
 class TestStates(unittest.TestCase):
     """Every state the page can be in, rendered without touching the network."""
 
@@ -66,56 +76,126 @@ class TestStates(unittest.TestCase):
         return response.get_data(as_text=True)
 
     def test_should_say_it_is_still_checking_before_the_first_refresh(self):
-        self.assertIn('Checking the BOINC client', self.page_for(Snapshot()))
+        self.assertIn('Checking your BOINC clients', self.page_for(Snapshot()))
 
-    def test_should_explain_what_to_fill_in_when_not_configured(self):
-        page = self.page_for(snapshot_failing_with(NotConfigured('nothing set')))
+    def test_should_explain_what_to_fill_in_when_nothing_is_configured(self):
+        page = self.page_for(snapshot_of())
 
         self.assertIn('No BOINC client is configured', page)
         self.assertIn('Configuration tab', page)
 
-    def test_should_show_the_address_it_tried_when_it_cannot_connect(self):
-        page = self.page_for(snapshot_failing_with(CannotConnect('Could not reach a BOINC client at boinc-host:31416')))
+    def test_should_show_running_tasks_with_progress_and_deadline(self):
+        page = self.page_for(snapshot_of(machine(running=[task()], queued=12, ready=2)))
 
-        self.assertIn('Cannot reach the BOINC client', page)
-        self.assertIn('boinc-host:31416', page)
-
-    def test_should_point_at_the_password_when_it_is_rejected(self):
-        page = self.page_for(snapshot_failing_with(AuthenticationFailed('rejected')))
-
-        self.assertIn('rejected the password', page)
-
-    def test_should_still_render_on_an_unexpected_failure(self):
-        page = self.page_for(snapshot_failing_with(BoincError('Unexpected reply')))
-
-        self.assertIn('Something went wrong', page)
-        self.assertIn('Unexpected reply', page)
-
-    def test_should_list_tasks_and_projects_when_connected(self):
-        page = self.page_for(snapshot_connected())
-
-        self.assertIn('task_one', page)
+        self.assertIn('Example Project', page)
         self.assertIn('25%', page)
-        self.assertIn('Example', page)
+        self.assertIn('in 1 day', page)
+        self.assertIn('12 waiting', page)
+        self.assertIn('2 finished', page)
 
-    def test_should_keep_the_last_state_visible_when_a_refresh_fails(self):
-        # A single failed poll should not blank a page that was working a minute ago.
-        snapshot = snapshot_connected()
-        snapshot.fail(CannotConnect('Could not reach a BOINC client at boinc-host:31416'))
+    def test_should_keep_the_task_identifier_out_of_the_way_but_reachable(self):
+        # BOINC's names say nothing to a reader, but they are what you would search for in boinctui.
+        page = self.page_for(snapshot_of(machine(running=[task(name='LATeah4013L03_925.0_0')])))
 
-        page = self.page_for(snapshot)
+        self.assertIn('title="LATeah4013L03_925.0_0"', page)
+        self.assertNotIn('>LATeah4013L03_925.0_0<', page)
 
-        self.assertIn('Cannot reach the BOINC client', page)
-        self.assertIn('task_one', page)
+    def test_should_say_when_a_connected_machine_is_running_nothing(self):
+        page = self.page_for(snapshot_of(machine(running=[], queued=5)))
 
-    def test_should_say_there_are_no_tasks_rather_than_showing_nothing(self):
-        snapshot = Snapshot()
-        snapshot.store({'cc_status': {}, 'projects': [], 'results': []})
+        self.assertIn('Nothing is running right now', page)
 
-        page = self.page_for(snapshot)
+    def test_should_show_why_a_machine_is_paused(self):
+        page = self.page_for(snapshot_of(machine(activity='Paused — the processor is busy with something else')))
 
-        self.assertIn('No tasks', page)
-        self.assertIn('not attached to any project', page)
+        self.assertIn('the processor is busy', page)
+
+    def test_should_report_each_failure_kind_against_its_own_machine(self):
+        for kind, expected in (
+            ('cannot_connect', 'Cannot be reached'),
+            ('auth_failed', 'Rejected the password'),
+            ('not_configured', 'Not fully configured'),
+            ('error', 'Something went wrong'),
+        ):
+            with self.subTest(kind=kind):
+                page = self.page_for(snapshot_of(machine(error='boom', error_kind=kind)))
+                self.assertIn(expected, page)
+
+    def test_should_still_show_the_machines_that_work_when_one_is_broken(self):
+        page = self.page_for(snapshot_of(
+            machine(name='broken', error='boom', error_kind='cannot_connect'),
+            machine(name='working', running=[task(project='Rosetta@home')]),
+        ))
+
+        self.assertIn('Cannot be reached', page)
+        self.assertIn('working', page)
+        self.assertIn('Rosetta@home', page)
+
+    def test_should_render_a_section_per_machine_in_configured_order(self):
+        page = self.page_for(snapshot_of(machine(name='first'), machine(name='second')))
+
+        self.assertLess(page.index('first'), page.index('second'))
+
+
+class TestFormatDue(unittest.TestCase):
+
+    def test_should_describe_a_deadline_in_readable_units(self):
+        # Each delta carries a small margin because format_due reads the clock itself: the unit is
+        # truncated, never rounded up, so a deadline is never described as further away than it is.
+        now = datetime.now()
+        for delta, expected in (
+            (timedelta(days=3, minutes=1), 'in 3 days'),
+            (timedelta(days=1, hours=2), 'in 1 day'),
+            (timedelta(hours=5, minutes=1), 'in 5 hours'),
+            (timedelta(minutes=90), 'in 1 hour'),
+            (timedelta(seconds=30), 'in under a minute'),
+            (timedelta(days=-1), 'overdue'),
+        ):
+            with self.subTest(delta=delta):
+                self.assertEqual(expected, format_due(now + delta))
+
+    def test_should_never_overstate_the_time_left(self):
+        # Truncating up would tell someone they have three days when they have two and a bit.
+        self.assertEqual('in 2 days', format_due(datetime.now() + timedelta(days=2, hours=23)))
+
+    def test_should_cope_with_a_task_that_has_no_deadline(self):
+        self.assertEqual('—', format_due(None))
+
+    def test_should_not_mix_naive_and_aware_datetimes(self):
+        # Deadlines arrive naive; comparing them against an aware "now" raises TypeError, which
+        # would take the whole page down rather than one cell.
+        try:
+            format_due(datetime.now() + timedelta(days=1))
+        except TypeError as error:
+            self.fail(f'format_due compared incompatible datetimes: {error}')
+
+
+class TestClientsFrom(unittest.TestCase):
+
+    def test_should_use_the_client_list_when_present(self):
+        clients = clients_from({'clients': [{'host': 'a', 'password': 'x'}]})
+
+        self.assertEqual([{'host': 'a', 'password': 'x'}], clients)
+
+    def test_should_accept_the_old_single_client_options(self):
+        # Supervisor silently drops options missing from the schema, so removing these outright
+        # would wipe an existing configuration. It still has to say so in the log.
+        with self.assertLogs(level='WARNING') as logged:
+            clients = clients_from({'boinc_host': 'pc', 'boinc_port': 31417, 'gui_rpc_password': 'x'})
+
+        self.assertEqual([{'name': 'pc', 'host': 'pc', 'port': 31417, 'password': 'x'}], clients)
+        self.assertIn('will stop working', ''.join(logged.output))
+
+    def test_should_prefer_the_list_over_the_old_options(self):
+        clients = clients_from({
+            'clients': [{'host': 'new', 'password': 'x'}],
+            'boinc_host': 'old', 'gui_rpc_password': 'y',
+        })
+
+        self.assertEqual('new', clients[0]['host'])
+
+    def test_should_return_nothing_when_unconfigured(self):
+        self.assertEqual([], clients_from({}))
 
 
 class TestIngressConstraint(unittest.TestCase):
@@ -141,8 +221,9 @@ class TestIngressConstraint(unittest.TestCase):
     def test_should_never_emit_a_root_relative_url_in_any_state(self):
         for name, snapshot in (
             ('checking', Snapshot()),
-            ('not configured', snapshot_failing_with(NotConfigured('nothing set'))),
-            ('connected', snapshot_connected()),
+            ('unconfigured', snapshot_of()),
+            ('connected', snapshot_of(machine(running=[task()]))),
+            ('broken', snapshot_of(machine(error='boom', error_kind='cannot_connect'))),
         ):
             with self.subTest(state=name):
                 self.assert_no_root_relative_urls(client_for(snapshot).get('/').get_data(as_text=True))
@@ -161,8 +242,8 @@ class TestIngressConstraint(unittest.TestCase):
 class TestRefreshButton(unittest.TestCase):
 
     def test_should_ask_for_a_poll_without_waiting_for_it(self):
-        # Polling inline would hold the request for as long as the BOINC host takes to answer, which
-        # is the very thing the background refresher exists to avoid.
+        # Polling inline would hold the request for as long as the slowest machine takes to answer,
+        # which is the very thing the background refresher exists to avoid.
         calls = []
         app = create_app(Snapshot())
         app.config['REFRESHER'] = type('FakeRefresher', (), {
@@ -185,8 +266,8 @@ class TestRefresher(unittest.TestCase):
         # Without this the button would do nothing visible until the next scheduled poll, which is a
         # minute away.
         polls = threading.Semaphore(0)
-        original = app_module.read_state
-        app_module.read_state = lambda *args: polls.release() or {'cc_status': {}, 'projects': [], 'results': []}
+        original = app_module.read_all
+        app_module.read_all = lambda clients: polls.release() or []
         stop = threading.Event()
         refresher = Refresher(Snapshot(), {}, stop)
         try:
@@ -200,7 +281,7 @@ class TestRefresher(unittest.TestCase):
             stop.set()
             refresher.request_refresh()
             refresher.join(timeout=10)
-            app_module.read_state = original
+            app_module.read_all = original
 
 
 if __name__ == '__main__':
