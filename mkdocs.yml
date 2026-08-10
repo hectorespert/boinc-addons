@@ -23,3 +23,7 @@ nav:
       - Overview: boinctui/README.md
       - Documentation: boinctui/DOCS.md
       - Changelog: boinctui/CHANGELOG.md
+  - BOINC UI Add-on:
+      - Overview: boincui/README.md
+      - Documentation: boincui/DOCS.md
+      - Changelog: boincui/CHANGELOG.md

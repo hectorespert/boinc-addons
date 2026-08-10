@@ -15,7 +15,7 @@ and update it as items are fixed or discarded.
 
 ## Repository structure
 
-Two independent Home Assistant add-ons, each self-contained with its own `config.yaml`,
+Three independent Home Assistant add-ons, each self-contained with its own `config.yaml`,
 `build.yaml`, `Dockerfile`, `CHANGELOG.md`, and `DOCS.md`:
 
 - **`boinc/`** — runs the actual BOINC client. Has a Python "operator" (`boinc/operator/`) that
@@ -23,6 +23,12 @@ Two independent Home Assistant add-ons, each self-contained with its own `config
   process.
 - **`boinctui/`** — a terminal UI (via `ttyd` + `boinctui`) for monitoring/controlling the BOINC
   client, exposed through Home Assistant ingress.
+- **`boincui/`** — a graphical web interface, intended to become a BOINC Manager equivalent served
+  through ingress. Currently a scaffold: `boincui/server/main.py` logs one line and exits, and
+  `config.yaml` declares `stage: experimental` (which also suppresses its Bluesky release
+  announcement, see CI section). See `TODO.md` for the design constraints already worked out —
+  in particular that the cheapest next step is testing whether an existing web UI survives
+  ingress's `/api/hassio_ingress/<token>/` base path, before writing one.
 
 Add-ons are versioned and released independently: each has its own semver in `config.yaml`, and CI
 only builds/releases an add-on when files inside its directory change (see CI section below).
@@ -75,6 +81,15 @@ python -m unittest test.test_boinc.TestBoincCommand.test_builds_command_with_rem
 
 Dependency: `dict2xml` (`pip install dict2xml`).
 
+### Run the `boincui` unit tests
+
+```bash
+cd boincui/server
+python -m unittest discover -s test -t test
+```
+
+Stdlib only, no dependencies. CI runs this as a second job in `operator.yaml`.
+
 ### Build/run an add-on image locally
 
 See [boinc/DEVELOPMENT.md](boinc/DEVELOPMENT.md) for the `docker build`/`docker run` commands.
@@ -102,7 +117,8 @@ mkdocs build --strict   # or: mkdocs serve
 
 - YAML: `yamllint .` (config in `.yamllint`; `.github` is ignored, line-length is warning-only at 180).
 - Add-on metadata: `frenck/action-addon-linter` per add-on directory (no direct local CLI equivalent).
-- Dockerfiles: `hadolint boinc/Dockerfile` / `hadolint boinctui/Dockerfile`.
+- Dockerfiles: `hadolint boinc/Dockerfile` / `hadolint boinctui/Dockerfile` /
+  `hadolint boincui/Dockerfile`.
 - Shell scripts: `shellcheck -s bash` over each add-on directory (covers `boinctui/run.sh`).
 
 ## CI/CD architecture (`.github/workflows/`)
@@ -111,15 +127,24 @@ Workflows are composed via `workflow_call` — `pr.yaml` and `release.yaml` are 
 chain the reusable workflows in this order:
 
 `lint.yaml` → `operator.yaml` (Python tests) → `find-changed-addons.yaml` (diffs
-`build.yaml`/`config.yaml`/`Dockerfile`/`operator` per add-on directory) → `check-version.yaml`
+`build.yaml`/`config.yaml`/`Dockerfile`/`operator`/`server` per add-on directory) →
+`check-version.yaml`
 (on PRs: informational; on release/main: strict — new version must exceed the latest
 `<addon>-vX.Y.Z` git tag) → `build-addons.yaml` (matrix build per changed add-on/arch; on PRs
 builds only, on release also publishes to `ghcr.io/hectorespert/addon-<name>` and verifies the
 multi-arch manifest).
 
+Add-on directories are **discovered, not listed**: `lint.yaml` and `find-changed-addons.yaml` both
+use `home-assistant/actions/helpers/find-addons`, which globs for top-level `config.yaml`, and the
+image name and architectures come from that file too. A new add-on directory therefore joins the
+pipeline with no workflow edits — except the `monitored_files` list above, which is matched as a
+*regex* against changed paths, so a new code directory has to be added there (and must not be a
+prefix of an unrelated path: `app` would also match `boinc/apparmor.txt.disable`).
+
 `release.yaml` (push to `main`) additionally tags each changed add-on as `<addon>-vX.Y.Z`, cuts a
 GitHub Release with the matching section extracted from that add-on's `CHANGELOG.md`, and posts an
-announcement to Bluesky.
+announcement to Bluesky — except for add-ons declaring `stage: experimental` in `config.yaml`,
+which are still built and released but not announced.
 
 Because builds/releases are gated on **which files changed**, bumping an add-on's version in
 `config.yaml` (and updating its `CHANGELOG.md`) is what triggers a release for that add-on —

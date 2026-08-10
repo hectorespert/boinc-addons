@@ -8,6 +8,14 @@ updates:
     directory: "boinc"
     schedule:
       interval: daily
+  - package-ecosystem: "docker"
+    directory: "boinctui"
+    schedule:
+      interval: daily
+  - package-ecosystem: "docker"
+    directory: "boincui"
+    schedule:
+      interval: daily
   - package-ecosystem: "pip"
     directory: "/"
     schedule:

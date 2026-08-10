@@ -39,5 +39,14 @@ This app configures and executes the BOINC client in your Home Assistant instanc
 
 It provides a terminal user interface (TUI) to monitor and control the BOINC client.
 
+### [BOINC UI app](./boincui)
+
+![Supports aarch64 Architecture][aarch64-shield]
+![Supports amd64 Architecture][amd64-shield]
+
+A graphical web interface to monitor and control the BOINC client, as an alternative to the text mode interface boinctui provides.
+
+This app is **experimental and does not do anything useful yet**. Use boinctui to manage BOINC today.
+
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg

@@ -1,15 +1,15 @@
 ---
 name: run-boinc-addons
-description: Build, run, and smoke-test the boinc and boinctui Home Assistant add-ons, either via plain Docker or under a real Home Assistant Supervisor. Use when asked to run boinc-addons, build/start the boinc or boinctui add-on, start the BOINC client in a container, talk to it via boinccmd, test the boinctui ttyd terminal UI, test an add-on in Home Assistant/Supervisor/the devcontainer, or run the operator's Python unit tests.
+description: Build, run, and smoke-test the boinc, boinctui and boincui Home Assistant add-ons, either via plain Docker or under a real Home Assistant Supervisor. Use when asked to run boinc-addons, build/start the boinc, boinctui or boincui add-on, start the BOINC client in a container, talk to it via boinccmd, test the boinctui ttyd terminal UI, test an add-on in Home Assistant/Supervisor/the devcontainer, or run the Python unit tests.
 ---
 
-This repo ships two independent Home Assistant add-ons (`boinc/`, `boinctui/`), each
-just a Dockerfile — no Supervisor is needed to build/run/drive them locally, plain
-`docker build`/`docker run` is enough. Drive both via
+This repo ships three independent Home Assistant add-ons (`boinc/`, `boinctui/`,
+`boincui/`), each just a Dockerfile — no Supervisor is needed to build/run/drive them
+locally, plain `docker build`/`docker run` is enough. Drive all three via
 `.claude/skills/run-boinc-addons/smoke.sh`, which builds each image, launches it,
 and verifies it's actually working (`boinccmd` RPC for `boinc`, an HTTP request to
-`ttyd` for `boinctui`), then tears everything down. All paths below are relative to
-the repo root.
+`ttyd` for `boinctui`, a log line for `boincui`), then tears everything down. All
+paths below are relative to the repo root.
 
 Plain Docker cannot see anything Supervisor does *around* the container: option
 schema validation, `config.yaml`/`build.yaml` conformance, translations, ingress,
@@ -29,7 +29,8 @@ escalate only when the question is about the add-on's Home Assistant surface.
 ```bash
 ./.claude/skills/run-boinc-addons/smoke.sh boinc      # build + smoke-test boinc
 ./.claude/skills/run-boinc-addons/smoke.sh boinctui    # build + smoke-test boinctui
-./.claude/skills/run-boinc-addons/smoke.sh all         # both, in sequence
+./.claude/skills/run-boinc-addons/smoke.sh boincui     # build + smoke-test boincui
+./.claude/skills/run-boinc-addons/smoke.sh all         # all three, in sequence
 ```
 
 Exit code 0 means the image built and the running container was verified end to
@@ -43,6 +44,7 @@ What each subcommand actually does (all verified in this session):
 |---|---|---|---|
 | `boinc` | `docker build -t boinc-addon-test:local boinc/` | CI-style one-shot run with `--exit-immediately`, then a second persistent run | `--exit-immediately` run exits 0; then `docker exec --workdir /data/boinc <container> boinccmd --get_state` returns a real state dump (`Time stats` section) |
 | `boinctui` | `docker build -t boinctui-addon-test:local boinctui/` | `docker run -d -p 17681:7681 boinctui-addon-test:local` | `curl -H "X-Remote-User-Name: test" http://localhost:17681/` returns HTTP 200 with the ttyd terminal HTML page |
+| `boincui` | `docker build -t boincui-addon-test:local boincui/` | `docker run --rm boincui-addon-test:local --log-level DEBUG` | the run exits 0 and its output contains `hello world` — the add-on has no interface yet, so there is nothing else to probe |
 
 ## Run (human path)
 
@@ -83,6 +85,7 @@ your working tree.
 ./.claude/skills/run-boinc-addons/supervisor.sh up               # boot Supervisor (idempotent)
 ./.claude/skills/run-boinc-addons/supervisor.sh install boinc    # stage + build + install + start
 ./.claude/skills/run-boinc-addons/supervisor.sh install boinctui
+./.claude/skills/run-boinc-addons/supervisor.sh install boincui
 ./.claude/skills/run-boinc-addons/supervisor.sh logs boinc       # the log as Supervisor sees it
 ./.claude/skills/run-boinc-addons/supervisor.sh status
 ./.claude/skills/run-boinc-addons/supervisor.sh down             # remove container + volumes (~5GB)
