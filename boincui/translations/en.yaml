@@ -1,10 +1,25 @@
 configuration:
-  boinc_host:
-    name: BOINC client address
+  clients:
+    name: BOINC clients
+    description: "The machines running BOINC that you want to watch. Add one entry per machine; each of them also has to be set up to accept the connection"
+  name:
+    name: Name
+    description: "What to call this machine on the page. Optional — its address is used if you leave it empty"
+  host:
+    name: Address
     description: "Hostname or IP address of the machine running BOINC. For the BOINC app on this same Home Assistant, use the hostname shown on its Info page"
+  port:
+    name: Port
+    description: "Port this client listens on for remote control. Leave empty unless you changed it; BOINC uses 31416"
+  password:
+    name: Password
+    description: "Must match the GUI RPC password set on that machine. Without it the client refuses the connection"
+  boinc_host:
+    name: BOINC client address (old setting)
+    description: "Replaced by the client list above. Move your settings there; this will stop working in a future version"
   boinc_port:
-    name: BOINC client port
-    description: "Port the BOINC client listens on for remote control. Leave empty unless you changed it; BOINC uses 31416"
+    name: BOINC client port (old setting)
+    description: "Replaced by the client list above. Move your settings there; this will stop working in a future version"
   gui_rpc_password:
-    name: BOINC client password
-    description: "Must match the GUI RPC password set in the BOINC app's configuration. Without it the client refuses the connection"
+    name: BOINC client password (old setting)
+    description: "Replaced by the client list above. Move your settings there; this will stop working in a future version"

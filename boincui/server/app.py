@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from flask import Flask, redirect, render_template
 
-from boinc import AuthenticationFailed, BoincError, CannotConnect, NotConfigured, read_state
+from boinc import read_all
 
 # Home Assistant serves this app under /api/hassio_ingress/<token>/ and strips that prefix before
 # forwarding, without telling us what it was: the only headers ingress adds are X-Remote-User-* and
@@ -14,63 +14,67 @@ from boinc import AuthenticationFailed, BoincError, CannotConnect, NotConfigured
 # and out of the panel. test_app.py guards all three of href, action and Location.
 SELF = './'
 
-# The BOINC client's state does not move quickly, and every refresh costs it a connection. The page
-# reloads far more often than this, but it only ever reads the snapshot below.
+# A BOINC client's state does not move quickly, and every refresh costs each machine a connection.
+# The page reloads far more often than this, but it only ever reads the snapshot below.
 REFRESH_SECONDS = 60
 
-ERROR_KINDS = {
-    NotConfigured: 'not_configured',
-    CannotConnect: 'cannot_connect',
-    AuthenticationFailed: 'auth_failed',
-}
+
+def clients_from(options: dict) -> list[dict]:
+    """The machines to poll, accepting the single-client options this add-on used to have.
+
+    Supervisor drops options that are absent from the schema without telling anyone, so removing the
+    old keys outright would silently wipe an existing configuration. They keep working for one
+    version instead.
+    """
+    clients = options.get('clients') or []
+    if clients:
+        return clients
+
+    if options.get('boinc_host') or options.get('gui_rpc_password'):
+        logging.warning(
+            'Using the old single-client options. Move them to the "clients" list in the '
+            'Configuration tab; they will stop working in a future version'
+        )
+        return [{
+            'name': options.get('boinc_host'),
+            'host': options.get('boinc_host'),
+            'port': options.get('boinc_port'),
+            'password': options.get('gui_rpc_password'),
+        }]
+
+    return []
 
 
 class Snapshot:
     """The state the views render.
 
     Views never talk to a BOINC client while handling a request: the refresher below writes here and
-    the views only read. That keeps rendering time independent of how many hosts are configured, and
-    means a host that is switched off cannot stall the page.
+    the views only read. That keeps rendering time independent of how many machines are configured,
+    and means one that is switched off cannot stall the page.
     """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._state: dict | None = None
+        self._machines: list[dict] | None = None
         self._updated: datetime | None = None
-        self._error: str | None = None
-        self._error_kind: str | None = None
 
     def read(self) -> dict:
         with self._lock:
-            return {
-                'state': self._state,
-                'updated': self._updated,
-                'error': self._error,
-                'error_kind': self._error_kind,
-            }
+            return {'machines': self._machines, 'updated': self._updated}
 
-    def store(self, state: dict) -> None:
+    def store(self, machines: list[dict]) -> None:
         with self._lock:
-            self._state = state
+            self._machines = machines
             self._updated = datetime.now(timezone.utc)
-            self._error = self._error_kind = None
-
-    def fail(self, error: BoincError) -> None:
-        # The last good state is deliberately kept: a page showing yesterday's tasks next to "could
-        # not reach the client" is more useful than one that goes blank on a single failed poll.
-        with self._lock:
-            self._updated = datetime.now(timezone.utc)
-            self._error = str(error)
-            self._error_kind = ERROR_KINDS.get(type(error), 'error')
 
 
 class Refresher(threading.Thread):
-    """Polls the BOINC client on its own thread, so requests never wait on the network."""
+    """Polls every configured machine on its own thread, so requests never wait on the network."""
 
     def __init__(self, snapshot: Snapshot, options: dict, stop: threading.Event) -> None:
         super().__init__(name='refresher', daemon=True)
         self._snapshot = snapshot
-        self._options = options
+        self._clients = clients_from(options)
         # Not `self._stop`: threading.Thread already uses that name for a private method, and
         # shadowing it makes join() raise TypeError.
         self._stop_requested = stop
@@ -79,23 +83,18 @@ class Refresher(threading.Thread):
     def request_refresh(self) -> None:
         """Ask for a poll now, and return without waiting for it.
 
-        Running the poll inline would block the request for as long as the BOINC host takes to
-        answer -- up to the connect timeout when it is unreachable -- which is exactly what this
+        Running the poll inline would block the request for as long as the slowest machine takes to
+        answer -- up to the connect timeout when one is unreachable -- which is exactly what this
         class exists to keep out of request handling.
         """
         self._wake.set()
 
     def refresh_once(self) -> None:
-        try:
-            self._snapshot.store(read_state(
-                self._options.get('boinc_host'),
-                self._options.get('boinc_port'),
-                self._options.get('gui_rpc_password'),
-            ))
-            logging.debug('Refreshed state from the BOINC client')
-        except BoincError as error:
-            logging.warning(f'Could not read the BOINC client state: {error}')
-            self._snapshot.fail(error)
+        machines = read_all(self._clients)
+        for machine in machines:
+            if machine['error']:
+                logging.warning(f'{machine["name"]}: {machine["error"]}')
+        self._snapshot.store(machines)
 
     def run(self) -> None:
         while not self._stop_requested.is_set():
@@ -104,10 +103,27 @@ class Refresher(threading.Thread):
             self._wake.wait(REFRESH_SECONDS)
 
 
+def format_due(deadline: datetime | None) -> str:
+    """A deadline as something a person reads, e.g. "in 2 days"."""
+    if deadline is None:
+        return '—'
+
+    # Deadlines arrive as naive datetimes in local time, because that is what the library produces.
+    # `now` is deliberately naive too: mixing an aware datetime in here raises TypeError.
+    seconds = (deadline - datetime.now()).total_seconds()
+    if seconds <= 0:
+        return 'overdue'
+    for size, unit in ((86400, 'day'), (3600, 'hour'), (60, 'minute')):
+        if seconds >= size:
+            count = int(seconds // size)
+            return f'in {count} {unit}{"s" if count > 1 else ""}'
+    return 'in under a minute'
+
+
 def create_app(snapshot: Snapshot | None = None) -> Flask:
     app = Flask(__name__)
     app.config['SNAPSHOT'] = snapshot if snapshot is not None else Snapshot()
-    app.config['REFRESH_SECONDS'] = REFRESH_SECONDS
+    app.jinja_env.filters['due'] = format_due
 
     @app.route('/')
     def index():

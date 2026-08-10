@@ -1,5 +1,5 @@
 name: BOINC UI
-version: "0.3.0"
+version: "0.4.0"
 slug: boincui
 description: Graphical web interface to monitor and control the BOINC client
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boincui"
@@ -10,7 +10,20 @@ init: false
 ingress: true
 panel_icon: mdi:chart-box
 stage: experimental
+# A list-of-dict option cannot be marked optional: Supervisor's check for missing options only
+# honours a trailing "?" on a string, and for a list it looks at the first element, which here is a
+# dict (apps/options.py, _check_missing_options). Without this default an empty configuration fails
+# validation, so neither a fresh install nor an upgrade from 0.3.0 would start.
+options:
+  clients: []
 schema:
+  clients:
+    - name: "str?"
+      host: "str"
+      port: "port?"
+      password: "password"
+  # Replaced by the list above. Kept for one version so that upgrading does not silently discard an
+  # existing configuration: Supervisor drops options that are missing from the schema without asking.
   boinc_host: "str?"
   boinc_port: "port?"
   gui_rpc_password: "password?"

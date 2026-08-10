@@ -13,23 +13,32 @@
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     line-height: 1.5;
     margin: 0 auto;
-    max-width: 52rem;
+    max-width: 48rem;
     padding: 1.5rem 1rem;
   }
   h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
-  h2 { font-size: 1.1rem; margin: 1.75rem 0 0.5rem; }
   .muted { opacity: 0.7; font-size: 0.9rem; }
+  .machine {
+    border-left: 3px solid currentColor;
+    margin: 1.75rem 0;
+    padding-left: 0.9rem;
+  }
+  .machine.problem { opacity: 0.85; }
+  .machine h2 { font-size: 1.15rem; margin: 0; }
+  .status { margin: 0.15rem 0; }
+  .counts { font-size: 0.9rem; opacity: 0.75; margin: 0.15rem 0 0.75rem; }
   .card {
     border: 1px solid currentColor;
     border-radius: 0.5rem;
     margin: 1.25rem 0;
     padding: 1rem 1.25rem;
   }
-  .card.problem { border-width: 2px; }
   table { border-collapse: collapse; width: 100%; }
-  th, td { text-align: left; padding: 0.35rem 0.6rem 0.35rem 0; vertical-align: baseline; }
-  th { font-weight: 600; border-bottom: 1px solid currentColor; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 0.3rem 0.6rem 0.3rem 0; vertical-align: baseline; }
+  th { font-weight: 600; border-bottom: 1px solid currentColor; font-size: 0.85rem; }
+  td.due { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  progress { width: 100%; max-width: 8rem; vertical-align: middle; }
+  .pct { font-variant-numeric: tabular-nums; font-size: 0.9rem; }
   button {
     border: 1px solid currentColor;
     border-radius: 0.375rem;
@@ -43,90 +52,88 @@
 </head>
 <body>
 <h1>BOINC UI</h1>
-<p class="muted">Experimental. Shows what the BOINC client is doing; it cannot change anything yet.</p>
+<p class="muted">Experimental. Shows what your BOINC clients are doing; it cannot change anything.</p>
 
-{% if error_kind == 'not_configured' %}
-<div class="card problem">
-  <p><strong>No BOINC client is configured.</strong></p>
-  <p>Open this app's Configuration tab and fill in the address of the machine running BOINC and its
-  GUI RPC password.</p>
-  <p>The BOINC app has to allow the connection as well: give it a GUI RPC password, and either turn
-  on remote access or list this app's hostname among its allowed hosts. Its Documentation tab has
-  the details.</p>
-</div>
-
-{% elif error_kind == 'cannot_connect' %}
-<div class="card problem">
-  <p><strong>Cannot reach the BOINC client.</strong></p>
-  <p>{{ error }}</p>
-  <p>Check that the address in the Configuration tab matches the hostname on the BOINC app's own
-  page, that the BOINC app is started, and that it is allowed to accept connections from this app.</p>
-</div>
-
-{% elif error_kind == 'auth_failed' %}
-<div class="card problem">
-  <p><strong>The BOINC client rejected the password.</strong></p>
-  <p>The GUI RPC password here has to be exactly the one set in the BOINC app's configuration.</p>
-</div>
-
-{% elif error_kind %}
-<div class="card problem">
-  <p><strong>Something went wrong talking to the BOINC client.</strong></p>
-  <p>{{ error }}</p>
-</div>
-
-{% elif not state %}
+{% if machines is none %}
 <div class="card">
-  <p>Checking the BOINC client…</p>
+  <p>Checking your BOINC clients…</p>
   <p class="muted">This page will fill in on its own once the first check finishes.</p>
 </div>
-{% endif %}
 
-{% if state %}
-  {% set tasks = state.results %}
-  <h2>Tasks</h2>
-  {% if tasks %}
-  <table>
-    <thead>
-      <tr><th>Task</th><th>Project</th><th>Progress</th><th>State</th></tr>
-    </thead>
-    <tbody>
-      {% for task in tasks %}
-      <tr>
-        <td>{{ task.name }}</td>
-        <td>{{ task.project_url }}</td>
-        <td class="num">
-          {% if task.active_task and task.active_task.fraction_done is not none %}
-          {{ '%.0f' | format(task.active_task.fraction_done * 100) }}%
-          {% else %}—{% endif %}
-        </td>
-        <td>{% if task.active_task %}Running{% else %}Waiting{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>No tasks. The client has nothing to compute right now.</p>
-  {% endif %}
+{% elif not machines %}
+<div class="card">
+  <p><strong>No BOINC client is configured.</strong></p>
+  <p>Open this app's Configuration tab and add a client: the address of the machine running BOINC
+  and its GUI RPC password.</p>
+  <p>That machine has to allow the connection as well. For the BOINC app on this Home Assistant,
+  give it a GUI RPC password and either turn on remote access or list this app's hostname among its
+  allowed hosts; its Documentation tab has the details.</p>
+</div>
 
-  <h2>Projects</h2>
-  {% if state.projects %}
-  <table>
-    <thead>
-      <tr><th>Project</th><th>Address</th></tr>
-    </thead>
-    <tbody>
-      {% for project in state.projects %}
-      <tr>
-        <td>{{ project.project_name or project.master_url }}</td>
-        <td>{{ project.master_url }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-  <p>This client is not attached to any project yet.</p>
-  {% endif %}
+{% else %}
+  {% for machine in machines %}
+  <div class="machine{% if machine.error %} problem{% endif %}">
+    <h2>{{ machine.name }}</h2>
+
+    {% if machine.error_kind == 'cannot_connect' %}
+    <p class="status"><strong>Cannot be reached.</strong> {{ machine.error }}</p>
+    <p class="muted">Check the address, that BOINC is running there, and that it is allowed to
+    accept connections from this app.</p>
+
+    {% elif machine.error_kind == 'auth_failed' %}
+    <p class="status"><strong>Rejected the password.</strong></p>
+    <p class="muted">It has to be exactly the GUI RPC password set on that machine.</p>
+
+    {% elif machine.error_kind == 'not_configured' %}
+    <p class="status"><strong>Not fully configured.</strong> {{ machine.error }}</p>
+
+    {% elif machine.error %}
+    <p class="status"><strong>Something went wrong.</strong> {{ machine.error }}</p>
+
+    {% else %}
+    <p class="status">{{ machine.state.activity }}</p>
+    <p class="counts">
+      {{ machine.state.running | length }} running ·
+      {{ machine.state.queued }} waiting ·
+      {{ machine.state.ready_to_report }} finished
+    </p>
+
+    {% if machine.state.running %}
+    <table>
+      <thead>
+        <tr><th>Project</th><th>Progress</th><th class="due">Due</th></tr>
+      </thead>
+      <tbody>
+        {% for task in machine.state.running %}
+        <tr title="{{ task.name }}">
+          <td>{{ task.project }}</td>
+          <td>
+            {% if task.fraction_done is not none %}
+            <progress value="{{ task.fraction_done }}" max="1"></progress>
+            <span class="pct">{{ '%.0f' | format(task.fraction_done * 100) }}%</span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="due">{{ task.deadline | due }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% elif machine.state.queued or machine.state.ready_to_report %}
+    <p class="muted">Nothing is running right now.</p>
+    {% else %}
+    <p class="muted">This machine has no tasks.</p>
+    {% endif %}
+
+    {% if machine.state.projects %}
+    <p class="counts">Projects:
+      {% for project in machine.state.projects %}{{ project.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+    </p>
+    {% else %}
+    <p class="counts">Not attached to any project.</p>
+    {% endif %}
+    {% endif %}
+  </div>
+  {% endfor %}
 {% endif %}
 
 <form method="post" action="refresh">
