@@ -26,9 +26,11 @@ RUN apt-get update && \
 # Copy server
 COPY server/*.py /opt/boincui/
 COPY server/templates/ /opt/boincui/templates/
+# Vendored third-party library, see server/pyboinc/VENDOR.md
+COPY server/pyboinc/ /opt/boincui/pyboinc/
 
 # Entrypoint & CMD
-ENTRYPOINT [ "python3", "/opt/boincui/main.py" ]
+ENTRYPOINT [ "python3", "/opt/boincui/main.py", "--options", "/data/options.json" ]
 
 # Build arguments
 ARG BUILD_DATE

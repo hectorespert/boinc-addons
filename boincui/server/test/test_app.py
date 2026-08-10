@@ -6,11 +6,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import Snapshot, create_app  # noqa: E402
+from boinc import AuthenticationFailed, BoincError, CannotConnect, NotConfigured  # noqa: E402
 
 # An URL that is fine to emit absolutely: it leaves the panel on purpose, or does not navigate.
 EXTERNAL_PREFIXES = ('http://', 'https://', 'mailto:', '#')
 
 URL_ATTRIBUTES = ('href', 'src', 'action', 'formaction')
+
+CONNECTED_STATE = {
+    'cc_status': {'task_mode': 2},
+    'projects': [{'master_url': 'https://example.org/', 'project_name': 'Example'}],
+    'results': [{
+        'name': 'task_one',
+        'project_url': 'https://example.org/',
+        'active_task': {'active_task_state': 1, 'fraction_done': 0.25},
+    }],
+}
 
 
 class UrlCollector(HTMLParser):
@@ -26,26 +37,94 @@ class UrlCollector(HTMLParser):
                 self.urls.append((tag, name, value))
 
 
-class TestApp(unittest.TestCase):
+def client_for(snapshot):
+    app = create_app(snapshot)
+    app.config.update(TESTING=True)
+    return app.test_client()
 
-    def setUp(self):
-        self.app = create_app(Snapshot())
-        self.app.config.update(TESTING=True)
-        self.client = self.app.test_client()
 
-    def test_should_render_the_page_when_no_client_is_connected(self):
-        response = self.client.get('/')
+def snapshot_failing_with(error):
+    snapshot = Snapshot()
+    snapshot.fail(error)
+    return snapshot
 
+
+def snapshot_connected():
+    snapshot = Snapshot()
+    snapshot.store(CONNECTED_STATE)
+    return snapshot
+
+
+class TestStates(unittest.TestCase):
+    """Every state the page can be in, rendered without touching the network."""
+
+    def page_for(self, snapshot):
+        response = client_for(snapshot).get('/')
         self.assertEqual(200, response.status_code)
-        self.assertIn('No BOINC client is connected', response.get_data(as_text=True))
+        return response.get_data(as_text=True)
 
-    # Home Assistant ingress serves this app under /api/hassio_ingress/<token>/ and strips that
-    # prefix without telling the app what it was, so a root-relative URL escapes the panel and lands
-    # on the Home Assistant root instead. The three tests below are the guard for that, and they are
-    # the reason this add-on renders on the server rather than shipping a bundled front end.
-    def test_should_never_emit_a_root_relative_url(self):
+    def test_should_say_it_is_still_checking_before_the_first_refresh(self):
+        self.assertIn('Checking the BOINC client', self.page_for(Snapshot()))
+
+    def test_should_explain_what_to_fill_in_when_not_configured(self):
+        page = self.page_for(snapshot_failing_with(NotConfigured('nothing set')))
+
+        self.assertIn('No BOINC client is configured', page)
+        self.assertIn('Configuration tab', page)
+
+    def test_should_show_the_address_it_tried_when_it_cannot_connect(self):
+        page = self.page_for(snapshot_failing_with(CannotConnect('Could not reach a BOINC client at boinc-host:31416')))
+
+        self.assertIn('Cannot reach the BOINC client', page)
+        self.assertIn('boinc-host:31416', page)
+
+    def test_should_point_at_the_password_when_it_is_rejected(self):
+        page = self.page_for(snapshot_failing_with(AuthenticationFailed('rejected')))
+
+        self.assertIn('rejected the password', page)
+
+    def test_should_still_render_on_an_unexpected_failure(self):
+        page = self.page_for(snapshot_failing_with(BoincError('Unexpected reply')))
+
+        self.assertIn('Something went wrong', page)
+        self.assertIn('Unexpected reply', page)
+
+    def test_should_list_tasks_and_projects_when_connected(self):
+        page = self.page_for(snapshot_connected())
+
+        self.assertIn('task_one', page)
+        self.assertIn('25%', page)
+        self.assertIn('Example', page)
+
+    def test_should_keep_the_last_state_visible_when_a_refresh_fails(self):
+        # A single failed poll should not blank a page that was working a minute ago.
+        snapshot = snapshot_connected()
+        snapshot.fail(CannotConnect('Could not reach a BOINC client at boinc-host:31416'))
+
+        page = self.page_for(snapshot)
+
+        self.assertIn('Cannot reach the BOINC client', page)
+        self.assertIn('task_one', page)
+
+    def test_should_say_there_are_no_tasks_rather_than_showing_nothing(self):
+        snapshot = Snapshot()
+        snapshot.store({'cc_status': {}, 'projects': [], 'results': []})
+
+        page = self.page_for(snapshot)
+
+        self.assertIn('No tasks', page)
+        self.assertIn('not attached to any project', page)
+
+
+class TestIngressConstraint(unittest.TestCase):
+    """Home Assistant ingress serves this app under /api/hassio_ingress/<token>/ and strips that
+    prefix without telling the app what it was, so a root-relative URL escapes the panel and lands on
+    the Home Assistant root instead. These are the guard for that, and they are the reason this
+    add-on renders on the server rather than shipping a bundled front end."""
+
+    def assert_no_root_relative_urls(self, page):
         collector = UrlCollector()
-        collector.feed(self.client.get('/').get_data(as_text=True))
+        collector.feed(page)
 
         self.assertTrue(collector.urls, 'the page emitted no URLs at all, so this proves nothing')
         for tag, attribute, url in collector.urls:
@@ -57,8 +136,17 @@ class TestApp(unittest.TestCase):
                     f'<{tag} {attribute}="{url}"> is root-relative and would escape the ingress path',
                 )
 
+    def test_should_never_emit_a_root_relative_url_in_any_state(self):
+        for name, snapshot in (
+            ('checking', Snapshot()),
+            ('not configured', snapshot_failing_with(NotConfigured('nothing set'))),
+            ('connected', snapshot_connected()),
+        ):
+            with self.subTest(state=name):
+                self.assert_no_root_relative_urls(client_for(snapshot).get('/').get_data(as_text=True))
+
     def test_should_redirect_relatively_after_refreshing(self):
-        response = self.client.post('/refresh')
+        response = client_for(Snapshot()).post('/refresh')
 
         self.assertEqual(302, response.status_code)
         location = response.headers['Location']
@@ -67,14 +155,21 @@ class TestApp(unittest.TestCase):
             f'Location: {location} is root-relative and would send the browser out of the panel',
         )
 
-    def test_should_record_the_refresh_in_the_snapshot(self):
-        snapshot = Snapshot()
-        client = create_app(snapshot).test_client()
-        self.assertIsNone(snapshot.read()[1])
 
-        client.post('/refresh')
+class TestRefreshButton(unittest.TestCase):
 
-        self.assertIsNotNone(snapshot.read()[1])
+    def test_should_poll_on_demand_when_a_refresher_is_wired_in(self):
+        calls = []
+        app = create_app(Snapshot())
+        app.config['REFRESHER'] = type('FakeRefresher', (), {'refresh_once': lambda self: calls.append(1)})()
+
+        app.test_client().post('/refresh')
+
+        self.assertEqual(1, len(calls))
+
+    def test_should_still_redirect_when_no_refresher_is_wired_in(self):
+        # The app is created without one in the unit tests, and must not fall over because of it.
+        self.assertEqual(302, client_for(Snapshot()).post('/refresh').status_code)
 
 
 if __name__ == '__main__':

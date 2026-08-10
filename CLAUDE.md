@@ -23,20 +23,31 @@ Three independent Home Assistant add-ons, each self-contained with its own `conf
   process.
 - **`boinctui/`** — a terminal UI (via `ttyd` + `boinctui`) for monitoring/controlling the BOINC
   client, exposed through Home Assistant ingress.
-- **`boincui/`** — a graphical web interface, intended to become a BOINC Manager equivalent served
-  through ingress. It does not talk to BOINC yet: `boincui/server/` is a Flask app rendered entirely
-  on the server (`app.py` holds the routes, `main.py` runs it under waitress and owns the process
-  lifecycle), serving one page that reports no client is connected. `--exit-immediately` is the
-  one-shot path used by CI; otherwise it blocks until signalled, because an entrypoint that returns
-  leaves Supervisor reporting the app as stopped seconds after the user started it. `config.yaml`
-  declares `stage: experimental`, which also suppresses its Bluesky release announcement (see CI
-  section). See `TODO.md` for the design constraints already worked out.
+- **`boincui/`** — a read-only graphical web interface served through ingress, intended to grow into
+  a BOINC Manager equivalent. `boincui/server/` is a Flask app rendered entirely on the server:
+  `app.py` holds the routes plus `Snapshot`/`Refresher`, `boinc.py` is the only module that talks to
+  a BOINC client, and `main.py` runs it under waitress and owns the process lifecycle.
+  `--exit-immediately` is the one-shot path used by CI; otherwise it blocks until signalled, because
+  an entrypoint that returns leaves Supervisor reporting the app as stopped seconds after the user
+  started it. `config.yaml` declares `stage: experimental`, which also suppresses its Bluesky release
+  announcement (see CI section).
 
-  Two rules that are easy to break and are covered by tests in `boincui/server/test/test_app.py`:
-  **every emitted URL must be relative** (ingress strips its prefix and does not pass it on — see
-  the Gotchas in `.claude/skills/run-boinc-addons/SKILL.md`), and **views must never contact a
-  BOINC host during a request** — a background refresher writes a snapshot, views only read it, so
-  a host that is switched off cannot stall the page.
+  Three rules that are easy to break, all covered by tests:
+  1. **Every emitted URL must be relative** — ingress strips its prefix and does not pass it on (see
+     the Gotchas in `.claude/skills/run-boinc-addons/SKILL.md`). `test_app.py` parses the rendered
+     HTML and fails on any root-relative `href`/`src`/`action`, and on a root-relative `Location`.
+  2. **Views must never contact a BOINC host during a request.** `Refresher` polls on its own thread
+     and writes `Snapshot`; views only read it. A host that is switched off cannot stall the page,
+     and render time does not depend on how many hosts are configured.
+  3. **`boinc.py` is the only place that may import `pyboinc`.** It converts the library's asyncio
+     API and its quirks into plain dicts and `BoincError` subclasses, so nothing above it knows the
+     library exists.
+
+- **`boincui/server/pyboinc/`** is vendored third-party code (MIT), not ours — it has never been
+  published to PyPI, so there is no version to depend on. `VENDOR.md` in that directory records the
+  upstream commit, the local patches (currently just an added `close()`, since upstream never closes
+  its socket) and the upstream quirks that `boinc.py` works around. Keep local changes minimal and
+  listed there; do not restyle it.
 
 Add-ons are versioned and released independently: each has its own semver in `config.yaml`, and CI
 only builds/releases an add-on when files inside its directory change (see CI section below).

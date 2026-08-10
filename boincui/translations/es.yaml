@@ -1,0 +1,10 @@
+configuration:
+  boinc_host:
+    name: Dirección del cliente BOINC
+    description: "Nombre de host o dirección IP de la máquina que ejecuta BOINC. Si es la aplicación BOINC de este mismo Home Assistant, usa el nombre de host que aparece en su página de información"
+  boinc_port:
+    name: Puerto del cliente BOINC
+    description: "Puerto en el que el cliente BOINC escucha las conexiones de control remoto. Déjalo vacío salvo que lo hayas cambiado; BOINC usa el 31416"
+  gui_rpc_password:
+    name: Contraseña del cliente BOINC
+    description: "Tiene que coincidir con la contraseña de GUI RPC configurada en la aplicación BOINC. Sin ella el cliente rechaza la conexión"
