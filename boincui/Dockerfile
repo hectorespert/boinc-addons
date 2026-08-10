@@ -17,12 +17,15 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
-    python3 && \
+    python3 \
+    python3-flask \
+    python3-waitress && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy server
 COPY server/*.py /opt/boincui/
+COPY server/templates/ /opt/boincui/templates/
 
 # Entrypoint & CMD
 ENTRYPOINT [ "python3", "/opt/boincui/main.py" ]

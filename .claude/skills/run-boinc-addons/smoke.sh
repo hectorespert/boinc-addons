@@ -93,11 +93,11 @@ boincui_smoke() {
   }
   echo "-> exit-immediately run exited 0 and logged 'hello world'"
 
-  echo "== boincui: persistent run + clean stop =="
-  # The add-on has no interface to probe yet, so what matters is the lifecycle: it must stay up
-  # until asked to stop, or Supervisor reports it as stopped seconds after the user starts it.
+  echo "== boincui: persistent run + serve + clean stop =="
+  # It must stay up until asked to stop, or Supervisor reports it as stopped seconds after the user
+  # starts it.
   docker rm -f boincui-driver-test >/dev/null 2>&1 || true
-  docker run -d --name boincui-driver-test boincui-addon-test:local --log-level DEBUG >/dev/null
+  docker run -d --name boincui-driver-test -p 18099:8099 boincui-addon-test:local --log-level DEBUG >/dev/null
 
   for _ in $(seq 1 20); do
     docker logs boincui-driver-test 2>&1 | grep -q "BOINC UI started" && break
@@ -110,6 +110,32 @@ boincui_smoke() {
     exit 1
   }
   echo "-> still running after startup"
+
+  for _ in $(seq 1 20); do
+    code=$(curl -sS -o /tmp/boincui-index.html -w '%{http_code}' --max-time 5 \
+      http://localhost:18099/ 2>/dev/null || true)
+    [ "$code" = "200" ] && break
+    sleep 0.5
+  done
+  if [ "$code" != "200" ]; then
+    echo "boincui did not serve its page (last HTTP code: $code)"
+    docker logs boincui-driver-test
+    docker rm -f boincui-driver-test >/dev/null
+    exit 1
+  fi
+  grep -q "BOINC UI" /tmp/boincui-index.html
+  echo "-> served the page (HTTP 200)"
+
+  # Home Assistant serves this app under /api/hassio_ingress/<token>/ and strips that prefix without
+  # telling the app, so any root-relative URL escapes the panel. The unit tests assert this against
+  # the Flask app; this is the same check against the image that actually ships.
+  if grep -qE '(href|src|action)="/' /tmp/boincui-index.html; then
+    echo "boincui emitted a root-relative URL, which would break under ingress:"
+    grep -oE '(href|src|action)="/[^"]*"' /tmp/boincui-index.html
+    docker rm -f boincui-driver-test >/dev/null
+    exit 1
+  fi
+  echo "-> every URL on the page is relative, so it survives the ingress prefix"
 
   docker stop -t 10 boincui-driver-test >/dev/null
   code=$(docker inspect -f '{{.State.ExitCode}}' boincui-driver-test)

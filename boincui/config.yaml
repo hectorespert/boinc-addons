@@ -1,5 +1,5 @@
 name: BOINC UI
-version: "0.1.0"
+version: "0.2.0"
 slug: boincui
 description: Graphical web interface to monitor and control the BOINC client
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boincui"
@@ -7,6 +7,8 @@ arch:
   - aarch64
   - amd64
 init: false
+ingress: true
+panel_icon: mdi:chart-box
 stage: experimental
 image: "ghcr.io/hectorespert/addon-boincui"
 apparmor: false

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- No URL, so this reloads whatever address the browser is already on. Giving it one would mean
+     writing a path this app cannot know, since ingress hides the prefix it is served under. -->
+<meta http-equiv="refresh" content="10">
+<title>BOINC UI</title>
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.5;
+    margin: 0 auto;
+    max-width: 45rem;
+    padding: 1.5rem 1rem;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+  .muted { opacity: 0.7; font-size: 0.9rem; }
+  .card {
+    border: 1px solid currentColor;
+    border-radius: 0.5rem;
+    margin: 1.5rem 0;
+    opacity: 0.95;
+    padding: 1rem 1.25rem;
+  }
+  button {
+    border: 1px solid currentColor;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    padding: 0.4rem 0.9rem;
+  }
+</style>
+</head>
+<body>
+<h1>BOINC UI</h1>
+<p class="muted">Experimental. This app cannot show your tasks yet.</p>
+
+<div class="card">
+  {% if hosts %}
+  <p>{{ hosts | length }} BOINC client(s) connected.</p>
+  {% else %}
+  <p><strong>No BOINC client is connected.</strong></p>
+  <p>There is nothing to configure yet — the connection settings will appear here in a later
+  version. To manage BOINC today, use the <strong>boinctui</strong> app.</p>
+  {% endif %}
+</div>
+
+<form method="post" action="refresh">
+  <button type="submit">Refresh now</button>
+</form>
+
+<p class="muted">
+  {% if updated %}
+  Last checked {{ updated.strftime('%Y-%m-%d %H:%M:%S') }} UTC. This page reloads every 10 seconds.
+  {% else %}
+  Not checked yet. This page reloads every 10 seconds.
+  {% endif %}
+</p>
+</body>
+</html>
