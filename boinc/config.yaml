@@ -31,4 +31,4 @@ image: "ghcr.io/hectorespert/addon-boinc"
 apparmor: false
 backup: cold
 map:
-  - app_config
+  - addon_config
