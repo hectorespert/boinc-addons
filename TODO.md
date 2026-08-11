@@ -215,6 +215,24 @@ Common BOINC global preferences not exposed, each roughly one key away in
 
 - [ ] **Prometheus metrics endpoint** — same data source, different consumer.
 
+- [ ] **Remove `boincui`'s deprecated single-client options in 0.6.0** — `boinc_host`, `boinc_port`
+  and `gui_rpc_password`, replaced by the `clients` list in 0.4.0. Held back from 0.5.0 on purpose:
+  they had been deprecated for a single released version, and Supervisor **silently discards options
+  that disappear from the schema**, so anyone who had not migrated would lose their configuration
+  with no warning. `clients_from` in `app.py` is the whole migration; deleting it also means dropping
+  the three entries from `translations/*.yaml` and the *Upgrading* section of `DOCS.md`.
+
+- [ ] **Localise `boincui`'s page.** Only `translations/*.yaml` is translated today, and that covers
+  configuration fields, not the page itself. If it is ever done, the activity control's wording
+  should come from BOINC's own catalogue rather than a third phrasing — `locale/es/BOINC-Manager.po`
+  has *Ejecutar siempre* / *Ejecutar según preferencias* / *Suspender* with their descriptions. See
+  the UI/UX section of `boincui/DEVELOPMENT.md`.
+
+- [ ] **Show how long a temporary activity mode has left.** `cc_status` already returns
+  `task_mode_delay` alongside `task_mode_perm`, in the reply `boincui` fetches anyway, so a machine
+  suspended for an hour from BOINC Manager could say so instead of just "paused". Needs a duration
+  formatter; `format_due` only handles deadlines.
+
 - [ ] **Publish a maintained fork of `pyboinc` to PyPI.** Deferred deliberately; `boincui` vendors it
   instead (see `boincui/server/pyboinc/VENDOR.md`). What is already established, so it is not
   re-derived:
@@ -230,6 +248,12 @@ Common BOINC global preferences not exposed, each roughly one key away in
     (OIDC) so there is no long-lived token. Plus folding in the fixes that already exist but are
     stranded upstream: SpuelMett's `str(duration)`, PR #1's Windows buffer fix, PR #2's typo, our
     `close()` and the `"\n"` normalisation.
+  - **The write path is broken upstream and in both forks**, which is the strongest reason yet to
+    publish a fixed one. All three `set_*_mode()` methods pass the duration where a tag name belongs,
+    so they raise `TypeError` before sending anything; `Igor-Misic` left it, and SpuelMett's
+    `str(duration)` stops the crash while silently dropping the duration, turning a timed change into
+    a permanent one. `boincui` carries the real fix (`ET.SubElement(req, Tag.DURATION)`), verified
+    against a running client — it is a three-line PR to upstream whenever the fork happens.
   - **This is what a Home Assistant core integration would require**, since core only accepts
     dependencies pinned as `<package>==<version>` from PyPI (`script/hassfest/requirements.py`).
   - Cost: a public package to maintain. Courtesy first: offer upstream to take over maintenance.
@@ -288,9 +312,12 @@ Common BOINC global preferences not exposed, each roughly one key away in
     - **Likely network gotcha — verify empirically.** Add-on ↔ add-on traffic stays on HA's Docker
       network and the target sees the container hostname. Traffic to a LAN machine is masqueraded,
       so the remote host most likely sees **the Home Assistant host's IP** — i.e. a remote PC's
-      `remote_hosts.cfg` needs a *different* entry than a sibling add-on does. This is inference
-      about Docker NAT, **not verified**; confirm with `tcpdump` or a remote BOINC's rejection log.
-      If true it is the first support question this will get, and both recipes belong in the docs.
+      `remote_hosts.cfg` needs a *different* entry than a sibling add-on does. **Strongly supported,
+      not yet confirmed on Home Assistant itself**: 2026-08-11, a BOINC client in a container reached
+      through a published port logged `GUI RPC request from non-allowed address 192.168.65.1`, the
+      Docker gateway rather than the caller. That is Docker Desktop's NAT, so the address a real HA
+      host presents still has to be checked there. Documented in `boincui/DOCS.md` as the likely
+      cause when a LAN machine refuses the connection.
     - **Security blast radius multiplies.** BOINC's GUI RPC has one password per client and no users
       or roles. A multi-host UI concentrates total control of every BOINC machine behind one ingress
       panel. **Verify whether HA can restrict an ingress panel to admin users**; if it cannot, any HA

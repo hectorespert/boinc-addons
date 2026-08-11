@@ -25,6 +25,18 @@ Only the package is copied — not upstream's tests, `setup.py` or `.travis.yml`
 - **`close()` added** to `_RPCClientRaw` and `RPCClient`. Upstream never closes the connection, so
   anything that polls leaks a socket per cycle and depends on the garbage collector to reap it; BOINC
   also caps concurrent GUI RPC connections. Both additions are marked `LOCAL PATCH` in the source.
+- **`set_run_mode()`, `set_network_mode()` and `set_gpu_mode()` fixed.** All three built the duration
+  element as `ET.SubElement(req, duration)`, passing the *number* where a tag name belongs, so every
+  one of them died with `TypeError: cannot serialize 0 (type int)` before reaching the socket — the
+  whole write path was dead on arrival, which is a fair sign nobody has ever exercised it. Now
+  `ET.SubElement(req, Tag.DURATION)`.
+
+  Neither fork fixes this properly: `Igor-Misic/pyboinc` left it alone, and `SpuelMett/pyboinc` (with
+  the copy inside the HACS integration) changed it to `str(duration)`, which emits `<0>0</0>`. That
+  stops the crash but never sends a duration at all, so BOINC falls back to its default of zero:
+  right by accident for a permanent change, and silently permanent when a temporary one was asked
+  for. The corrected request matches what `boinctui` builds by hand
+  (`src/srvdata.cpp:445`), and was verified against a running BOINC client.
 
 Nothing else is modified.
 
@@ -37,9 +49,9 @@ Nothing else is modified.
   `../boinc.py` calls `authorize()` and checks its return value before querying.
 - `_write()` calls `drain()` before writing instead of after, and the loop in `receive()` is dead
   code because `readuntil` already stops at the separator. Both harmless.
-- The three `set_*_mode()` methods pass a number where `ET.SubElement` wants a tag name. Only
-  affects the write path, which this add-on does not use. Fixed downstream in the HACS integration
-  as `str(duration)` if it is ever needed.
+- Nothing in the library distinguishes a host that is not there from one that accepts the connection
+  and hangs up, which is what BOINC does to a caller missing from its allowed list. `../boinc.py`
+  tells them apart by which stage failed.
 
 ## Upstream is dormant
 

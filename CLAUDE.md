@@ -5,8 +5,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 For what this repo is, how to install it, and per-app end-user docs, see:
 [README.md](README.md), [boinc/README.md](boinc/README.md) + [boinc/DOCS.md](boinc/DOCS.md) +
 [boinc/DEVELOPMENT.md](boinc/DEVELOPMENT.md), [boinctui/README.md](boinctui/README.md) +
-[boinctui/DOCS.md](boinctui/DOCS.md), and [boinc/operator/README.md](boinc/operator/README.md).
+[boinctui/DOCS.md](boinctui/DOCS.md), [boincui/README.md](boincui/README.md) +
+[boincui/DOCS.md](boincui/DOCS.md) + [boincui/DEVELOPMENT.md](boincui/DEVELOPMENT.md), and
+[boinc/operator/README.md](boinc/operator/README.md).
 This file only covers what those don't: internal architecture and contributor workflow.
+
+[boincui/DEVELOPMENT.md](boincui/DEVELOPMENT.md) additionally carries **the UI and UX decisions for
+`boincui`, with the reasoning and the evidence behind each one**. Read it before changing how that
+page looks or behaves, and add to it when a new decision is made — otherwise the argument gets had
+again from scratch, which has already happened more than once.
 
 [TODO.md](TODO.md) is the standing backlog of known bugs, HA-platform conformance gaps, and
 feature ideas found by review but not yet acted on. Consult it before starting work in this repo —
@@ -23,8 +30,9 @@ Three independent Home Assistant add-ons, each self-contained with its own `conf
   process.
 - **`boinctui/`** — a terminal UI (via `ttyd` + `boinctui`) for monitoring/controlling the BOINC
   client, exposed through Home Assistant ingress.
-- **`boincui/`** — a read-only graphical web interface served through ingress, intended to grow into
-  a BOINC Manager equivalent. `boincui/server/` is a Flask app rendered entirely on the server:
+- **`boincui/`** — a graphical web interface served through ingress, intended to grow into a BOINC
+  Manager equivalent. It reads every configured machine and can set each one's activity mode; it
+  cannot yet act on individual tasks. `boincui/server/` is a Flask app rendered entirely on the server:
   `app.py` holds the routes plus `Snapshot`/`Refresher`, `boinc.py` is the only module that talks to
   a BOINC client, and `main.py` runs it under waitress and owns the process lifecycle.
   `--exit-immediately` is the one-shot path used by CI; otherwise it blocks until signalled, because
@@ -36,18 +44,21 @@ Three independent Home Assistant add-ons, each self-contained with its own `conf
   1. **Every emitted URL must be relative** — ingress strips its prefix and does not pass it on (see
      the Gotchas in `.claude/skills/run-boinc-addons/SKILL.md`). `test_app.py` parses the rendered
      HTML and fails on any root-relative `href`/`src`/`action`, and on a root-relative `Location`.
-  2. **Views must never contact a BOINC host during a request.** `Refresher` polls on its own thread
-     and writes `Snapshot`; views only read it. A host that is switched off cannot stall the page,
-     and render time does not depend on how many hosts are configured.
+  2. **Rendering must never contact a BOINC host.** `Refresher` polls on its own thread and writes
+     `Snapshot`; views only read it. A host that is switched off cannot stall the page, and render
+     time does not depend on how many hosts are configured. An *action* is the one exception — it
+     runs its exchange inside the request, with a shorter deadline than the poll gets, because a
+     button press with no confirmation is worse than a slow one.
   3. **`boinc.py` is the only place that may import `pyboinc`.** It converts the library's asyncio
      API and its quirks into plain dicts and `BoincError` subclasses, so nothing above it knows the
      library exists.
 
 - **`boincui/server/pyboinc/`** is vendored third-party code (MIT), not ours — it has never been
   published to PyPI, so there is no version to depend on. `VENDOR.md` in that directory records the
-  upstream commit, the local patches (currently just an added `close()`, since upstream never closes
-  its socket) and the upstream quirks that `boinc.py` works around. Keep local changes minimal and
-  listed there; do not restyle it.
+  upstream commit, the local patches (an added `close()`, since upstream never closes its socket, and
+  a fix to the three `set_*_mode()` methods, whose entire write path raised `TypeError` before
+  reaching the socket) and the upstream quirks that `boinc.py` works around. Keep local changes
+  minimal and listed there; do not restyle it.
 
 Add-ons are versioned and released independently: each has its own semver in `config.yaml`, and CI
 only builds/releases an add-on when files inside its directory change (see CI section below).
@@ -146,8 +157,11 @@ pip install -r requirements.txt
 mkdocs build --strict   # or: mkdocs serve
 ```
 
-`mkdocs.yml` nav pulls each add-on's `README.md`, `DOCS.md`, and `CHANGELOG.md` directly, plus
-`boinc/DEVELOPMENT.md`.
+The nav in `mkdocs.yml` does **not** reach into the add-on directories. `docs/` is the docs dir and
+every page in it is a **symlink** to the real file (`docs/boincui/DOCS.md -> ../../boincui/DOCS.md`,
+`docs/index.md -> ../README.md`). Adding a page to the nav therefore means creating the symlink too,
+or `--strict` fails with "included in the 'nav' configuration, which is not found in the
+documentation files".
 
 ### Linting (mirrors CI, see `.github/workflows/lint.yaml`)
 

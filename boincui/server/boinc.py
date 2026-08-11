@@ -8,12 +8,22 @@ import asyncio
 import logging
 
 from pyboinc import init_rpc_client
-from status import describe_activity
+from pyboinc.rpc_client import Mode
+from status import describe_activity, describe_mode
 
 DEFAULT_PORT = 31416
 # BOINC's own client gives up well before this; the point is only that a host which accepts the
 # connection and then says nothing cannot hold the refresher forever.
 TIMEOUT_SECONDS = 30
+# Acting on a button press is allowed to touch the network, but not for as long as a poll may: this
+# runs inside a request, with someone waiting for the page to come back.
+ACTION_TIMEOUT_SECONDS = 5
+
+# The mode names this app uses, and the request each one sends.
+MODES = {'always': Mode.ALWAYS, 'auto': Mode.AUTO, 'never': Mode.NEVER}
+# A duration of zero makes the change permanent: it survives a restart of the BOINC client, rather
+# than reverting on its own after a while (`RUN_MODE::set`, client/client_types.cpp:1414).
+PERMANENT = 0
 
 # `active_task_state` when a task is actually executing (lib/common_defs.h: PROCESS_EXECUTING).
 PROCESS_EXECUTING = 1
@@ -31,6 +41,10 @@ class CannotConnect(BoincError):
     pass
 
 
+class ConnectionRejected(BoincError):
+    """The machine answered and then hung up, which means it is running but will not talk to us."""
+
+
 class AuthenticationFailed(BoincError):
     pass
 
@@ -38,6 +52,7 @@ class AuthenticationFailed(BoincError):
 ERROR_KINDS = {
     NotConfigured: 'not_configured',
     CannotConnect: 'cannot_connect',
+    ConnectionRejected: 'rejected',
     AuthenticationFailed: 'auth_failed',
 }
 
@@ -108,49 +123,113 @@ def _summarise(results: list, projects: list) -> dict:
     }
 
 
-async def _collect(host: str, port: int, password: str) -> dict:
-    client = await init_rpc_client(host, password, port)
+async def _open(host: str, port: int, password: str):
+    """Connect, telling a machine that is not there apart from one that will not talk to us.
+
+    BOINC checks the caller's address only after accepting the connection, and hangs up on anyone
+    missing from its allowed list. Both failures look alike from the outside, so they are told apart
+    by *when* they happen: anything after this function returned means we were let in and then cut
+    off, which is a different problem with a different fix.
+    """
     try:
-        # init_rpc_client connects but does not authenticate, and the query methods below do not
-        # check authorisation: against an unauthorised session they return parsed nonsense rather
-        # than failing. Checking the return value here is what turns a wrong password into an error
-        # the page can explain instead of a silently empty screen.
-        if not await client.authorize():
-            raise AuthenticationFailed('The BOINC client rejected the password')
-        cc_status = await client.get_cc_status()
-        projects = _as_list(await client.get_project_status())
-        results = _as_list(await client.get_results())
+        return await init_rpc_client(host, password, port)
+    except (TimeoutError, OSError) as error:
+        raise CannotConnect(f'Could not reach a BOINC client at {host}:{port}') from error
+
+
+async def _authenticate(client, host: str, port: int) -> None:
+    # init_rpc_client connects but does not authenticate, and the query methods do not check
+    # authorisation: against an unauthorised session they return parsed nonsense rather than
+    # failing. Checking the return value here is what turns a wrong password into an error the page
+    # can explain instead of a silently empty screen.
+    try:
+        authorized = await client.authorize()
+    except (asyncio.IncompleteReadError, EOFError, OSError) as error:
+        raise ConnectionRejected(
+            f'The BOINC client at {host}:{port} closed the connection without answering'
+        ) from error
+    if not authorized:
+        raise AuthenticationFailed('The BOINC client rejected the password')
+
+
+async def _read_state(client) -> dict:
+    cc_status = await client.get_cc_status()
+    projects = _as_list(await client.get_project_status())
+    results = _as_list(await client.get_results())
+    return {
+        'activity': describe_activity(cc_status),
+        'mode': describe_mode(cc_status),
+        **_summarise(results, projects),
+    }
+
+
+async def _collect(host: str, port: int, password: str) -> dict:
+    client = await _open(host, port, password)
+    try:
+        await _authenticate(client, host, port)
+        return await _read_state(client)
     finally:
         await client.close()
 
-    return {'activity': describe_activity(cc_status), **_summarise(results, projects)}
+
+async def _apply_mode(host: str, port: int, password: str, mode: str) -> dict:
+    client = await _open(host, port, password)
+    try:
+        await _authenticate(client, host, port)
+        # A false return means the client answered <unauthorized/>, the only refusal the library
+        # reports this way. It should not happen after the authentication above succeeded, so if it
+        # ever does the message needs to say what was actually refused rather than invent a cause.
+        if not await client.set_run_mode(MODES[mode], PERMANENT):
+            raise AuthenticationFailed(
+                'The BOINC client treated the change as unauthorised'
+            )
+        # Read back over the same connection, so the page shows the new mode immediately rather
+        # than looking unchanged until the next poll. The mode is already updated by the time this
+        # returns; the suspend reason may not be, because the client recomputes that on its own
+        # cycle -- verified against a running client.
+        return await _read_state(client)
+    finally:
+        await client.close()
 
 
-async def _collect_safely(client: dict) -> dict:
+async def _safely(client: dict, action, timeout: int) -> dict:
+    """Run one exchange with a client, turning every way it can fail into a message."""
     host, password = client.get('host'), client.get('password')
     port = client.get('port') or DEFAULT_PORT
     if not host or not password:
         return {'error': NotConfigured('This client is missing an address or a password')}
 
     try:
-        logging.debug(f'Reading state from {host}:{port}')
-        state = await asyncio.wait_for(_collect(host, port, password), TIMEOUT_SECONDS)
-        return {'state': state}
-    except AuthenticationFailed as error:
+        return {'state': await asyncio.wait_for(action(host, port, password), timeout)}
+    except BoincError as error:
         return {'error': error}
-    except (TimeoutError, OSError, ConnectionError) as error:
+    except (TimeoutError, OSError) as error:
         return {'error': CannotConnect(f'Could not reach a BOINC client at {host}:{port}')}
     except Exception as error:
         # The library raises bare exceptions and assertion-style errors on malformed replies, so
         # anything unexpected still has to reach the page as a message rather than kill the poll.
-        logging.debug(f'Unexpected failure reading {host}:{port}: {error!r}')
+        logging.debug(f'Unexpected failure talking to {host}:{port}: {error!r}')
         return {'error': BoincError(f'Unexpected reply from the BOINC client at {host}:{port}')}
+
+
+def _machine(client: dict, outcome: dict) -> dict:
+    """One machine as the page sees it: what it is doing, or what went wrong reaching it."""
+    error = outcome.get('error')
+    return {
+        'name': describe_client(client),
+        'host': client.get('host'),
+        'state': outcome.get('state'),
+        'error': str(error) if error else None,
+        'error_kind': ERROR_KINDS.get(type(error), 'error') if error else None,
+    }
 
 
 async def _read_all(clients: list[dict]) -> list[dict]:
     # Every client is contacted at the same time, so a machine that is switched off delays only
     # itself: a cycle takes as long as the slowest one rather than the sum of all of them.
-    return await asyncio.gather(*(_collect_safely(client) for client in clients))
+    return await asyncio.gather(
+        *(_safely(client, _collect, TIMEOUT_SECONDS) for client in clients)
+    )
 
 
 def read_all(clients: list[dict]) -> list[dict]:
@@ -159,14 +238,23 @@ def read_all(clients: list[dict]) -> list[dict]:
         return []
 
     outcomes = asyncio.run(_read_all(clients))
-    machines = []
-    for client, outcome in zip(clients, outcomes):
-        error = outcome.get('error')
-        machines.append({
-            'name': describe_client(client),
-            'host': client.get('host'),
-            'state': outcome.get('state'),
-            'error': str(error) if error else None,
-            'error_kind': ERROR_KINDS.get(type(error), 'error') if error else None,
-        })
-    return machines
+    return [_machine(client, outcome) for client, outcome in zip(clients, outcomes)]
+
+
+def set_mode(client: dict, mode: str) -> dict:
+    """Change one machine's activity mode, and report how it looks afterwards.
+
+    Returns the same shape as an entry of `read_all`, so the caller can drop it straight into the
+    snapshot. Reaching the machine can fail in all the usual ways and that is reported, not raised;
+    an unknown mode is a mistake in this program and does raise.
+    """
+    if mode not in MODES:
+        raise ValueError(f'Unknown activity mode {mode!r}')
+
+    logging.debug(f'Setting activity mode {mode} on {client.get("host")}')
+    outcome = asyncio.run(_safely(
+        client,
+        lambda host, port, password: _apply_mode(host, port, password, mode),
+        ACTION_TIMEOUT_SECONDS,
+    ))
+    return _machine(client, outcome)

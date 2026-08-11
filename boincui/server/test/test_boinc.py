@@ -9,7 +9,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import boinc  # noqa: E402
-from boinc import read_all  # noqa: E402
+from boinc import read_all, set_mode  # noqa: E402
+
+MODE_VALUES = {'always': 1, 'auto': 2, 'never': 3}
 
 END = b'\x03'
 PASSWORD = 'correct horse'
@@ -55,8 +57,9 @@ NO_PROJECTS = '<boinc_gui_rpc_reply>\n<projects>\n</projects>\n</boinc_gui_rpc_r
 NO_TASKS = results_reply()
 
 
-def cc_status(mode=2, suspend_reason=0):
+def cc_status(mode=2, suspend_reason=0, perm=None):
     return (f'<boinc_gui_rpc_reply>\n<cc_status>\n<task_mode>{mode}</task_mode>\n'
+            f'<task_mode_perm>{mode if perm is None else perm}</task_mode_perm>\n'
             f'<task_suspend_reason>{suspend_reason}</task_suspend_reason>\n'
             '</cc_status>\n</boinc_gui_rpc_reply>')
 
@@ -68,11 +71,15 @@ class FakeBoincClient:
     and <auth2> is accepted only when it carries md5(nonce + password).
     """
 
-    def __init__(self, password=PASSWORD, tasks=None, projects=PROJECTS, status=None):
+    def __init__(self, password=PASSWORD, tasks=None, projects=PROJECTS, status=None, rejects=False):
         self.password = password
         self.tasks = tasks if tasks is not None else results_reply(running_task())
         self.projects = projects
         self.status = status if status is not None else cc_status()
+        # A client that accepts the connection and then hangs up, which is what BOINC does to a
+        # caller missing from its allowed list -- it checks the address only after accepting.
+        self.rejects = rejects
+        self.requests = []
         self.connections_seen = 0
         self.connections_closed = 0
         self._server = None
@@ -112,13 +119,25 @@ class FakeBoincClient:
         self.port = self._server.sockets[0].getsockname()[1]
         ready.set()
         self._loop.run_forever()
+        # Without this the interpreter reports an unclosed event loop per server, which reads like a
+        # leak in the code under test rather than in this double.
+        self._loop.close()
 
     async def _handle(self, reader, writer):
         self.connections_seen += 1
         nonce = '1234567890'
+        if self.rejects:
+            self.connections_closed += 1
+            writer.close()
+            # Waiting for the transport to finish closing, rather than returning on a half-closed
+            # one, which some Python versions report as a ResourceWarning that looks like a leak in
+            # the code under test.
+            await writer.wait_closed()
+            return
         try:
             while True:
                 request = (await reader.readuntil(END)).decode('ISO-8859-1')
+                self.requests.append(request)
                 if '<auth1' in request:
                     reply = f'<boinc_gui_rpc_reply>\n<nonce>{nonce}</nonce>\n</boinc_gui_rpc_reply>'
                 elif '<auth2' in request:
@@ -131,6 +150,13 @@ class FakeBoincClient:
                     reply = self.projects
                 elif '<get_results' in request:
                     reply = self.tasks
+                elif '<set_run_mode' in request:
+                    # Answering <success/> is not enough: the client really does change what it
+                    # reports, and the page reads that back over the same connection.
+                    for name, value in MODE_VALUES.items():
+                        if f'<{name} ' in request or f'<{name}/' in request:
+                            self.status = cc_status(mode=value)
+                    reply = '<boinc_gui_rpc_reply>\n<success/>\n</boinc_gui_rpc_reply>'
                 else:
                     reply = '<boinc_gui_rpc_reply>\n<unauthorized/>\n</boinc_gui_rpc_reply>'
                 writer.write(reply.encode('ISO-8859-1') + END)
@@ -296,6 +322,91 @@ class TestSeveralClients(unittest.TestCase):
 
     def test_should_return_nothing_when_no_client_is_configured(self):
         self.assertEqual([], read_all([]))
+
+
+class TestActivityMode(unittest.TestCase):
+    """Changing a machine's activity mode -- the only thing this app writes."""
+
+    def test_should_send_exactly_the_request_the_client_expects(self):
+        # The vendored library passed the duration as an element *name*, so this request never
+        # reached the wire at all. boinctui builds the same message by hand (src/srvdata.cpp:445),
+        # and a real client was verified to accept this one and change mode.
+        with FakeBoincClient() as server:
+            set_mode(server.as_client('machine'), 'never')
+            sent = ''.join(server.requests)
+
+        self.assertIn('<set_run_mode><never/><duration>0</duration></set_run_mode>', sent)
+
+    def test_should_ask_for_a_permanent_change(self):
+        # A non-zero duration would revert on its own; this app only offers changes that stick.
+        with FakeBoincClient() as server:
+            set_mode(server.as_client('machine'), 'auto')
+            sent = ''.join(server.requests)
+
+        self.assertIn('<duration>0</duration>', sent)
+
+    def test_should_report_the_mode_the_client_settled_on(self):
+        for mode in ('always', 'auto', 'never'):
+            with self.subTest(mode=mode):
+                with FakeBoincClient() as server:
+                    machine = set_mode(server.as_client('machine'), mode)
+
+                self.assertIsNone(machine['error'])
+                self.assertEqual(mode, machine['state']['mode'])
+
+    def test_should_read_the_whole_machine_back_so_the_page_can_show_it(self):
+        # The page swaps this straight into its snapshot, so it has to be a complete entry rather
+        # than just the new mode.
+        with FakeBoincClient() as server:
+            machine = set_mode(server.as_client('machine'), 'never')
+
+        self.assertEqual('machine', machine['name'])
+        self.assertEqual(1, len(machine['state']['running']))
+        self.assertEqual(['Example Project'], [p['name'] for p in machine['state']['projects']])
+
+    def test_should_follow_the_permanent_mode_not_a_temporary_one(self):
+        # A temporary mode set from BOINC Manager reverts on its own, so highlighting it would mark
+        # a state these buttons never set and cannot restore.
+        with FakeBoincClient(status=cc_status(mode=3, perm=2)) as server:
+            machine = read_all([server.as_client('machine')])[0]
+
+        self.assertEqual('auto', machine['state']['mode'])
+
+    def test_should_report_a_wrong_password_without_changing_anything(self):
+        with FakeBoincClient() as server:
+            machine = dict(server.as_client('machine'), password='wrong password')
+            outcome = set_mode(machine, 'never')
+            sent = ''.join(server.requests)
+
+        self.assertEqual('auth_failed', outcome['error_kind'])
+        self.assertNotIn('set_run_mode', sent)
+
+    def test_should_report_a_machine_that_cannot_be_reached(self):
+        client = {'name': 'off', 'host': '127.0.0.1', 'port': refused_port(), 'password': PASSWORD}
+
+        self.assertEqual('cannot_connect', set_mode(client, 'never')['error_kind'])
+
+    def test_should_refuse_a_mode_it_does_not_know(self):
+        # Not a network problem -- a mistake in this program, which should not be dressed up as one.
+        with self.assertRaises(ValueError):
+            set_mode({'host': '127.0.0.1', 'password': PASSWORD}, 'turbo')
+
+
+class TestRejectedConnection(unittest.TestCase):
+    """A machine that is switched off and one that will not talk to us need different advice."""
+
+    def test_should_tell_a_refused_connection_apart_from_an_absent_machine(self):
+        with FakeBoincClient(rejects=True) as server:
+            machine = read_all([server.as_client('guarded')])[0]
+
+        self.assertEqual('rejected', machine['error_kind'])
+        self.assertIn('closed the connection', machine['error'])
+
+    def test_should_say_the_same_when_acting_on_it(self):
+        with FakeBoincClient(rejects=True) as server:
+            machine = set_mode(server.as_client('guarded'), 'never')
+
+        self.assertEqual('rejected', machine['error_kind'])
 
 
 if __name__ == '__main__':

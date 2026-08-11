@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
+from urllib.parse import urljoin
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -17,7 +18,8 @@ URL_ATTRIBUTES = ('href', 'src', 'action', 'formaction')
 
 
 def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=0,
-            projects=(('Example Project', 'https://example.org/'),), activity='Computing — always computing'):
+            projects=(('Example Project', 'https://example.org/'),), activity='Computing',
+            mode='auto'):
     return {
         'name': name,
         'host': 'pc.local',
@@ -25,6 +27,7 @@ def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=
         'error_kind': error_kind,
         'state': None if error else {
             'activity': activity,
+            'mode': mode,
             'running': list(running),
             'queued': queued,
             'ready_to_report': ready,
@@ -61,9 +64,28 @@ class UrlCollector(HTMLParser):
                 self.urls.append((tag, name, value))
 
 
-def client_for(snapshot):
+class ModeButtonCollector(HTMLParser):
+    """The activity buttons as {mode: whether it is shown as the current one}."""
+
+    def __init__(self):
+        super().__init__()
+        self.buttons = {}
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == 'button' and attrs.get('name') == 'mode':
+            self.buttons[attrs.get('value')] = attrs.get('aria-pressed')
+
+
+def modes_in(page):
+    collector = ModeButtonCollector()
+    collector.feed(page)
+    return collector.buttons
+
+
+def client_for(snapshot, clients=None):
     app = create_app(snapshot)
-    app.config.update(TESTING=True)
+    app.config.update(TESTING=True, CLIENTS=clients if clients is not None else [])
     return app.test_client()
 
 
@@ -260,6 +282,99 @@ class TestRefreshButton(unittest.TestCase):
         self.assertEqual(302, client_for(Snapshot()).post('/refresh').status_code)
 
 
+class TestActivityControl(unittest.TestCase):
+    """The three-way control, and the route behind it."""
+
+    def page_with(self, **kwargs):
+        return client_for(snapshot_of(machine(**kwargs))).get('/').get_data(as_text=True)
+
+    def test_should_offer_the_three_modes_boinc_itself_names(self):
+        page = self.page_with()
+
+        for label in ('Run always', 'Run based on preferences', 'Suspend'):
+            self.assertIn(label, page)
+        self.assertIn('Allow work regardless of preferences', page)
+
+    def test_should_mark_the_mode_the_machine_is_actually_in(self):
+        self.assertEqual(
+            {'always': 'false', 'auto': 'false', 'never': 'true'},
+            modes_in(self.page_with(mode='never')),
+        )
+
+    def test_should_not_offer_the_control_for_a_machine_it_cannot_read(self):
+        # There is nothing to act on, and the buttons would only mislead.
+        page = self.page_with(error='boom', error_kind='cannot_connect')
+
+        self.assertEqual({}, modes_in(page))
+
+    def test_should_explain_a_connection_that_was_refused_rather_than_absent(self):
+        page = self.page_with(error='hung up', error_kind='rejected')
+
+        self.assertIn('Refused the connection', page)
+        self.assertIn('allowed to connect', page)
+
+
+class TestModeRoute(unittest.TestCase):
+
+    def setUp(self):
+        self.calls = []
+        self.original = app_module.set_mode
+        app_module.set_mode = lambda client, mode: (
+            self.calls.append((client, mode)) or machine(name='pc', mode=mode)
+        )
+        self.addCleanup(setattr, app_module, 'set_mode', self.original)
+
+    def post(self, snapshot=None, clients=None, **data):
+        snapshot = snapshot if snapshot is not None else snapshot_of(machine())
+        clients = clients if clients is not None else [{'host': 'pc.local', 'password': 'x'}]
+        return client_for(snapshot, clients).post('/mode', data=data)
+
+    def test_should_change_the_mode_of_the_machine_that_was_asked_for(self):
+        response = self.post(machine='0', mode='never')
+
+        self.assertEqual(302, response.status_code)
+        self.assertEqual([({'host': 'pc.local', 'password': 'x'}, 'never')], self.calls)
+
+    def test_should_show_the_new_state_without_waiting_for_the_next_poll(self):
+        # Otherwise the page comes back looking exactly as before and the button reads as broken.
+        snapshot = snapshot_of(machine(mode='auto'))
+        self.post(snapshot=snapshot, machine='0', mode='never')
+
+        self.assertEqual('never', snapshot.read()['machines'][0]['state']['mode'])
+
+    def test_should_redirect_back_to_the_page_and_not_alongside_it(self):
+        # A nested route such as /mode/0 would make this same './' resolve to /mode/, which is why
+        # the machine travels in the form instead of the path. The root-relative guard elsewhere
+        # cannot catch this: './' does not start with a slash either.
+        response = self.post(machine='0', mode='never')
+
+        self.assertEqual('/', urljoin('/mode', response.headers['Location']))
+
+    def test_should_point_at_the_machine_that_could_not_be_changed(self):
+        app_module.set_mode = lambda client, mode: machine(
+            name='pc', error='hung up', error_kind='rejected')
+        response = self.post(machine='0', mode='never')
+
+        self.assertEqual('/?failed=0', urljoin('/mode', response.headers['Location']))
+
+    def test_should_say_so_on_the_page_when_a_change_did_not_go_through(self):
+        page = client_for(snapshot_of(machine(error='hung up', error_kind='rejected'))) \
+            .get('/?failed=0').get_data(as_text=True)
+
+        self.assertIn('did not go through', page)
+
+    def test_should_refuse_anything_the_browser_made_up(self):
+        for data in ({'machine': '7', 'mode': 'never'},      # no such machine
+                     {'machine': 'all', 'mode': 'never'},    # not a number
+                     {'machine': '0', 'mode': 'turbo'},      # not a mode
+                     {}):                                    # nothing at all
+            with self.subTest(data=data):
+                response = self.post(**data)
+
+                self.assertEqual(302, response.status_code)
+                self.assertEqual([], self.calls, 'a made-up request reached a BOINC client')
+
+
 class TestRefresher(unittest.TestCase):
 
     def test_should_poll_again_promptly_when_a_refresh_is_requested(self):
@@ -269,7 +384,7 @@ class TestRefresher(unittest.TestCase):
         original = app_module.read_all
         app_module.read_all = lambda clients: polls.release() or []
         stop = threading.Event()
-        refresher = Refresher(Snapshot(), {}, stop)
+        refresher = Refresher(Snapshot(), [], stop)
         try:
             refresher.start()
             self.assertTrue(polls.acquire(timeout=10), 'the refresher never polled on startup')

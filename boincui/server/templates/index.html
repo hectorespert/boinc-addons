@@ -48,11 +48,50 @@
     font: inherit;
     padding: 0.4rem 0.9rem;
   }
+  .activity { margin: 0 0 0.9rem; }
+  .activity-label {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.3rem;
+    opacity: 0.6;
+    text-transform: uppercase;
+  }
+  /* Stacked rather than side by side: each mode carries BOINC's own description, and three of
+     those do not fit across a phone without truncating the one that most needs reading. */
+  .modes {
+    border: 1px solid currentColor;
+    border-radius: 0.375rem;
+    display: flex;
+    flex-direction: column;
+    max-width: 27rem;
+    overflow: hidden;
+  }
+  .modes button {
+    border: 0;
+    border-bottom: 1px solid currentColor;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding: 0.5rem 0.8rem 0.55rem;
+    text-align: left;
+    width: 100%;
+  }
+  .modes button:last-child { border-bottom: 0; }
+  .modes button small { font-size: 0.78rem; opacity: 0.7; }
+  /* Canvas is the page's own background, so the selected row reads correctly in light and dark
+     without this file having to know which one it is in. */
+  .modes button[aria-pressed="true"] { background: currentColor; }
+  .modes button[aria-pressed="true"] span,
+  .modes button[aria-pressed="true"] small { color: Canvas; }
+  .modes button[aria-pressed="true"] small { opacity: 0.85; }
 </style>
 </head>
 <body>
 <h1>BOINC UI</h1>
-<p class="muted">Experimental. Shows what your BOINC clients are doing; it cannot change anything.</p>
+<p class="muted">Experimental. Shows what your BOINC clients are doing, and lets you start and stop
+their computing.</p>
 
 {% if machines is none %}
 <div class="card">
@@ -75,10 +114,19 @@
   <div class="machine{% if machine.error %} problem{% endif %}">
     <h2>{{ machine.name }}</h2>
 
+    {% if failed == loop.index0 %}
+    <p class="status"><strong>That change did not go through.</strong></p>
+    {% endif %}
+
     {% if machine.error_kind == 'cannot_connect' %}
     <p class="status"><strong>Cannot be reached.</strong> {{ machine.error }}</p>
     <p class="muted">Check the address, that BOINC is running there, and that it is allowed to
     accept connections from this app.</p>
+
+    {% elif machine.error_kind == 'rejected' %}
+    <p class="status"><strong>Refused the connection.</strong></p>
+    <p class="muted">BOINC is running on that machine, but it is not letting this app in. On that
+    machine, add this Home Assistant to the computers allowed to connect to it.</p>
 
     {% elif machine.error_kind == 'auth_failed' %}
     <p class="status"><strong>Rejected the password.</strong></p>
@@ -92,6 +140,21 @@
 
     {% else %}
     <p class="status">{{ machine.state.activity }}</p>
+
+    <form method="post" action="mode" class="activity">
+      <input type="hidden" name="machine" value="{{ loop.index0 }}">
+      <span class="activity-label">Activity</span>
+      <div class="modes">
+        {% for key, label, description in modes %}
+        <button type="submit" name="mode" value="{{ key }}"
+                aria-pressed="{{ 'true' if machine.state.mode == key else 'false' }}">
+          <span>{{ label }}</span>
+          <small>{{ description }}</small>
+        </button>
+        {% endfor %}
+      </div>
+    </form>
+
     <p class="counts">
       {{ machine.state.running | length }} running ·
       {{ machine.state.queued }} waiting ·
