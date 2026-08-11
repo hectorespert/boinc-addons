@@ -36,9 +36,14 @@ if args.options:
         logging.warning(f'No configuration file at {args.options}, starting unconfigured')
     except json.JSONDecodeError as error:
         logging.error(f'Ignoring unreadable configuration file {args.options}: {error}')
-# The password is never logged, at any level: this add-on holds a copy of the one that controls the
-# BOINC client, and DEBUG logs are what users paste into issues.
-logging.debug(f'Reading BOINC client at {options.get("boinc_host")}:{options.get("boinc_port")}')
+# Worked out once and shared, because the activity buttons address a machine by its position in this
+# very list.
+clients = clients_from(options)
+# Addresses only. The password is never logged, at any level: this add-on holds a copy of the one
+# that controls the BOINC client, and DEBUG logs are what users paste into issues.
+logging.debug('Watching ' + (', '.join(
+    f'{client.get("host")}:{client.get("port") or "default"}' for client in clients
+) or 'no machines'))
 
 stop_requested = threading.Event()
 
@@ -56,9 +61,6 @@ if args.exit_immediately:
 else:
     snapshot = Snapshot()
     app = create_app(snapshot)
-    # Worked out once and shared: calling this twice would log the deprecation warning twice, and
-    # the activity buttons address a machine by its position in this very list.
-    clients = clients_from(options)
     refresher = Refresher(snapshot, clients, stop_requested)
     app.config['CLIENTS'] = clients
     # Lets the "refresh now" button poll on demand instead of waiting for the next cycle.
