@@ -14,16 +14,16 @@ plugins:
 
 nav:
   - Home: index.md
-  - BOINC Add-on:
+  - BOINC app:
       - Overview: boinc/README.md
       - Documentation: boinc/DOCS.md
       - Development: boinc/DEVELOPMENT.md
       - Changelog: boinc/CHANGELOG.md
-  - boinctui Add-on:
+  - boinctui app:
       - Overview: boinctui/README.md
       - Documentation: boinctui/DOCS.md
       - Changelog: boinctui/CHANGELOG.md
-  - BOINC UI Add-on:
+  - BOINC UI app:
       - Overview: boincui/README.md
       - Documentation: boincui/DOCS.md
       - Development: boincui/DEVELOPMENT.md

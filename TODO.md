@@ -18,15 +18,6 @@ Resolved.
 
 ## Security / permissions
 
-- [ ] **`video` and `docker_api` are granted but never explained.** `boinc/config.yaml` sets
-  `video: true`, `host_pid: true`, `host_uts: true` and `docker_api: true`. `host_pid`/`host_uts`
-  are explained (CPU monitoring, the Protection Mode warning in `boinc/README.md` and
-  `main.py:31-32`), but `video` and `docker_api` are not mentioned in any user-facing doc.
-  `boinc/Dockerfile` confirms the intent: `docker-cli` for BOINC's `docker_wrapper` jobs that spawn
-  sibling containers, `libgl1` for GPU-compute projects. So the grants are deliberate, not
-  boilerplate — but `docker_api` in particular is Docker socket access, a real privilege that users
-  accepting the install deserve to see explained in one line next to the Protection Mode warning.
-
 - [ ] **`apparmor: false` on both add-ons, against an explicit documented recommendation.** These
   add-ons disable AppArmor *and* request `host_pid`, `host_uts`, `docker_api` and `video`, so they
   sit at the low end of the platform's 1–6 rating by construction. Ties to the dead
@@ -89,10 +80,16 @@ findings measured directly against the Supervisor in `.devcontainer`.
 
 ### Confirmed correct — checked, no action needed
 
-- **`icon.png` meets the 1x1 rule.** Re-measured 2026-08-11: `boinc/icon.png`, `boinctui/icon.png`
-  and `boincui/icon.png` are byte-identical and **256 x 256**. An earlier note here recorded
-  256 x 245 and was wrong. `logo.png` at 600x305 is fine either way — the docs explicitly allow other
-  logo ratios. `docs/icon.png` is a symlink to `boinc/icon.png` and follows automatically.
+- **Every permission this repo requests is now explained to the user.** `host_pid`/`host_uts` by the
+  Protection Mode warning, and `video`/`docker_api` by the *What else this app asks for* section
+  added to `boinc/README.md` in `ad846b7` — graphics access for GPU-capable projects, Docker access
+  for projects shipping their work as containers, said plainly to be the broadest permission
+  requested and not separately switchable. This was an open item until re-checked 2026-08-11.
+- **`icon.png` meets the 1x1 rule — fixed, not a false alarm.** The 256 x 245 recorded here was
+  real; the icon was squared in `ad846b7` and shipped as `boinc` 3.9.1 / `boinctui` 2.4.2. Measured
+  again 2026-08-11: all three are byte-identical and **256 x 256**. `logo.png` at 600x305 is fine
+  either way — the docs explicitly allow other logo ratios. `docs/icon.png` is a symlink to
+  `boinc/icon.png` and follows automatically.
 - `boinctui/run.sh:17` uses `--auth-header X-Remote-User-Name`, matching the ingress identity
   headers the security docs specify. Correct use of the platform auth mechanism.
 - `boinc/config.yaml` maps `31416/tcp: null` — null means "not published by default, user may opt
