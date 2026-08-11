@@ -14,12 +14,3 @@ configuration:
   password:
     name: Contraseña
     description: "Tiene que coincidir con la contraseña de GUI RPC de esa máquina. Sin ella el cliente rechaza la conexión"
-  boinc_host:
-    name: Dirección del cliente BOINC (ajuste antiguo)
-    description: "Sustituido por la lista de clientes de arriba. Mueve ahí tus ajustes; esto dejará de funcionar en una versión futura"
-  boinc_port:
-    name: Puerto del cliente BOINC (ajuste antiguo)
-    description: "Sustituido por la lista de clientes de arriba. Mueve ahí tus ajustes; esto dejará de funcionar en una versión futura"
-  gui_rpc_password:
-    name: Contraseña del cliente BOINC (ajuste antiguo)
-    description: "Sustituido por la lista de clientes de arriba. Mueve ahí tus ajustes; esto dejará de funcionar en una versión futura"

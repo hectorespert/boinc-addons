@@ -14,12 +14,3 @@ configuration:
   password:
     name: Password
     description: "Must match the GUI RPC password set on that machine. Without it the client refuses the connection"
-  boinc_host:
-    name: BOINC client address (old setting)
-    description: "Replaced by the client list above. Move your settings there; this will stop working in a future version"
-  boinc_port:
-    name: BOINC client port (old setting)
-    description: "Replaced by the client list above. Move your settings there; this will stop working in a future version"
-  gui_rpc_password:
-    name: BOINC client password (old setting)
-    description: "Replaced by the client list above. Move your settings there; this will stop working in a future version"

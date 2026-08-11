@@ -39,10 +39,10 @@ Resolved.
 Reviewed against <https://developers.home-assistant.io/docs/apps/> (fetched 2026-08-08), plus
 findings measured directly against the Supervisor in `.devcontainer`.
 
-- [ ] **`icon.png` violates the documented 1x1 aspect ratio in both add-ons.** `boinc/icon.png` and
-  `boinctui/icon.png` are byte-identical and **256 x 245**, so they are letterboxed or distorted in
-  the store. `logo.png` at 600x305 is fine — the docs explicitly allow other logo ratios. Padding to
-  256 x 256 with transparency (not rescaling) is the fix.
+- [x] **`icon.png` aspect ratio — no longer an issue.** Re-measured 2026-08-11: `boinc/icon.png`,
+  `boinctui/icon.png` and `boincui/icon.png` are byte-identical and **256 x 256**, so the 1x1 rule is
+  met. The earlier note recording 256 x 245 was wrong or has been overtaken. `logo.png` at 600x305 is
+  fine either way — the docs explicitly allow other logo ratios.
   `docs/icon.png` is a symlink to `boinc/icon.png` and follows automatically.
 
 - [ ] **`map:` uses the legacy plain-string form.** `boinc/config.yaml` has `map: [addon_config]`,
@@ -215,12 +215,13 @@ Common BOINC global preferences not exposed, each roughly one key away in
 
 - [ ] **Prometheus metrics endpoint** — same data source, different consumer.
 
-- [ ] **Remove `boincui`'s deprecated single-client options in 0.6.0** — `boinc_host`, `boinc_port`
-  and `gui_rpc_password`, replaced by the `clients` list in 0.4.0. Held back from 0.5.0 on purpose:
-  they had been deprecated for a single released version, and Supervisor **silently discards options
-  that disappear from the schema**, so anyone who had not migrated would lose their configuration
-  with no warning. `clients_from` in `app.py` is the whole migration; deleting it also means dropping
-  the three entries from `translations/*.yaml` and the *Upgrading* section of `DOCS.md`.
+- [x] **`boincui`'s deprecated single-client options removed — in 1.0.0, not 0.6.0.** Held back from
+  0.5.0 because they had been deprecated for a single released version and Supervisor **silently
+  discards options that disappear from the schema**. Brought forward to 1.0.0 rather than pushed
+  further out, because that release also drops `stage: experimental`: once an add-on is stable,
+  removing an option from its schema is a breaking change that would call for a 2.0, so 1.0 was the
+  last cheap moment. The landing is soft — an unmigrated install starts with no machines and the page
+  says exactly that — and the `CHANGELOG.md` entry warns before the update.
 
 - [ ] **Localise `boincui`'s page.** Only `translations/*.yaml` is translated today, and that covers
   configuration fields, not the page itself. If it is ever done, the activity control's wording

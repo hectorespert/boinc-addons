@@ -2,7 +2,7 @@
 
 BOINC UI shows what your BOINC clients are doing — what each machine is computing right now, and the
 projects it is attached to — on a page inside Home Assistant, and lets you start and stop their
-computing. It is **experimental**. It cannot yet act on individual tasks.
+computing. It cannot yet act on individual tasks.
 
 ## Adding a machine
 
@@ -94,8 +94,3 @@ change did not go through and nothing is altered.
 The page checks every machine once a minute. **Refresh now** asks for a check straight away instead
 of waiting — the result appears within a few seconds, when the page next reloads.
 
-## Upgrading from an earlier version
-
-If you configured a single client before this version, it keeps working and appears as one machine.
-Move those settings into the **BOINC clients** list when convenient: the old fields are marked as old
-settings and will stop working in a future version.
