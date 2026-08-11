@@ -6,7 +6,7 @@ import threading
 
 import waitress
 
-from app import Refresher, Snapshot, create_app
+from app import Refresher, Snapshot, clients_from, create_app
 
 # Supervisor's own default for `ingress_port`, which is why config.yaml does not set it -- the
 # add-on linter rejects redeclaring a default. Home Assistant proxies to this port on the
@@ -56,7 +56,11 @@ if args.exit_immediately:
 else:
     snapshot = Snapshot()
     app = create_app(snapshot)
-    refresher = Refresher(snapshot, options, stop_requested)
+    # Worked out once and shared: calling this twice would log the deprecation warning twice, and
+    # the activity buttons address a machine by its position in this very list.
+    clients = clients_from(options)
+    refresher = Refresher(snapshot, clients, stop_requested)
+    app.config['CLIENTS'] = clients
     # Lets the "refresh now" button poll on demand instead of waiting for the next cycle.
     app.config['REFRESHER'] = refresher
     refresher.start()

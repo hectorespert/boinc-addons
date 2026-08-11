@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0
+
+You can now start and stop computing on each machine, under Activity: Run always, Run based on preferences, or Suspend. They are the same three choices, with the same names, that BOINC Manager offers
+
+The choice takes effect immediately and sticks, surviving a restart of BOINC and of the machine
+
+Careful with Run always: it makes that machine compute on battery, while you are using it, and outside the hours you set for it
+
+A machine that is running BOINC but refuses to let this app in now says so, instead of being reported as unreachable — they need different fixes
+
 ## 0.4.0
 
 You can now watch several BOINC machines at once, each with its own section on the page. Add them under BOINC clients in the Configuration tab

@@ -209,7 +209,8 @@ class RPCClient:
         """
         req = ET.Element(Tag.SET_RUN_MODE)
         ET.SubElement(req, mode.value)
-        a = ET.SubElement(req, duration)
+        # LOCAL PATCH (not upstream) -- see VENDOR.md
+        a = ET.SubElement(req, Tag.DURATION)
         a.text = str(duration)
         return await self._request_auth(req)
 
@@ -220,7 +221,8 @@ class RPCClient:
         """
         req = ET.Element(Tag.SET_NETWORK_MODE)
         ET.SubElement(req, mode.value)
-        a = ET.SubElement(req, duration)
+        # LOCAL PATCH (not upstream) -- see VENDOR.md
+        a = ET.SubElement(req, Tag.DURATION)
         a.text = str(duration)
         return await self._request_auth(req)
 
@@ -231,6 +233,7 @@ class RPCClient:
         """
         req = ET.Element(Tag.SET_GPU_MODE)
         ET.SubElement(req, mode.value)
-        a = ET.SubElement(req, duration)
+        # LOCAL PATCH (not upstream) -- see VENDOR.md
+        a = ET.SubElement(req, Tag.DURATION)
         a.text = str(duration)
         return await self._request_auth(req)

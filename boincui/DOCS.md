@@ -1,8 +1,8 @@
 # Home Assistant BOINC UI App
 
 BOINC UI shows what your BOINC clients are doing — what each machine is computing right now, and the
-projects it is attached to — on a page inside Home Assistant. It is **experimental**, and this
-version can only look: it cannot suspend, resume or abort anything.
+projects it is attached to — on a page inside Home Assistant, and lets you start and stop their
+computing. It is **experimental**. It cannot yet act on individual tasks.
 
 ## Adding a machine
 
@@ -49,15 +49,47 @@ waiting to be sent back. To see the full queue, use the **boinctui** app.
 Each row shows the project, how far along the task is and when it is due. Hovering over a row shows
 BOINC's own name for the task, which is what you would search for in boinctui.
 
+## Starting and stopping a machine
+
+Under **Activity**, each machine has the same three choices BOINC Manager offers, with the same
+names:
+
+- **Run always** — compute regardless of that machine's preferences.
+- **Run based on preferences** — compute when its own settings allow it. This is the usual choice.
+- **Suspend** — stop computing.
+
+Pick one and it takes effect immediately, and stays that way — it survives restarting BOINC and
+restarting the machine, until you or someone else changes it again. The machine's line updates as
+soon as the page comes back.
+
+Two things worth knowing:
+
+**Run always ignores that machine's own rules.** It will keep computing on battery, while you are
+using the computer, and outside the hours you set. On a laptop that means a warm machine and a flat
+battery. It is the right choice for a machine that exists to compute, and the wrong one for the
+laptop you are typing on.
+
+**Run always is not a promise to compute.** A machine can still pause for reasons that are not
+preferences — measuring its own speed after starting up, or the operating system asking it to stop.
+The line above the buttons always says what it is really doing.
+
+If you have suspended a machine from BOINC Manager for a set amount of time, the buttons still show
+its underlying setting, because the timed suspension undoes itself.
+
 ## When something is wrong
 
 Each machine reports its own problem, and the others keep working:
 
-- **Cannot be reached** — wrong address, BOINC not running there, or it has not been told to accept
-  connections from this app.
+- **Cannot be reached** — wrong address, or BOINC is not running there.
+- **Refused the connection** — BOINC is running on that machine, but it is not letting this app in.
+  On that machine, add this Home Assistant to the computers it allows to connect. See *A computer
+  elsewhere on your network* above for which address it will most likely be.
 - **Rejected the password** — the passwords do not match. The BOINC app needs a restart after
   changing its own.
 - **Not fully configured** — that entry is missing its address or password.
+
+If a machine cannot be reached when you press one of the **Activity** buttons, the page says the
+change did not go through and nothing is altered.
 
 The page checks every machine once a minute. **Refresh now** asks for a check straight away instead
 of waiting — the result appears within a few seconds, when the page next reloads.

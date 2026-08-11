@@ -2,9 +2,14 @@ import logging
 import threading
 from datetime import datetime, timezone
 
-from flask import Flask, redirect, render_template
+from flask import Flask, redirect, render_template, request
 
-from boinc import read_all
+from boinc import read_all, set_mode
+from status import ACTIVITY_MODES
+
+# The modes a browser is allowed to ask for. Taken from the same table the page renders, so the
+# buttons and what is accepted here cannot drift apart.
+MODE_NAMES = frozenset(key for key, _label, _description in ACTIVITY_MODES)
 
 # Home Assistant serves this app under /api/hassio_ingress/<token>/ and strips that prefix before
 # forwarding, without telling us what it was: the only headers ingress adds are X-Remote-User-* and
@@ -67,14 +72,25 @@ class Snapshot:
             self._machines = machines
             self._updated = datetime.now(timezone.utc)
 
+    def replace(self, index: int, machine: dict) -> None:
+        """Update a single machine, after acting on it.
+
+        Only the one that was acted on changes: re-reading the rest would mean waiting on every
+        configured client inside a request, which is what the background refresher exists to avoid.
+        """
+        with self._lock:
+            if self._machines is not None and 0 <= index < len(self._machines):
+                self._machines[index] = machine
+                self._updated = datetime.now(timezone.utc)
+
 
 class Refresher(threading.Thread):
     """Polls every configured machine on its own thread, so requests never wait on the network."""
 
-    def __init__(self, snapshot: Snapshot, options: dict, stop: threading.Event) -> None:
+    def __init__(self, snapshot: Snapshot, clients: list[dict], stop: threading.Event) -> None:
         super().__init__(name='refresher', daemon=True)
         self._snapshot = snapshot
-        self._clients = clients_from(options)
+        self._clients = clients
         # Not `self._stop`: threading.Thread already uses that name for a private method, and
         # shadowing it makes join() raise TypeError.
         self._stop_requested = stop
@@ -127,13 +143,39 @@ def create_app(snapshot: Snapshot | None = None) -> Flask:
 
     @app.route('/')
     def index():
-        return render_template('index.html', **app.config['SNAPSHOT'].read())
+        return render_template(
+            'index.html',
+            modes=ACTIVITY_MODES,
+            failed=request.args.get('failed', type=int),
+            **app.config['SNAPSHOT'].read(),
+        )
 
     @app.route('/refresh', methods=['POST'])
     def refresh():
         refresher = app.config.get('REFRESHER')
         if refresher is not None:
             refresher.request_refresh()
+        return redirect(SELF)
+
+    # A flat route on purpose. Under `/mode/<machine>` the redirect below would resolve against
+    # `/mode/` and never reach the page again, since the only correct relative target this app can
+    # emit is one that assumes it lives at the root -- see SELF.
+    @app.route('/mode', methods=['POST'])
+    def mode():
+        clients = app.config.get('CLIENTS') or []
+        machine = request.form.get('machine', '')
+        chosen = request.form.get('mode', '')
+        # Both fields come from a browser, so they are checked before anything reaches a client.
+        if not machine.isdigit() or int(machine) >= len(clients) or chosen not in MODE_NAMES:
+            logging.warning(f'Ignoring an activity change for machine {machine!r} to {chosen!r}')
+            return redirect(SELF)
+
+        index = int(machine)
+        updated = set_mode(clients[index], chosen)
+        app.config['SNAPSHOT'].replace(index, updated)
+        if updated['error']:
+            logging.warning(f'{updated["name"]}: {updated["error"]}')
+            return redirect(f'{SELF}?failed={index}')
         return redirect(SELF)
 
     return app

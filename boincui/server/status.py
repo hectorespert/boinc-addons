@@ -36,23 +36,48 @@ RUN_MODE_ALWAYS = 1
 RUN_MODE_AUTO = 2
 RUN_MODE_NEVER = 3
 
-RUN_MODES = {
-    RUN_MODE_ALWAYS: 'always computing',
-    RUN_MODE_AUTO: 'computing when its settings allow',
-    RUN_MODE_NEVER: 'set never to compute',
+# What each mode is called on screen. The three labels and their descriptions are copied verbatim
+# from BOINC's own Activity menu (`clientgui/AdvancedFrame.cpp:517-529`); `boinctui` uses the same
+# three strings (`src/topmenu.cpp:89-91`). Anyone who has used either recognises this control.
+ACTIVITY_MODES = (
+    ('always', 'Run always', 'Allow work regardless of preferences'),
+    ('auto', 'Run based on preferences', 'Allow work according to preferences'),
+    ('never', 'Suspend', 'Stop work regardless of preferences'),
+)
+
+MODE_KEYS = {
+    RUN_MODE_ALWAYS: 'always',
+    RUN_MODE_AUTO: 'auto',
+    RUN_MODE_NEVER: 'never',
 }
 
 
 def describe_activity(cc_status: dict | None) -> str:
-    """One line saying whether the client is computing, and if not, why not."""
+    """One line saying whether the client is computing, and if not, why not.
+
+    Deliberately silent about the run mode: the activity control on the page already shows it, and
+    saying it here as well produced the likes of "Computing — computing when its settings allow".
+    """
     if not cc_status:
         return 'Unknown'
 
-    mode = cc_status.get('task_mode')
     reason = cc_status.get('task_suspend_reason') or 0
-
     if reason:
         return f'Paused — {SUSPEND_REASONS.get(reason, "BOINC did not say why")}'
-    if mode == RUN_MODE_NEVER:
-        return 'Paused — set never to compute'
-    return f'Computing — {RUN_MODES.get(mode, "running")}'
+    if cc_status.get('task_mode') == RUN_MODE_NEVER:
+        # Reached only in the moment between setting the mode and the client recomputing its
+        # suspend reason, which it does on its own cycle rather than when the mode is set.
+        return 'Paused — someone asked it to stop'
+    return 'Computing'
+
+
+def describe_mode(cc_status: dict | None) -> str | None:
+    """Which activity mode the buttons should show as selected.
+
+    Reads `task_mode_perm`, not `task_mode`: a temporary mode set from BOINC Manager makes the two
+    differ, and the temporary one reverts on its own, so marking it would highlight a state this
+    control never set and cannot restore.
+    """
+    if not cc_status:
+        return None
+    return MODE_KEYS.get(cc_status.get('task_mode_perm'))
