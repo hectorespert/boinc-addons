@@ -4,7 +4,7 @@ Standing backlog for this repo: known gaps, platform conformance items, and feat
 review. Consult it before starting work — what you are about to investigate may already be written
 up here with file:line references — and update it as items are resolved or discarded.
 
-Last reviewed 2026-08-10. Everything in **Resolved** below has shipped or been deliberately
+Last reviewed 2026-08-11. Everything in **Resolved** below has shipped or been deliberately
 discarded; it is kept in condensed form so the same ground is not re-covered, not as work to do.
 
 ---
@@ -18,15 +18,6 @@ Resolved.
 
 ## Security / permissions
 
-- [ ] **`video` and `docker_api` are granted but never explained.** `boinc/config.yaml` sets
-  `video: true`, `host_pid: true`, `host_uts: true` and `docker_api: true`. `host_pid`/`host_uts`
-  are explained (CPU monitoring, the Protection Mode warning in `boinc/README.md` and
-  `main.py:31-32`), but `video` and `docker_api` are not mentioned in any user-facing doc.
-  `boinc/Dockerfile` confirms the intent: `docker-cli` for BOINC's `docker_wrapper` jobs that spawn
-  sibling containers, `libgl1` for GPU-compute projects. So the grants are deliberate, not
-  boilerplate — but `docker_api` in particular is Docker socket access, a real privilege that users
-  accepting the install deserve to see explained in one line next to the Protection Mode warning.
-
 - [ ] **`apparmor: false` on both add-ons, against an explicit documented recommendation.** These
   add-ons disable AppArmor *and* request `host_pid`, `host_uts`, `docker_api` and `video`, so they
   sit at the low end of the platform's 1–6 rating by construction. Ties to the dead
@@ -38,12 +29,6 @@ Resolved.
 
 Reviewed against <https://developers.home-assistant.io/docs/apps/> (fetched 2026-08-08), plus
 findings measured directly against the Supervisor in `.devcontainer`.
-
-- [x] **`icon.png` aspect ratio — no longer an issue.** Re-measured 2026-08-11: `boinc/icon.png`,
-  `boinctui/icon.png` and `boincui/icon.png` are byte-identical and **256 x 256**, so the 1x1 rule is
-  met. The earlier note recording 256 x 245 was wrong or has been overtaken. `logo.png` at 600x305 is
-  fine either way — the docs explicitly allow other logo ratios.
-  `docs/icon.png` is a symlink to `boinc/icon.png` and follows automatically.
 
 - [ ] **`map:` uses the legacy plain-string form.** `boinc/config.yaml` has `map: [addon_config]`,
   and Supervisor warns on every store scan: `App 'BOINC' uses legacy map type 'addon_config'; use
@@ -95,6 +80,16 @@ findings measured directly against the Supervisor in `.devcontainer`.
 
 ### Confirmed correct — checked, no action needed
 
+- **Every permission this repo requests is now explained to the user.** `host_pid`/`host_uts` by the
+  Protection Mode warning, and `video`/`docker_api` by the *What else this app asks for* section
+  added to `boinc/README.md` in `ad846b7` — graphics access for GPU-capable projects, Docker access
+  for projects shipping their work as containers, said plainly to be the broadest permission
+  requested and not separately switchable. This was an open item until re-checked 2026-08-11.
+- **`icon.png` meets the 1x1 rule — fixed, not a false alarm.** The 256 x 245 recorded here was
+  real; the icon was squared in `ad846b7` and shipped as `boinc` 3.9.1 / `boinctui` 2.4.2. Measured
+  again 2026-08-11: all three are byte-identical and **256 x 256**. `logo.png` at 600x305 is fine
+  either way — the docs explicitly allow other logo ratios. `docs/icon.png` is a symlink to
+  `boinc/icon.png` and follows automatically.
 - `boinctui/run.sh:17` uses `--auth-header X-Remote-User-Name`, matching the ingress identity
   headers the security docs specify. Correct use of the platform auth mechanism.
 - `boinc/config.yaml` maps `31416/tcp: null` — null means "not published by default, user may opt
@@ -184,44 +179,15 @@ Common BOINC global preferences not exposed, each roughly one key away in
 
 ## Feature ideas (not scoped, just candidates)
 
-- [ ] **Link the existing third-party HA integration instead of rebuilding it** (searched
-  2026-08-08). Cheapest high-value item in this section.
-  <https://github.com/SpuelMett/Boinc-Home-Assistant-Integration> — custom component, MIT, config
-  flow, ~12 stars, v0.0.7, **not in HACS**. Talks GUI RPC directly to remote BOINC hosts, so it
-  needs `remote_hosts.cfg`, `gui_rpc_auth.cfg` and port 31416 — exactly the mechanism this add-on
-  configures. Sensors: total tasks, running tasks, average progress rate. Services: start, hard
-  stop, soft stop (waits for the next checkpoint), GPU start/stop. Multiple hosts.
-  **The fit is mutual and explicit**: its README states it cannot run BOINC on the Home Assistant
-  host itself and that a separate add-on is needed for that — which is this repo. This repo has no
-  HA entity surface at all. Complements, not competitors.
-  **Action (small):** document the pairing in `boinc/DOCS.md` — enable `allow_remote_gui_rpc`, add
-  the HA host to `remote_hosts`, share `gui_rpc_password` — plus a link.
-  **Consequence:** the "query" half largely has an answer already; anything built here should target
-  the *configure* half (project attach/detach, account manager, preferences), which nothing covers.
-  **Maturity caveat:** single maintainer, v0.0.7, not in HACS. Linking is free; depending on it is a
-  risk decision. No core/official HA BOINC integration found, though that rests on web search rather
-  than a direct check of the (client-side rendered) integrations listing.
+The entity surface — sensors, and a Prometheus endpoint — is **not this repo's job**; see Resolved.
+Anything built here should target the *configure* half (project attach/detach, account manager,
+preferences), which nothing else covers.
 
-- [ ] **HA-native sensors for BOINC stats** — tasks running/queued, credits, project status. Today
-  the only way to see BOINC state from Home Assistant is opening the `boinctui` ingress panel.
-  ⚠ Partly solved by the integration above; read that item first.
+### `boincui` follow-ups
 
-- [ ] **Python GUI RPC libraries already exist — pick one rather than writing one.**
-  <https://pypi.org/project/boinc-client/> (v1.12.1, May 2024, synchronous) and
-  <https://github.com/nielstron/pyboinc> (MIT, asyncio, the one SpuelMett's integration uses, whose
-  README admits it is "very basic"). Both small and lightly maintained, so vendoring vs. depending
-  is a real call — but either removes "write a GUI RPC client from scratch" from the critical path
-  of everything below.
-
-- [ ] **Prometheus metrics endpoint** — same data source, different consumer.
-
-- [x] **`boincui`'s deprecated single-client options removed — in 1.0.0, not 0.6.0.** Held back from
-  0.5.0 because they had been deprecated for a single released version and Supervisor **silently
-  discards options that disappear from the schema**. Brought forward to 1.0.0 rather than pushed
-  further out, because that release also drops `stage: experimental`: once an add-on is stable,
-  removing an option from its schema is a breaking change that would call for a 2.0, so 1.0 was the
-  last cheap moment. The landing is soft — an unmigrated install starts with no machines and the page
-  says exactly that — and the `CHANGELOG.md` entry warns before the update.
+The "build a graphical web UI" item that used to dominate this file was answered by `boincui` 1.0.0 —
+see Resolved for what was decided and why. What follows is what it did **not** settle, in rough order
+of cost.
 
 - [ ] **Localise `boincui`'s page.** Only `translations/*.yaml` is translated today, and that covers
   configuration fields, not the page itself. If it is ever done, the activity control's wording
@@ -264,73 +230,47 @@ Common BOINC global preferences not exposed, each roughly one key away in
   cross-add-on setup friction, but requires granting `hassio_api`, i.e. widening this add-on's
   permissions. Needs its own analysis before anyone reaches for it.
 
-- [ ] **Graphical web UI** — biggest item in this file by an order of magnitude. What follows is the
-  design work, independent of where the code ends up living.
+- [ ] **Cross-host aggregation — one table of every task across every machine**, sortable by
+  deadline, with bulk actions. This is the one thing neither `boinctui` nor SpuelMett's integration
+  offers, and `boincui` does not either: it renders a section per machine, deliberately (see the
+  UI/UX section of `boincui/DEVELOPMENT.md`, which argues the per-machine view is the right default,
+  not that an aggregate view is wrong). Needs a story for **partial failure** — one powered-off host
+  must not empty or stall the table — which the current per-machine layout gets for free.
 
-  **Honest baseline: `boinctui` already does this.** It is a full BOINC Manager through ingress,
-  working today, built from ~20 lines of `run.sh` plus an apt package. A graphical UI adds usability
-  (mobile/touch, people who will not use a TUI), not capability. Valid reason, but the cost ratio is
-  10-50x.
+- [ ] **Act on individual tasks and projects.** `boincui` can set a machine's activity mode and
+  nothing else. The next rungs, in BOINC's own vocabulary: per-project suspend / resume / update /
+  no new work, and abort task. Each is one more `pyboinc` call and one more confirmation question —
+  aborting a task destroys days of work, so it is not a bare button like the mode control is.
 
-  - **"Query" and "configure" are two different products.** Querying in HA is done with *entities* —
-    dashboards, automations, notifications, history, statistics — none of which an ingress page
-    gives. Configuring is where a UI genuinely wins. Both need the same backend, and **that backend,
-    not the UI, is the real first deliverable**; it is shared with the sensors item above.
-  - **Ingress compatibility is the gate that decides wrap-vs-build.** Served under
-    `/api/hassio_ingress/<token>/` with a changing token, so the app must emit relative URLs or take
-    a base path **at runtime, not build time** — which rules out most third-party SPAs that bake
-    absolute `/assets/...` paths. It must also have no login of its own and trust `X-Remote-User-*`.
-    WebSockets do work through ingress (`boinctui` proves it). Usual breakage: absolute `Location:`
-    redirects and `Path=/` cookies. **Evaluating an existing web UI against this costs about an
-    afternoon** and can save months — run that experiment first. Candidates: BoincTasks Js and any
-    other browser-based BOINC manager (list unverified — search before assuming none exist).
-  - **Cross-add-on connectivity is the worst part of the current UX and would be inherited.** Today
-    `boinctui` → `boinc` needs three manual steps across two add-ons, including **a second copy of
-    the GUI RPC password in another `options.json`**. Consider instead running the UI *inside* the
-    `boinc` add-on: localhost RPC, reads `gui_rpc_auth.cfg` straight from the data folder, no
-    `remote_hosts` entry, no duplicated password. The price is **not** loss of multi-host (a process
-    there can still dial other hosts on 31416); it is loss of lifecycle independence — if the local
-    client crash-loops, the UI you were using to watch the *other* machines goes with it.
-  - **`boinccmd` is not a viable backend.** The operator shells out and regex-parses human-readable
-    text (`boinccmd.py`, `re.search(r'URL: (\S+)')`) — fine for one field at startup, unusable for a
-    UI polling every few seconds: one process spawn per call against output that is not a stable
-    API. And from a *separate* add-on it would need `--passwd <pw>` in argv, which with
-    `host_pid: true` is more visible than usual. Speak GUI RPC over TCP 31416 instead (XML,
-    nonce+MD5 auth — verify the exact protocol against upstream, not from memory).
-  - **A configuration UI is a third external writer** — read the state-ownership reasoning in
-    Resolved as a prerequisite, not parallel debt.
-  - **Multi-host is a stated requirement**, and retrofitting it is expensive while designing it in
-    is nearly free:
-    - Multi-host alone is not a differentiator (`boinctui` and SpuelMett's integration both do it).
-      What neither offers is **cross-host aggregation** — one table of all tasks across all machines,
-      sortable by deadline, with bulk actions. That is the actual reason to build, and it should
-      drive the design. It also raises the value of the ingress experiment: BoincTasks Js is
-      multi-machine by design.
-    - **Host + credential storage is a design fork.** N × (host, port, password) either in add-on
-      options (declarative, visible, backed up, but static and multiplying the secrets problem by N)
-      or managed from the UI under `/data` (dynamic, but invisible to HA's config layer and needing
-      its own secret handling). Doing both recreates the two-writers problem inside the UI itself.
-    - **Likely network gotcha — verify empirically.** Add-on ↔ add-on traffic stays on HA's Docker
-      network and the target sees the container hostname. Traffic to a LAN machine is masqueraded,
-      so the remote host most likely sees **the Home Assistant host's IP** — i.e. a remote PC's
-      `remote_hosts.cfg` needs a *different* entry than a sibling add-on does. **Strongly supported,
-      not yet confirmed on Home Assistant itself**: 2026-08-11, a BOINC client in a container reached
-      through a published port logged `GUI RPC request from non-allowed address 192.168.65.1`, the
-      Docker gateway rather than the caller. That is Docker Desktop's NAT, so the address a real HA
-      host presents still has to be checked there. Documented in `boincui/DOCS.md` as the likely
-      cause when a LAN machine refuses the connection.
-    - **Security blast radius multiplies.** BOINC's GUI RPC has one password per client and no users
-      or roles. A multi-host UI concentrates total control of every BOINC machine behind one ingress
-      panel. **Verify whether HA can restrict an ingress panel to admin users**; if it cannot, any HA
-      account controls the whole fleet.
-    - **Partial failure is the normal case** (one powered-off host must not stall the aggregate
-      view), and **version skew** is real (different client versions expose different RPC fields).
-  - **MVP scope, if it happens:** read-only tasks/projects/transfers plus a few actions (global
-    suspend/resume, per-project suspend/resume/update, abort task), leaving the rest to `boinctui`.
-  - **Suggested order:** (1) link the existing integration from `boinc/DOCS.md` — hours of work,
-    closes the loop for users today; (2) run the ingress wrap experiment; (3) pick an existing GUI
-    RPC library rather than writing one; (4) only then decide on the UI, with real demand data on
-    whether users need to *configure* from a phone or `boinctui` suffices.
+- [ ] **Can an ingress panel be restricted to admin users?** Unverified, and it decides how much
+  power `boincui` may concentrate: BOINC's GUI RPC has one password per client and no roles, so the
+  panel already grants total control of every configured machine to whoever opens it. If HA cannot
+  restrict it, that is a documentation duty at minimum. Check `SCHEMA_APP_USER` and the ingress
+  session API in Supervisor.
+
+- [ ] **Version skew across BOINC clients.** Different client versions expose different RPC fields;
+  `boinc.py` reads what it needs and would `KeyError` or silently blank on an older one. Nothing has
+  gone wrong yet because every client tested was current. Decide the policy — a declared minimum
+  version, or defensive reads — before someone points it at an old machine.
+
+- [ ] **Confirm the Docker NAT behaviour on a real Home Assistant host.** Add-on ↔ add-on traffic
+  stays on HA's Docker network and the target sees the container hostname; traffic to a LAN machine
+  is masqueraded, so the remote host most likely sees **the Home Assistant host's IP** — meaning a
+  remote PC's `remote_hosts.cfg` needs a *different* entry than a sibling add-on does. Strongly
+  supported, not confirmed there: 2026-08-11 a BOINC client in a container reached through a
+  published port logged `GUI RPC request from non-allowed address 192.168.65.1`, the Docker gateway
+  rather than the caller — but that is Docker Desktop's NAT. Already documented in `boincui/DOCS.md`
+  as the likely cause when a LAN machine refuses the connection, so the risk is a wrong hint, not a
+  broken feature.
+
+- [ ] **The GUI RPC password is still typed twice**, once in `boinc`'s options and again in
+  `boincui`'s, because they are separate add-ons. Running the UI *inside* the `boinc` add-on would
+  remove it — localhost RPC, `gui_rpc_auth.cfg` read straight from the data folder, no `remote_hosts`
+  entry — at the cost of lifecycle independence: a crash-looping local client would take down the UI
+  you were using to watch the *other* machines. Not a reversal to make lightly now that `boincui`
+  ships; the cheaper half is the hostname discovery item above.
+
+### `boinc` operator
 
 - [ ] **Declare projects to attach in the add-on options** (a `projects:` list). Attractive, but a
   much bigger step than the existing scalar options, because it turns reconciliation into *set*
@@ -374,6 +314,29 @@ Common BOINC global preferences not exposed, each roughly one key away in
 # Resolved — kept so it is not re-litigated
 
 ## Discarded after investigation
+
+- [x] **A Home Assistant entity surface is not this repo's job (decided 2026-08-11).** Three items
+  used to sit here — link SpuelMett's integration, build HA-native sensors, expose a Prometheus
+  endpoint. Only the first survived, as work rather than backlog: the pairing is now documented in
+  `boinc/DOCS.md`, and the maintainer runs that integration against this add-on.
+  - **Sensors: dropped.** An add-on cannot create entities — it is not an integration and lives in
+    another container. Publishing would mean MQTT discovery (forces a broker on the user), or Core's
+    REST API with `homeassistant_api: true` (widens permissions this repo deliberately keeps narrow,
+    see the `hassio_api` item), or shipping a custom integration alongside — which is precisely what
+    <https://github.com/SpuelMett/Boinc-Home-Assistant-Integration> already is (MIT, config flow,
+    multiple hosts; sensors for total/running tasks and average progress; services for start, hard
+    stop, soft stop and GPU start/stop). Its README says it cannot run BOINC on the Home Assistant
+    host and that a separate add-on is needed for that — which is this repo. Complements, not
+    competitors. Maturity caveat, unchanged: single maintainer, v0.0.7, not in HACS. Linking is free;
+    depending on it would be a risk decision, and the docs treat it as optional.
+  - **Prometheus: dropped, and it was never parallel to sensors.** Home Assistant's own `prometheus`
+    integration exports the entities it already has, so once the integration above provides them,
+    scraping comes essentially free. A `/metrics` endpoint in an add-on gives no entity in return, so
+    it would only serve someone wanting BOINC metrics *without* Home Assistant — not this repo's
+    audience.
+  - **The `boincui` data layer stays where it is.** `boincui/server/boinc.py` already reads running /
+    queued / finished tasks, projects and activity mode from every configured machine each minute.
+    That it could feed entities is true and irrelevant: the blocker was never the data.
 
 - [x] **`backup_exclude` — no exclusion is free; nothing is excluded (decided 2026-08-10).**
   The idea was to keep `slots/` and `projects/` out of every Home Assistant backup. Reading the
@@ -568,3 +531,41 @@ Common BOINC global preferences not exposed, each roughly one key away in
   new code**: the `niu_` keys stayed in `MANAGED_PREFERENCES`, so a stale value the operator wrote
   itself falls into the removal branch that has existed since 3.8.1, while one set by the user from
   `boinctui` is untouched.
+
+## Shipped as `boincui`, 0.1.0 → 1.0.0
+
+- [x] **"Graphical web UI" — built, and most of its design questions are now answered rather than
+  open.** The item used to be the largest in this file; what it planned, `boincui` does. Kept
+  condensed because the reasoning still guides the remaining items above, and the full argument with
+  its evidence lives in `boincui/DEVELOPMENT.md`:
+  - **Ingress compatibility decided build-over-wrap.** Served under `/api/hassio_ingress/<token>/`
+    with a token generated at install time and never passed on, so every emitted URL — `href`,
+    `action` *and* `Location` — must be relative. Server-rendered Flask, no SPA, no `url_for`;
+    `test_app.py` and `smoke.sh` both assert it. The "evaluate an existing web UI first" experiment
+    was never run: writing the page cost less than auditing a third-party SPA for baked-in absolute
+    asset paths.
+  - **`boinccmd` was rejected as a backend, as predicted** — one process spawn per call against
+    human-readable text. `boincui` speaks GUI RPC over TCP 31416 through vendored `pyboinc`, which
+    also settles the separate "pick a library rather than writing one" item: `boinc-client`
+    (synchronous, no licence metadata) lost to `nielstron/pyboinc` (MIT, asyncio, already used by
+    SpuelMett's integration), vendored rather than depended on because it was never published to
+    PyPI. See `boincui/server/pyboinc/VENDOR.md` and the open item on publishing a fork.
+  - **Host + credential storage went to add-on options**, the declarative fork: visible, backed up,
+    validated by Supervisor, and one writer instead of two. A list of dicts cannot be optional, hence
+    `options: clients: []`.
+  - **Partial failure is handled by construction**, not by a retry policy: a background refresher
+    polls on its own thread and views only read its snapshot, so a machine that is switched off costs
+    a log line and a per-machine error state instead of a stalled page.
+  - **"Query" and "configure" remain two products.** `boincui` is the configure half through ingress;
+    the query half — HA entities, history, automations — is still unbuilt and still best served by
+    linking SpuelMett's integration.
+
+- [x] **`boincui`'s deprecated single-client options removed — in 1.0.0, not 0.6.0.** Held back from
+  0.5.0 because they had been deprecated for a single released version and Supervisor **silently
+  discards options that disappear from the schema**. Brought forward to 1.0.0 rather than pushed
+  further out, because that release also drops `stage: experimental`: once an add-on is stable,
+  removing an option from its schema is a breaking change that would call for a 2.0, so 1.0 was the
+  last cheap moment. The landing is soft — an unmigrated install starts with no machines and the page
+  says exactly that — and the `CHANGELOG.md` entry warns before the update. Both paths were exercised
+  against a real Supervisor: a migrated install is untouched, and Supervisor keeps the removed keys
+  in its own `apps.json` rather than destroying them.

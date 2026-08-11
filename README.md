@@ -11,8 +11,8 @@ The [BOINC](https://boinc.berkeley.edu) platform enables individuals to contribu
 To install the apps provided by this repository in your Home Assistant instance, click on the button above or follow these steps:
 
 1. Open your Home Assistant instance.
-2. Go to the Supervisor panel.
-3. Click on the "Add-on Store" tab.
+2. Go to **Settings → Apps** (called **Add-ons** before Home Assistant 2026.2).
+3. Click on the "App Store" button in the bottom right corner.
 4. Click on the three dots in the top right corner and select "Repositories".
 5. Add the repository URL: `https://github.com/hectorespert/boinc-addons`.
 6. Install the desired apps from the store.
@@ -46,7 +46,9 @@ It provides a terminal user interface (TUI) to monitor and control the BOINC cli
 
 A graphical web interface to monitor and control the BOINC client, as an alternative to the text mode interface boinctui provides.
 
-This app is **experimental and does not do anything useful yet**. Use boinctui to manage BOINC today.
+It opens a page inside Home Assistant showing what each of your BOINC machines is computing and the projects it is attached to — the BOINC app on this machine, other computers on your network, or both — and each machine can be set to compute always, to follow its own preferences, or to stop.
+
+It does not yet act on individual tasks, attach or detach projects, or change a machine's preferences. Use boinctui for those.
 
 [aarch64-shield]: https://img.shields.io/badge/aarch64-yes-green.svg
 [amd64-shield]: https://img.shields.io/badge/amd64-yes-green.svg

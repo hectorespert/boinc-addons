@@ -209,8 +209,17 @@ editing files outside a changed add-on's directory does not trigger its pipeline
   binaries, and set the standard Home Assistant add-on `io.hass.*`/`org.opencontainers.image.*`
   labels using the `BUILD_*` args injected by the builder — follow the existing pattern rather than
   hand-rolling new labels.
-- User-facing terminology has migrated from "add-on" to "app" in docs (README, operator README);
-  `config.yaml`/directory names/internal code still say "addon"/"add-on".
+- **"App", not "add-on", in anything a user reads** — this follows Home Assistant, which renamed the
+  concept in [2026.2](https://www.home-assistant.io/blog/2026/02/04/release-20262/) to stop it
+  reading like "integration"; the
+  [architecture discussion](https://github.com/home-assistant/architecture/discussions/1287) lists
+  the string changes. So **Settings → Apps** and **App Store** are the current menu labels — never
+  send a user to "Settings → Add-ons" — and HA's own guidance is to note "formerly called add-ons"
+  on first mention, which our install steps and the Protection Mode instruction do.
+  Everything technical deliberately keeps the old spelling, upstream included: `config.yaml`,
+  directory names, slugs, the `/addons` API, the `addon_configs/…` folder users see in File editor
+  and Samba, and this repo's own name and URLs. Renaming any of those is not a docs fix, it is a
+  breaking change.
 - When Claude Code creates a commit in this repo, use an `Assisted-by:` trailer instead of the
   default `Co-Authored-By:` trailer.
 - Everything Home Assistant shows on an app's page is end-user documentation: `DOCS.md`
