@@ -182,31 +182,9 @@ Common BOINC global preferences not exposed, each roughly one key away in
 
 ## Feature ideas (not scoped, just candidates)
 
-### A Home Assistant entity surface — this repo still has none
-
-- [ ] **Link the existing third-party HA integration instead of rebuilding it** (searched
-  2026-08-08). Cheapest high-value item in this section.
-  <https://github.com/SpuelMett/Boinc-Home-Assistant-Integration> — custom component, MIT, config
-  flow, ~12 stars, v0.0.7, **not in HACS**. Talks GUI RPC directly to remote BOINC hosts, so it
-  needs `remote_hosts.cfg`, `gui_rpc_auth.cfg` and port 31416 — exactly the mechanism this add-on
-  configures. Sensors: total tasks, running tasks, average progress rate. Services: start, hard
-  stop, soft stop (waits for the next checkpoint), GPU start/stop. Multiple hosts.
-  **The fit is mutual and explicit**: its README states it cannot run BOINC on the Home Assistant
-  host itself and that a separate add-on is needed for that — which is this repo. This repo has no
-  HA entity surface at all. Complements, not competitors.
-  **Action (small):** document the pairing in `boinc/DOCS.md` — enable `allow_remote_gui_rpc`, add
-  the HA host to `remote_hosts`, share `gui_rpc_password` — plus a link.
-  **Consequence:** the "query" half largely has an answer already; anything built here should target
-  the *configure* half (project attach/detach, account manager, preferences), which nothing covers.
-  **Maturity caveat:** single maintainer, v0.0.7, not in HACS. Linking is free; depending on it is a
-  risk decision. No core/official HA BOINC integration found, though that rests on web search rather
-  than a direct check of the (client-side rendered) integrations listing.
-
-- [ ] **HA-native sensors for BOINC stats** — tasks running/queued, credits, project status. Today
-  the only way to see BOINC state from Home Assistant is opening the `boinctui` ingress panel.
-  ⚠ Partly solved by the integration above; read that item first.
-
-- [ ] **Prometheus metrics endpoint** — same data source, different consumer.
+The entity surface — sensors, and a Prometheus endpoint — is **not this repo's job**; see Resolved.
+Anything built here should target the *configure* half (project attach/detach, account manager,
+preferences), which nothing else covers.
 
 ### `boincui` follow-ups
 
@@ -339,6 +317,29 @@ of cost.
 # Resolved — kept so it is not re-litigated
 
 ## Discarded after investigation
+
+- [x] **A Home Assistant entity surface is not this repo's job (decided 2026-08-11).** Three items
+  used to sit here — link SpuelMett's integration, build HA-native sensors, expose a Prometheus
+  endpoint. Only the first survived, as work rather than backlog: the pairing is now documented in
+  `boinc/DOCS.md`, and the maintainer runs that integration against this add-on.
+  - **Sensors: dropped.** An add-on cannot create entities — it is not an integration and lives in
+    another container. Publishing would mean MQTT discovery (forces a broker on the user), or Core's
+    REST API with `homeassistant_api: true` (widens permissions this repo deliberately keeps narrow,
+    see the `hassio_api` item), or shipping a custom integration alongside — which is precisely what
+    <https://github.com/SpuelMett/Boinc-Home-Assistant-Integration> already is (MIT, config flow,
+    multiple hosts; sensors for total/running tasks and average progress; services for start, hard
+    stop, soft stop and GPU start/stop). Its README says it cannot run BOINC on the Home Assistant
+    host and that a separate add-on is needed for that — which is this repo. Complements, not
+    competitors. Maturity caveat, unchanged: single maintainer, v0.0.7, not in HACS. Linking is free;
+    depending on it would be a risk decision, and the docs treat it as optional.
+  - **Prometheus: dropped, and it was never parallel to sensors.** Home Assistant's own `prometheus`
+    integration exports the entities it already has, so once the integration above provides them,
+    scraping comes essentially free. A `/metrics` endpoint in an add-on gives no entity in return, so
+    it would only serve someone wanting BOINC metrics *without* Home Assistant — not this repo's
+    audience.
+  - **The `boincui` data layer stays where it is.** `boincui/server/boinc.py` already reads running /
+    queued / finished tasks, projects and activity mode from every configured machine each minute.
+    That it could feed entities is true and irrelevant: the blocker was never the data.
 
 - [x] **`backup_exclude` — no exclusion is free; nothing is excluded (decided 2026-08-10).**
   The idea was to keep `slots/` and `projects/` out of every Home Assistant backup. Reading the

@@ -40,6 +40,41 @@ account_manager_password: "yoursecretpassword"
 
 There is a boinctui app available for this purpose [here](https://github.com/hectorespert/boinc-addons/tree/main/boinctui).
 
+There is also a BOINC UI app [here](https://github.com/hectorespert/boinc-addons/tree/main/boincui),
+which shows what each machine is computing on a page inside Home Assistant and lets you start and
+stop it.
+
+### Sensors and automations (Advanced)
+
+This app computes, but it creates no sensors: BOINC's state is something you look at, not something
+you can put on a dashboard or use in an automation. If you want that, there is a third-party
+integration that provides it, and it is designed to work alongside this app:
+[BOINC for Home Assistant](https://github.com/SpuelMett/Boinc-Home-Assistant-Integration).
+
+It adds sensors for the tasks a machine is running and how far along they are, and actions to start
+and stop computing — so you can show BOINC on a dashboard, keep history, or stop it from an
+automation when the house gets too warm.
+
+To use it with this app:
+
+1. In this app's configuration, set a **gui_rpc_password** and turn on **allow_remote_gui_rpc**, then
+   restart the app.
+2. Install the integration through HACS as a custom repository — it is not in the HACS catalogue, so
+   you have to add its address yourself. Its own page has the current instructions.
+3. Add it from **Settings → Devices & services**, using the hostname shown on this app's **Info**
+   page as the address, and the same password you just set.
+
+**allow_remote_gui_rpc lets any machine on your network try to connect**, so the password is the only
+thing protecting the client — do not leave it empty. If you would rather not open it that widely, you
+can list allowed machines in **remote_hosts** instead; when a connection is refused, this app's
+**Log** tab names the address that was turned away, which is the one to add.
+
+Publishing port 31416 is only needed for programs running outside Home Assistant, such as BOINC
+Manager on another computer. Home Assistant itself and the other apps reach this one without it.
+
+This integration is not part of this project and is maintained by someone else. It is optional —
+nothing here depends on it.
+
 ## Configuration
 
 ### Configuration Options
