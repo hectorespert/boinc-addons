@@ -9,7 +9,8 @@ The BOINC app, running on your Home Assistant, downloads scientific computing jo
 **This app requires Protection Mode to be disabled** so it can see CPU usage across your whole
 Home Assistant host and pause BOINC computing whenever other apps need the CPU.
 
-To disable it: **Settings → Add-ons → BOINC → Info**, then turn off **Protection mode**.
+To disable it: **Settings → Apps → BOINC → Info**, then turn off **Protection mode**. On Home
+Assistant older than 2026.2, that menu is called **Add-ons**.
 
 **Security Note:** Disabling Protection Mode grants this app elevated access to host resources.
 Only install it if you understand and accept that.

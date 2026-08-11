@@ -11,8 +11,8 @@ The [BOINC](https://boinc.berkeley.edu) platform enables individuals to contribu
 To install the apps provided by this repository in your Home Assistant instance, click on the button above or follow these steps:
 
 1. Open your Home Assistant instance.
-2. Go to **Settings → Add-ons**.
-3. Click on the "Add-on Store" button in the bottom right corner.
+2. Go to **Settings → Apps** (called **Add-ons** before Home Assistant 2026.2).
+3. Click on the "App Store" button in the bottom right corner.
 4. Click on the three dots in the top right corner and select "Repositories".
 5. Add the repository URL: `https://github.com/hectorespert/boinc-addons`.
 6. Install the desired apps from the store.
