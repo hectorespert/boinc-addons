@@ -25,29 +25,13 @@ REFRESH_SECONDS = 60
 
 
 def clients_from(options: dict) -> list[dict]:
-    """The machines to poll, accepting the single-client options this add-on used to have.
+    """The machines to poll.
 
-    Supervisor drops options that are absent from the schema without telling anyone, so removing the
-    old keys outright would silently wipe an existing configuration. They keep working for one
-    version instead.
+    The single-client options this add-on started with (`boinc_host` and friends) were removed in
+    1.0.0 and are deliberately not read any more: Supervisor discards options that are missing from
+    the schema, so they cannot arrive here even if someone still has them configured.
     """
-    clients = options.get('clients') or []
-    if clients:
-        return clients
-
-    if options.get('boinc_host') or options.get('gui_rpc_password'):
-        logging.warning(
-            'Using the old single-client options. Move them to the "clients" list in the '
-            'Configuration tab; they will stop working in a future version'
-        )
-        return [{
-            'name': options.get('boinc_host'),
-            'host': options.get('boinc_host'),
-            'port': options.get('boinc_port'),
-            'password': options.get('gui_rpc_password'),
-        }]
-
-    return []
+    return options.get('clients') or []
 
 
 class Snapshot:

@@ -199,22 +199,13 @@ class TestClientsFrom(unittest.TestCase):
 
         self.assertEqual([{'host': 'a', 'password': 'x'}], clients)
 
-    def test_should_accept_the_old_single_client_options(self):
-        # Supervisor silently drops options missing from the schema, so removing these outright
-        # would wipe an existing configuration. It still has to say so in the log.
-        with self.assertLogs(level='WARNING') as logged:
-            clients = clients_from({'boinc_host': 'pc', 'boinc_port': 31417, 'gui_rpc_password': 'x'})
-
-        self.assertEqual([{'name': 'pc', 'host': 'pc', 'port': 31417, 'password': 'x'}], clients)
-        self.assertIn('will stop working', ''.join(logged.output))
-
-    def test_should_prefer_the_list_over_the_old_options(self):
-        clients = clients_from({
-            'clients': [{'host': 'new', 'password': 'x'}],
-            'boinc_host': 'old', 'gui_rpc_password': 'y',
-        })
-
-        self.assertEqual('new', clients[0]['host'])
+    def test_should_ignore_the_single_client_options_removed_in_1_0(self):
+        # They are gone from the schema, so Supervisor can no longer deliver them. Reading them
+        # again would quietly resurrect a configuration path that is no longer documented or tested.
+        self.assertEqual(
+            [],
+            clients_from({'boinc_host': 'pc', 'boinc_port': 31417, 'gui_rpc_password': 'x'}),
+        )
 
     def test_should_return_nothing_when_unconfigured(self):
         self.assertEqual([], clients_from({}))

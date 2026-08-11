@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.0
+
+The three old settings for a single BOINC client — address, port and password — are gone. If you are still using them instead of the BOINC clients list, this update leaves the app with no machines configured and the page will tell you so; add them to the list and it works again. If you already use the list, nothing changes
+
+BOINC UI is no longer marked as experimental
+
 ## 0.5.0
 
 You can now start and stop computing on each machine, under Activity: Run always, Run based on preferences, or Suspend. They are the same three choices, with the same names, that BOINC Manager offers

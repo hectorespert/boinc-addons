@@ -187,6 +187,14 @@ Gotchas.
   5. Restarting `hassio_supervisor` by hand loses `/run/supervisor`, after which
      Home Assistant Core fails to start with `bind source path does not exist`.
      `mkdir -p /run/supervisor` before rebooting Supervisor fixes it.
+  6. **`docker stop hassio_supervisor` takes the devcontainer's own Docker daemon
+     down with it.** `supervisor_run` runs under `set -e`, so the container it was
+     waiting on exiting ends the script and `dockerd` with it; `ha-addons-dev` stays
+     `Up` while every `docker` call inside it fails with `dial unix
+     /var/run/docker.sock: connect: no such file or directory`, and the whole hassio
+     stack is gone. `docker restart ha-addons-dev` alone does **not** bring it back —
+     re-run `supervisor.sh up`, which is idempotent and recovers in about a minute
+     since the images are already in the volume. Use `restart`, never `stop`.
 - **An installed add-on's metadata is a snapshot.** Supervisor stores the parsed
   `config.yaml`/`translations` in `/mnt/supervisor/apps.json` at install time, so
   `ha apps info` keeps serving the old values after you edit those files — even

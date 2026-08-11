@@ -37,8 +37,9 @@ Three independent Home Assistant add-ons, each self-contained with its own `conf
   a BOINC client, and `main.py` runs it under waitress and owns the process lifecycle.
   `--exit-immediately` is the one-shot path used by CI; otherwise it blocks until signalled, because
   an entrypoint that returns leaves Supervisor reporting the app as stopped seconds after the user
-  started it. `config.yaml` declares `stage: experimental`, which also suppresses its Bluesky release
-  announcement (see CI section).
+  started it. It declared `stage: experimental` until 1.0.0, which also suppressed its Bluesky
+  release announcement; like the other two it now leaves `stage` unset, which Supervisor reads as
+  `stable` (see CI section).
 
   Three rules that are easy to break, all covered by tests:
   1. **Every emitted URL must be relative** — ingress strips its prefix and does not pass it on (see
