@@ -176,8 +176,13 @@ async def _apply_mode(host: str, port: int, password: str, mode: str) -> dict:
     client = await _open(host, port, password)
     try:
         await _authenticate(client, host, port)
+        # A false return means the client answered <unauthorized/>, the only refusal the library
+        # reports this way. It should not happen after the authentication above succeeded, so if it
+        # ever does the message needs to say what was actually refused rather than invent a cause.
         if not await client.set_run_mode(MODES[mode], PERMANENT):
-            raise AuthenticationFailed('The BOINC client refused to change the mode')
+            raise AuthenticationFailed(
+                'The BOINC client treated the change as unauthorised'
+            )
         # Read back over the same connection, so the page shows the new mode immediately rather
         # than looking unchanged until the next poll. The mode is already updated by the time this
         # returns; the suspend reason may not be, because the client recomputes that on its own

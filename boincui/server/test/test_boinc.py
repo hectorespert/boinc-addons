@@ -129,6 +129,10 @@ class FakeBoincClient:
         if self.rejects:
             self.connections_closed += 1
             writer.close()
+            # Waiting for the transport to finish closing, rather than returning on a half-closed
+            # one, which some Python versions report as a ResourceWarning that looks like a leak in
+            # the code under test.
+            await writer.wait_closed()
             return
         try:
             while True:
