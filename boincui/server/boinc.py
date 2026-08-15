@@ -9,7 +9,7 @@ import logging
 
 from pyboinc import init_rpc_client
 from pyboinc.rpc_client import Mode
-from status import describe_activity, describe_mode
+from status import describe_activity, describe_mode, describe_processor
 
 DEFAULT_PORT = 31416
 # BOINC's own client gives up well before this; the point is only that a host which accepts the
@@ -154,11 +154,16 @@ async def _authenticate(client, host: str, port: int) -> None:
 
 async def _read_state(client) -> dict:
     cc_status = await client.get_cc_status()
+    # The processor is read here rather than once per machine at startup, so that a machine which
+    # was switched off when the app started still describes itself as soon as it answers. It is also
+    # why acting on a machine keeps its processor line: an action re-reads the state through here.
+    host_info = await client.get_host_info()
     projects = _as_list(await client.get_project_status())
     results = _as_list(await client.get_results())
     return {
         'activity': describe_activity(cc_status),
         'mode': describe_mode(cc_status),
+        'processor': describe_processor(host_info),
         **_summarise(results, projects),
     }
 

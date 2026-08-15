@@ -19,7 +19,7 @@ URL_ATTRIBUTES = ('href', 'src', 'action', 'formaction')
 
 def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=0,
             projects=(('Example Project', 'https://example.org/'),), activity='Computing',
-            mode='auto'):
+            mode='auto', processor=None):
     return {
         'name': name,
         'host': 'pc.local',
@@ -28,6 +28,7 @@ def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=
         'state': None if error else {
             'activity': activity,
             'mode': mode,
+            'processor': processor,
             'running': list(running),
             'queued': queued,
             'ready_to_report': ready,
@@ -171,6 +172,20 @@ class TestStates(unittest.TestCase):
         page = self.page_for(snapshot_of(machine(activity='Paused — the processor is busy with something else')))
 
         self.assertIn('the processor is busy', page)
+
+    def test_should_show_the_processor_under_the_machines_name(self):
+        page = self.page_for(snapshot_of(machine(name='attic pc', processor='AMD Ryzen 5 · 12 cores')))
+
+        self.assertIn('AMD Ryzen 5 · 12 cores', page)
+        self.assertLess(page.index('attic pc'), page.index('AMD Ryzen 5'))
+
+    def test_should_leave_out_the_processor_line_when_the_machine_did_not_report_one(self):
+        # A client that will not describe its hardware still gets a complete machine section: the
+        # line is simply absent, rather than a heading with nothing under it.
+        page = self.page_for(snapshot_of(machine(processor=None)))
+
+        self.assertNotIn('class="muted processor"', page)
+        self.assertIn('Computing', page)
 
     def test_should_report_each_failure_kind_against_its_own_machine(self):
         for kind, expected in (

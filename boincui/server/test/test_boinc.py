@@ -57,6 +57,21 @@ NO_PROJECTS = '<boinc_gui_rpc_reply>\n<projects>\n</projects>\n</boinc_gui_rpc_r
 NO_TASKS = results_reply()
 
 
+def host_info_reply(*fields: str) -> str:
+    return ('<boinc_gui_rpc_reply>\n<host_info>\n' + '\n'.join(fields)
+            + '\n</host_info>\n</boinc_gui_rpc_reply>')
+
+
+# The model carries BOINC's own CPUID decoding, exactly as a real Linux client sends it.
+HOST_INFO = host_info_reply(
+    '<p_vendor>GenuineIntel</p_vendor>',
+    '<p_model>Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz [Family 6 Model 158 Stepping 10]</p_model>',
+    '<p_ncpus>12</p_ncpus>',
+)
+
+NO_HOST_INFO = host_info_reply()
+
+
 def cc_status(mode=2, suspend_reason=0, perm=None):
     return (f'<boinc_gui_rpc_reply>\n<cc_status>\n<task_mode>{mode}</task_mode>\n'
             f'<task_mode_perm>{mode if perm is None else perm}</task_mode_perm>\n'
@@ -71,11 +86,13 @@ class FakeBoincClient:
     and <auth2> is accepted only when it carries md5(nonce + password).
     """
 
-    def __init__(self, password=PASSWORD, tasks=None, projects=PROJECTS, status=None, rejects=False):
+    def __init__(self, password=PASSWORD, tasks=None, projects=PROJECTS, status=None,
+                 host_info=HOST_INFO, rejects=False):
         self.password = password
         self.tasks = tasks if tasks is not None else results_reply(running_task())
         self.projects = projects
         self.status = status if status is not None else cc_status()
+        self.host_info = host_info
         # A client that accepts the connection and then hangs up, which is what BOINC does to a
         # caller missing from its allowed list -- it checks the address only after accepting.
         self.rejects = rejects
@@ -146,6 +163,8 @@ class FakeBoincClient:
                     reply = f'<boinc_gui_rpc_reply>\n<{tag}/>\n</boinc_gui_rpc_reply>'
                 elif '<get_cc_status' in request:
                     reply = self.status
+                elif '<get_host_info' in request:
+                    reply = self.host_info
                 elif '<get_project_status' in request:
                     reply = self.projects
                 elif '<get_results' in request:
@@ -236,6 +255,41 @@ class TestSingleClient(unittest.TestCase):
 
         self.assertIn('Paused', state['activity'])
         self.assertIn('did not say why', state['activity'])
+
+    def test_should_describe_the_processor_without_boincs_cpuid_decoding(self):
+        with FakeBoincClient() as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual('Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz · 12\u00a0cores', state['processor'])
+
+    def test_should_fall_back_to_the_vendor_when_the_client_reports_no_model(self):
+        info = host_info_reply('<p_vendor>AuthenticAMD</p_vendor>', '<p_ncpus>1</p_ncpus>')
+        with FakeBoincClient(host_info=info) as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual('AuthenticAMD · 1\u00a0core', state['processor'])
+
+    def test_should_fall_back_to_the_vendor_when_the_model_is_only_a_cpuid(self):
+        # Not hypothetical: this is exactly what a real client on Apple Silicon reports, so stripping
+        # the decoding without falling back would leave the machine with no processor at all.
+        info = host_info_reply(
+            '<p_vendor>ARM</p_vendor>',
+            '<p_model>[Impl 0x61 Arch 8 Variant 0x0 Part 0x000 Rev 0]</p_model>',
+            '<p_ncpus>14</p_ncpus>',
+        )
+        with FakeBoincClient(host_info=info) as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual('ARM · 14\u00a0cores', state['processor'])
+
+    def test_should_leave_out_the_processor_when_the_client_does_not_describe_it(self):
+        # An empty reply comes back as the string "\n", not a dict, and is not an error: the page
+        # simply has no processor line to show.
+        with FakeBoincClient(host_info=NO_HOST_INFO) as server:
+            machine = self.read_one(server)
+
+        self.assertIsNone(machine['error'])
+        self.assertIsNone(machine['state']['processor'])
 
     def test_should_report_a_rejected_password_rather_than_empty_data(self):
         # The library does not check authorisation on its query methods, so without our explicit
@@ -363,6 +417,8 @@ class TestActivityMode(unittest.TestCase):
         self.assertEqual('machine', machine['name'])
         self.assertEqual(1, len(machine['state']['running']))
         self.assertEqual(['Example Project'], [p['name'] for p in machine['state']['projects']])
+        # Without this the processor line would vanish the moment someone pressed an activity button.
+        self.assertIn('i7-8700', machine['state']['processor'])
 
     def test_should_follow_the_permanent_mode_not_a_temporary_one(self):
         # A temporary mode set from BOINC Manager reverts on its own, so highlighting it would mark

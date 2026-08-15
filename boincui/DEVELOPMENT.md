@@ -225,6 +225,67 @@ Two declarations look redundant and are not. `max-width` alongside the flex basi
 contributes its full 8rem to the table's minimum width and the page scrolls sideways on a phone.
 `min-width: 2rem`: it is the floor the bar shrinks to before the line gives up and wraps.
 
+## A machine says which processor it is, and nothing else about its hardware
+
+The name of a machine is whatever its owner typed — *attic pc* says nothing about what it is. One
+line under it, from `get_host_info`, does: the processor and its core count. It also explains the
+numbers below it, since the running tasks are normally one per core.
+
+**Everything else `host_info` offers was left out on purpose.** Memory, disk, OS version, GPUs and
+the benchmark figures are a hardware sheet, and BOINC Manager already has a whole *Computer info*
+panel for that. This page is read at a glance; a second machine has to fit on the screen beside the
+first one.
+
+**There is no live processor usage in this RPC, and no amount of design gets one.** `host_info` is a
+static description plus stored benchmark results — GUI RPC exposes no utilisation percentage at all.
+The nearest honest answer is the running-task count the page already shows.
+
+**The core count is the computer's, not BOINC's allowance.** A client held to half the processor by
+`max_ncpus` still reports every core here, so a machine can legitimately say *14 cores* with four
+tasks running. Making the two agree would mean reporting a different number than every other BOINC
+tool shows for that machine.
+
+### BOINC's CPUID decoding is stripped, and the vendor is what saves the line
+
+`get_processor_info` (`lib/hostinfo.cpp`) appends its own reading of the CPUID to the model:
+
+```
+Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz [Family 6 Model 158 Stepping 10]
+```
+
+That bracket roughly doubles the length of the line and means nothing to the reader, so it goes.
+
+What makes the fallback to `p_vendor` load-bearing rather than defensive is that **on some machines
+the model is nothing but the bracket**. Verified against a real client on Apple Silicon:
+
+```
+#CPUS: 14
+CPU vendor: ARM
+CPU model: [Impl 0x61 Arch 8 Variant 0x0 Part 0x000 Rev 0]
+```
+
+Stripping without falling back would have left that machine with no processor at all. It now reads
+*ARM · 14 cores*. The vendor is a fallback and not a second part of the line because on a machine
+that does name its processor the model already opens with the readable form of the vendor — *Intel(R)
+Core(TM)* — and `GenuineIntel` in front of it is noise.
+
+### The core count is joined by a non-breaking space
+
+A full Intel model name plus the count does not fit one column on a phone, and measured at 390px it
+broke in the worst possible place — *Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz · 12* / *cores*. A
+non-breaking space inside `12 cores` moves the only available break to the separator, so the second
+line reads *12 cores* whole. The line still wraps; it now wraps somewhere that reads.
+
+### It is read in the poll, and left out when it is missing
+
+`get_host_info` is a fourth call in `_read_state`, not a one-off at startup. Two things follow: a
+machine that was switched off when the app started describes itself as soon as it answers, and an
+activity change keeps its processor line, because an action re-reads state through the same function.
+
+A client that says nothing usable — or answers this request with `<unauthorized/>`, which the library
+turns into `True` rather than a dict — gets no line rather than a heading with nothing under it. It
+is not an error worth a message on a status page.
+
 ## Only running tasks are listed
 
 `get_results()` returns every task. A machine with a normal work buffer has dozens, which is

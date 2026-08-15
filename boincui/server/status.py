@@ -5,6 +5,8 @@ The tables come from the client's own source so the wording matches what BOINC s
 `lib/common_defs.h`.
 """
 
+import re
+
 # BOINC looks these up with an exact `switch`, not bit tests, and that is deliberate: the values
 # look like flags up to 4096, but 4097 onwards are sequential and would collide with combinations
 # (4097 == 4096 | 1). Matching on the exact value is the only correct reading.
@@ -51,6 +53,11 @@ MODE_KEYS = {
     RUN_MODE_NEVER: 'never',
 }
 
+# BOINC appends its own decoding of the CPUID to the model string -- e.g. "Intel(R) Core(TM) i7-8700
+# CPU @ 3.20GHz [Family 6 Model 158 Stepping 10]" (`get_processor_info`, lib/hostinfo.cpp). It
+# roughly doubles the length of the line and says nothing to someone glancing at a status page.
+_CPUID_SUFFIX = re.compile(r'\s*\[[^]]*]\s*$')
+
 
 def describe_activity(cc_status: dict | None) -> str:
     """One line saying whether the client is computing, and if not, why not.
@@ -69,6 +76,43 @@ def describe_activity(cc_status: dict | None) -> str:
         # suspend reason, which it does on its own cycle rather than when the mode is set.
         return 'Paused — someone asked it to stop'
     return 'Computing'
+
+
+def describe_processor(host_info) -> str | None:
+    """The machine's processor in one line, e.g. "ARM · 14 cores".
+
+    Returns None when the client described nothing usable, so the page can leave the line out
+    instead of printing a heading with no information under it.
+
+    `host_info` is whatever the library made of the reply, which is not always a dict: a
+    self-closing tag becomes `True` and an empty one a bare string. A client that will not answer
+    this request is not an error worth reporting on a status page, so it takes the same path as one
+    that answers without saying anything.
+    """
+    if not isinstance(host_info, dict):
+        return None
+
+    model = _CPUID_SUFFIX.sub('', str(host_info.get('p_model') or '')).strip()
+    # The vendor is a fallback rather than a second part of the line: it holds the CPUID string
+    # ("GenuineIntel", "AuthenticAMD", "ARM"), and a model already begins with the readable form of
+    # it. It is needed because on some machines the model is nothing *but* the decoding stripped
+    # above -- an Apple Silicon host reports "[Impl 0x61 Arch 8 Variant 0x0 Part 0x000 Rev 0]" and
+    # no name at all, verified against a real client -- which leaves the vendor as the only readable
+    # thing on offer.
+    if not model:
+        model = str(host_info.get('p_vendor') or '').strip()
+    parts = [model] if model else []
+
+    cores = host_info.get('p_ncpus')
+    # `True` is what the library makes of a self-closing tag, and it counts as an int here: without
+    # excluding it, a client that sends `<p_ncpus/>` would be reported as having one core.
+    if isinstance(cores, int) and not isinstance(cores, bool) and cores > 0:
+        # A non-breaking space, because a long model name wraps this line on a phone and the count is
+        # where it broke: "Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz · 12" / "cores". The line may
+        # still wrap, now only at the separator, which leaves the count whole on the second line.
+        parts.append(f'{cores}\N{NO-BREAK SPACE}core{"s" if cores > 1 else ""}')
+
+    return ' · '.join(parts) or None
 
 
 def describe_mode(cc_status: dict | None) -> str | None:
