@@ -47,12 +47,23 @@ findings measured directly against the Supervisor in `.devcontainer`.
   on the running add-on reports `/config rw=false`), so the switch would not change access when it
   eventually happens.
 
-- [ ] **`account_manager_url` is typed `str?` when the schema language has a `url` type.**
-  `boinc/config.yaml:21`. The `url` type exists (`supervisor/apps/options.py:25`) and gives
-  validation in the Supervisor UI instead of a runtime error from `boinccmd --acct_mgr attach`.
-  Same category: `remote_hosts` entries are `- "str?"`, and `?` marks optional *fields*, not
-  optional element types, so on a list element it likely means nothing — verify against Supervisor
-  before changing it to `- "str"`.
+- [x] **Option types — closed 2026-08-15, both halves.** The first half was already **stale**:
+  `account_manager_url` has been `url?` since 3.9.1, not `str?` as this item claimed.
+  The second half is now measured against a running Supervisor rather than guessed. `remote_hosts`
+  keeps `- "str?"`, and changing it to `- "str"` would demonstrate nothing:
+  - The element **type is enforced either way** — `remote_hosts: [1234]` is rejected with
+    `expected str`.
+  - The `?` does **not** make elements nullable — `remote_hosts: [null]` is rejected, and with a
+    confusing message at that: `Missing required option 'remote_hosts'`, i.e. Supervisor reads a
+    null first element as the option being absent rather than as a bad element.
+  - The option itself is optional regardless: options posted with no `remote_hosts` key are
+    accepted.
+  Related and worth keeping in mind for any future list option: a list of dicts is the opposite —
+  posting options **without** `projects` is rejected with `Missing option 'projects' in root`, which
+  is exactly why `config.yaml` must carry `options: projects: []`. Verified that this does not break
+  existing installs: a real 3.9.1 install with five options and no `projects` key, updated in place
+  with `ha apps update`, came up `started` with every option preserved and `projects: []` filled in
+  from the schema default.
 
 - [ ] **`build.yaml` itself is deprecated.** Supervisor, on every store scan: `App local_boinc uses
   build.yaml which is deprecated. Move build parameters into the Dockerfile directly.` Both
@@ -282,10 +293,9 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 
 ## Housekeeping
 
-- [ ] **`boinccmd.py:51` has a vestigial `while not current_account_manager_read:` loop** that always
-  runs exactly once, because its body either returns or sets the flag. Probably a retry loop that
-  lost its retry. Noticed while removing the `sleep(10)` next to it in 3.10.0 and deliberately left
-  alone to keep that change small.
+- [x] **`boinccmd.py`'s vestigial `while not current_account_manager_read:` loop** — removed in
+  3.10.0. It always ran exactly once, because its body either returned or set the flag; probably a
+  retry loop that lost its retry.
 
 - [ ] `boinc/apparmor.txt.disable` is unmodified add-on template boilerplate (references
   `/etc/services.d`, `/etc/cont-init.d`, bashio, s6-overlay `/init`) — none of which this add-on

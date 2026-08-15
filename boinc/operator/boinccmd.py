@@ -44,21 +44,16 @@ def sync_account_manager(data_folder: str) -> bool:
 
 def configure_boinc_projects(data_folder: str, account_manager_url: str | None, account_manager_username: str | None, account_manager_password: str | None) -> bool:
 
-    current_account_manager_url = None
-    current_account_manager_read = False
+    result = subprocess.run(["boinccmd", "--acct_mgr", "info"], capture_output=True, text=True, cwd=data_folder)
+    if result.returncode != 0:
+        logging.error(f'Failed to get account manager information: {result.stderr}')
+        return False
 
-    while not current_account_manager_read:
-        result = subprocess.run(["boinccmd", "--acct_mgr", "info"], capture_output=True, text=True, cwd=data_folder)
-        if result.returncode != 0:
-            logging.error(f'Failed to get account manager information: {result.stderr}')
-            return False
+    logging.debug(f'{result.stdout}')
 
-        logging.debug(f'{result.stdout}')
-
-        match = re.search(r'URL: (\S+)', result.stdout)
-        current_account_manager_url = match.group(1) if match else None
-        logging.info(f'Current account manager {current_account_manager_url}')
-        current_account_manager_read = True
+    match = re.search(r'URL: (\S+)', result.stdout)
+    current_account_manager_url = match.group(1) if match else None
+    logging.info(f'Current account manager {current_account_manager_url}')
 
     if any([account_manager_url, account_manager_username, account_manager_password]) and not all([account_manager_url, account_manager_username, account_manager_password]):
         # Half an account manager has no safe reading: attaching is impossible, and carrying on

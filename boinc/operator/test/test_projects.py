@@ -158,6 +158,21 @@ class ConfigureProjectsTestCase(unittest.TestCase):
         self.assertEqual(self.managed_state(), {MANAGED_ATTACHED: [EINSTEIN], MANAGED_DETACHING: []})
 
     @patch('projects.subprocess.run')
+    def test_should_keep_a_project_managed_when_its_detach_fails(self, run):
+        # The detach flag cannot be read back from the client, so dropping the project from the
+        # state file here would leave it attached with nothing left to ask about it ever again.
+        run.side_effect = [project_status(EINSTEIN, ROSETTA), completed(returncode=1)]
+        self.write_managed_state(attached=[EINSTEIN, ROSETTA])
+
+        self.assertEqual(configure_projects(self.data_folder, configured(EINSTEIN)), [])
+
+        self.assertEqual(executed_commands(run), [
+            ['--get_project_status'],
+            ['--project', ROSETTA, 'detach_when_done'],
+        ])
+        self.assertEqual(self.managed_state(), {MANAGED_ATTACHED: [EINSTEIN], MANAGED_DETACHING: [ROSETTA]})
+
+    @patch('projects.subprocess.run')
     def test_should_keep_asking_for_a_detach_until_the_client_lets_the_project_go(self, run):
         run.side_effect = [project_status(ROSETTA), completed()]
         self.write_managed_state(detaching=[ROSETTA])
