@@ -563,6 +563,15 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     canonicalization, removal → `detach_when_done`, a project attached by hand left untouched, the
     state file self-healing once the client lets a project go, re-add re-attaching, and the account
     manager conflict exiting 1 without starting BOINC.
+  - **And against a real Supervisor** (`supervisor.sh`, 2026-08-15), which is the half CI cannot
+    see. Supervisor parses the option as `type: schema`, `multiple: true`, with `url` carrying
+    `format: url` and `account_key` `format: password`; both translations render; the
+    `options: projects: []` default lets a fresh install validate; and **the schema rejects at
+    tier 1**, before the container starts, with the message shown in the UI — `expected a URL` for a
+    malformed address and `Missing option 'account_key' in projects` for a half-filled entry. The
+    runtime conflict then reports **`state: error`**, not the `stopped` the 3.8.4 note predicted;
+    that note describes a failure minutes into a run, while this one exits within a second of start,
+    so the two are not necessarily in conflict — but a fast hard failure is visibly an error.
 
 - [x] **`sleep(10)` between detaching and attaching an account manager — deleted, not shortened.**
   BOINC's `--acct_mgr detach` is `rpc.acct_mgr_rpc("", "", "")`, a single synchronous RPC
