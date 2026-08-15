@@ -126,9 +126,15 @@ findings measured directly against the Supervisor in `.devcontainer`.
   slow and fragile. Realistic middle ground: keep it a documented manual step before releasing a
   change to `config.yaml`/`build.yaml`/`translations/`, and revisit a nightly (not per-PR) job.
 
-- [ ] **`supervisor.sh install <addon>` fails with `App … is already installed`** instead of
-  reinstalling, so every iteration needs a manual uninstall first. Small quality-of-life fix in the
-  driver, noticed while verifying the changes above.
+- [x] **`supervisor.sh install <addon>` fails with `App … is already installed`** — fixed
+  2026-08-15: it uninstalls first, which is also the only way to make Supervisor re-read
+  `config.yaml` and `translations/`, since it snapshots them into `apps.json` at install time. Note
+  the uninstall discards the app's `/data`, so an *upgrade* still has to be tested by bumping the
+  version and running `ha apps update` by hand.
+  Fixed alongside it, found the same day: `up` treated an existing-but-stopped container as running
+  (`docker inspect` succeeds for a stopped one) and then died on `docker exec`; and after an unclean
+  stop `supervisor_run` gives up on a stale `/var/run/docker.pid`, so `up` now clears it and starts
+  `dockerd` itself. Between them, the documented recovery for gotcha 6 actually works unattended.
 
 ## Config schema — breaking redesign, for a future major
 
