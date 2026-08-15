@@ -42,6 +42,12 @@ app's. If it refuses the connection, that is the address to put in its list of a
 Each machine gets its own section, showing whether it is computing and, when it is not, why — being
 outside its allowed hours and the processor being busy are the usual reasons.
 
+Under the name is the processor that machine runs on and how many cores it has, which is handy when
+several machines are listed and their names do not say what they are. That is the number of cores the
+computer has, not how many BOINC is allowed to use, so a machine limited to part of its processor
+runs fewer tasks than it has cores. A machine that does not report its processor simply has no such
+line.
+
 The table lists only the tasks running at that moment, which is normally one per processor core. A
 line above it counts the rest: **waiting** are downloaded and queued, **finished** are done and
 waiting to be sent back. To see the full queue, use the **boinctui** app.

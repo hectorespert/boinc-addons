@@ -51,6 +51,9 @@
   }
   .machine.problem { opacity: 0.85; }
   .machine h2 { font-size: 1.15rem; margin: 0; }
+  /* Part of the heading block rather than a paragraph of its own: it says which computer this is,
+     which is the same job the name above it does. */
+  .processor { margin: 0.1rem 0 0.35rem; }
   .status { margin: 0.15rem 0; }
   .counts { font-size: 0.9rem; opacity: 0.75; margin: 0.15rem 0 0.75rem; }
   .card {
@@ -182,6 +185,9 @@ computing.</p>
     <p class="status"><strong>Something went wrong.</strong> {{ machine.error }}</p>
 
     {% else %}
+    {% if machine.state.processor %}
+    <p class="muted processor">{{ machine.state.processor }}</p>
+    {% endif %}
     <p class="status">{{ machine.state.activity }}</p>
 
     <form method="post" action="mode" class="activity">

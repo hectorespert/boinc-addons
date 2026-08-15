@@ -1,5 +1,5 @@
 name: BOINC UI
-version: "1.1.0"
+version: "1.2.0"
 slug: boincui
 description: Graphical web interface to monitor and control the BOINC client
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boincui"

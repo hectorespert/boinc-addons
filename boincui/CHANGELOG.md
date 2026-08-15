@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+Each machine now shows the processor it runs on and how many cores it has, under its name — useful when you have several and their names do not say what they are
+
+That is how many cores the computer has, not how many BOINC is allowed to use, so a machine limited to part of its processor runs fewer tasks than it has cores. A machine that does not report its processor is shown exactly as before
+
 ## 1.1.0
 
 On a computer screen your machines now sit side by side, up to three across, instead of in one narrow column with empty space either side of it. Several machines fit without scrolling
