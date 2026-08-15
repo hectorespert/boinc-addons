@@ -47,24 +47,6 @@ findings measured directly against the Supervisor in `.devcontainer`.
   on the running add-on reports `/config rw=false`), so the switch would not change access when it
   eventually happens.
 
-- [x] **Option types — closed 2026-08-15, both halves.** The first half was already **stale**:
-  `account_manager_url` has been `url?` since 3.9.1, not `str?` as this item claimed.
-  The second half is now measured against a running Supervisor rather than guessed. `remote_hosts`
-  keeps `- "str?"`, and changing it to `- "str"` would demonstrate nothing:
-  - The element **type is enforced either way** — `remote_hosts: [1234]` is rejected with
-    `expected str`.
-  - The `?` does **not** make elements nullable — `remote_hosts: [null]` is rejected, and with a
-    confusing message at that: `Missing required option 'remote_hosts'`, i.e. Supervisor reads a
-    null first element as the option being absent rather than as a bad element.
-  - The option itself is optional regardless: options posted with no `remote_hosts` key are
-    accepted.
-  Related and worth keeping in mind for any future list option: a list of dicts is the opposite —
-  posting options **without** `projects` is rejected with `Missing option 'projects' in root`, which
-  is exactly why `config.yaml` must carry `options: projects: []`. Verified that this does not break
-  existing installs: a real 3.9.1 install with five options and no `projects` key, updated in place
-  with `ha apps update`, came up `started` with every option preserved and `projects: []` filled in
-  from the schema default.
-
 - [ ] **`build.yaml` itself is deprecated.** Supervisor, on every store scan: `App local_boinc uses
   build.yaml which is deprecated. Move build parameters into the Dockerfile directly.` Both
   add-ons still ship one. This does **not** compose with simply deleting the file: Supervisor passes
@@ -90,6 +72,32 @@ findings measured directly against the Supervisor in `.devcontainer`.
   architectures by name (`amd64`, `aarch64`), so a new arch needs that `case` extended.
 
 ### Confirmed correct — checked, no action needed
+
+- **Option types are right as they stand, and the old item about them was half stale (2026-08-15).**
+  `account_manager_url` has been `url?` since 3.9.1, not the `str?` that item claimed. The other
+  half is now measured against a running Supervisor rather than guessed: `remote_hosts` keeps
+  `- "str?"`, because changing it to `- "str"` would demonstrate nothing. The element type is
+  enforced either way (`[1234]` → `expected str`); the `?` does not make elements nullable
+  (`[null]` is rejected, confusingly, as `Missing required option 'remote_hosts'` — Supervisor reads
+  a null first element as the option being absent); and the option is optional regardless, since
+  options posted with no `remote_hosts` key are accepted.
+  **A list of *dicts* behaves the opposite way**, which is worth knowing before adding another one:
+  options posted without `projects` are rejected with `Missing option 'projects' in root`, hence the
+  mandatory `options: projects: []` in `config.yaml`. That does not break existing installs —
+  verified by updating a real 3.9.1 install with five options and no `projects` key in place with
+  `ha apps update`: it came up `started`, every option preserved, `projects: []` filled in from the
+  schema default.
+- **The Dockerfile labels already agree; that item was stale too (2026-08-15).** It described
+  `image.vendor` disagreeing between add-ons, three spellings of the licence, and `image.url`
+  pointing at the repo in one place and the docs site in another. None of it is true now: the three
+  `LABEL` blocks are identical apart from the add-on's own name, every `licenses` is the SPDX
+  `Apache-2.0` in both the Dockerfiles and the `build.yaml` files, `vendor` is "Hector Espert"
+  everywhere and `url` is the docs site everywhere. The only place those old spellings survived was
+  the TODO entry describing them.
+  One real difference is left and it belongs to the `build.yaml` item above, not here: the
+  `build.yaml` labels use their own title and description ("Boinc add-on") and hardcode `source`,
+  where the Dockerfile uses `${BUILD_REPOSITORY}`. Worth settling *if* `build.yaml` survives; there
+  is no point tidying a file slated for removal.
 
 - **Every permission this repo requests is now explained to the user.** `host_pid`/`host_uts` by the
   Protection Mode warning, and `video`/`docker_api` by the *What else this app asks for* section
@@ -168,16 +176,6 @@ findings measured directly against the Supervisor in `.devcontainer`.
   docker-in-docker needs `--privileged`, a TTY, a health-check override and a ~2GB pull, so it is
   slow and fragile. Realistic middle ground: keep it a documented manual step before releasing a
   change to `config.yaml`/`build.yaml`/`translations/`, and revisit a nightly (not per-PR) job.
-
-- [x] **`supervisor.sh install <addon>` fails with `App … is already installed`** — fixed
-  2026-08-15: it uninstalls first, which is also the only way to make Supervisor re-read
-  `config.yaml` and `translations/`, since it snapshots them into `apps.json` at install time. Note
-  the uninstall discards the app's `/data`, so an *upgrade* still has to be tested by bumping the
-  version and running `ha apps update` by hand.
-  Fixed alongside it, found the same day: `up` treated an existing-but-stopped container as running
-  (`docker inspect` succeeds for a stopped one) and then died on `docker exec`; and after an unclean
-  stop `supervisor_run` gives up on a stale `/var/run/docker.pid`, so `up` now clears it and starts
-  `dockerd` itself. Between them, the documented recovery for gotcha 6 actually works unattended.
 
 ## Config schema — breaking redesign, for a future major
 
@@ -325,20 +323,14 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 
 ## Housekeeping
 
-- [x] **`boinccmd.py`'s vestigial `while not current_account_manager_read:` loop** — removed in
-  3.10.0. It always ran exactly once, because its body either returned or set the flag; probably a
-  retry loop that lost its retry.
 
 - [ ] `boinc/apparmor.txt.disable` is unmodified add-on template boilerplate (references
   `/etc/services.d`, `/etc/cont-init.d`, bashio, s6-overlay `/init`) — none of which this add-on
   uses; its entrypoint is a plain `python3 /opt/operator/main.py`. Inert today (`apparmor: false`),
   but it would need a full rewrite, not just re-enabling. Either rewrite it to match the real
   process tree or delete it so it does not mislead a future contributor.
-- [ ] The Dockerfile labels disagree between add-ons without reason: `image.vendor` is
-  "Hector Espert" in one and "Home Assistant Boinc Add-ons" in the other; `image.licenses` is
-  "Apache 2.0", "Apache2" and "Apache License 2.0" depending on where you look, counting the
-  `build.yaml` files; and `image.url` points at the repo in one and the docs site in the other.
-  Pick one set — SPDX `Apache-2.0`, vendor "Hector Espert", the docs site — and apply it to both.
+- The Dockerfile labels item was **stale and is closed** — see *Confirmed correct* under
+  Conformance. They already agree across all three add-ons.
 
 ---
 
@@ -643,6 +635,10 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     that note describes a failure minutes into a run, while this one exits within a second of start,
     so the two are not necessarily in conflict — but a fast hard failure is visibly an error.
 
+- [x] **`boinccmd.py`'s vestigial `while not current_account_manager_read:` loop — removed.** It
+  always ran exactly once, since its body either returned or set the flag; probably a retry loop
+  that lost its retry. Found next to the `sleep(10)` below.
+
 - [x] **`sleep(10)` between detaching and attaching an account manager — deleted, not shortened.**
   BOINC's `--acct_mgr detach` is `rpc.acct_mgr_rpc("", "", "")`, a single synchronous RPC
   (`client/boinc_cmd.cpp`); only `attach` and `sync` poll, and they do it inside `boinccmd`. So the
@@ -652,6 +648,24 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
   attach against a dead client and a **misleading `exit 1`**. `main.py` now re-checks for a stop
   *after* `configure_boinc_projects` returns, not only before calling it — the same distinction
   3.8.5 drew for a stop during initialization.
+
+## Shipped alongside `boinc` 3.10.0 — repo tooling, not an add-on
+
+- [x] **`supervisor.sh` could not be run twice (2026-08-15).** Three failures, all hit while
+  validating the `projects` schema against a real Supervisor:
+  - `install <addon>` refused with `App … is already installed`, so every iteration needed a manual
+    uninstall. It uninstalls first now — which is also the only way to make Supervisor re-read
+    `config.yaml` and `translations/`, since it snapshots them into `apps.json` at install time.
+    **That discards the app's `/data`**, so an *upgrade* still has to be tested by bumping the
+    version and running `ha apps update` by hand, which is how the 3.9.1 → 3.10.0 check above ran.
+  - `up` treated an existing-but-stopped container as running, because `docker inspect` succeeds for
+    a stopped one, and then died on the first `docker exec`.
+  - After an unclean stop, `supervisor_run` reads a stale `/var/run/docker.pid`, concludes dockerd
+    is up, fails to connect and gives up — leaving only `Cannot connect to the Docker daemon` and a
+    `SIGTERM` aimed at a pid from the previous boot. `up` now clears that pidfile and starts dockerd
+    itself.
+
+  Between them, the recovery that gotcha 6 in `SKILL.md` documents actually works unattended now.
 
 ## Shipped as `boincui`, 0.1.0 → 1.0.0
 
