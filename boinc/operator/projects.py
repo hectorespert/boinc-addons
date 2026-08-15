@@ -17,12 +17,6 @@ MANAGED_STATE_FILE = '.managed_projects.json'
 MANAGED_ATTACHED = 'attached'
 MANAGED_DETACHING = 'detaching'
 
-# Backoff for a project whose attach failed, in seconds. Attaching is a local RPC, so this covers a
-# client that is not answering yet rather than a project that is down -- the client retries the
-# project's own scheduler by itself, indefinitely, and does it better than the operator could.
-RETRY_INITIAL_DELAY = 30
-RETRY_MAX_DELAY = 1800
-
 
 def run_boinccmd(data_folder: str, arguments: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(["boinccmd", *arguments], capture_output=True, text=True, cwd=data_folder)
@@ -115,7 +109,7 @@ def attach_project(data_folder: str, url: str, account_key: str) -> bool:
     logging.info(f'Attaching project {url}')
     result = run_boinccmd(data_folder, ["--project_attach", url, account_key])
     if result.returncode != 0:
-        logging.warning(f'Failed to attach project {url}, retrying later: {result.stderr.strip() or result.stdout.strip()}')
+        logging.warning(f'Failed to attach project {url}, it will be attempted again when the app restarts: {result.stderr.strip() or result.stdout.strip()}')
         return False
 
     logging.debug(result.stdout)
@@ -133,7 +127,8 @@ def project_operation(data_folder: str, url: str, operation: str) -> bool:
 
 def configure_projects(data_folder: str, projects: list[dict] | None) -> list[str]:
     """Reconcile the attached projects against the configured ones, returning the projects that
-    still need attaching so the caller can try them again later."""
+    could not be attached. Reconciling happens once per start, so that list is what to report
+    rather than what to retry: nothing else will act on it until the app restarts."""
     desired = {canonicalize_url(project['url']): project['account_key'] for project in projects or []}
     managed = read_managed_state(data_folder)
 
@@ -145,7 +140,7 @@ def configure_projects(data_folder: str, projects: list[dict] | None) -> list[st
     statuses = read_attached_projects(data_folder)
     if statuses is None:
         # Without the current state there is no diff to compute, and acting blind could attach a
-        # project twice or detach one the operator does not own. Try the whole thing again later.
+        # project twice or detach one the operator does not own. Nothing configured got applied.
         return sorted(desired)
 
     # A project an account manager attached belongs to the account manager, which re-asserts its

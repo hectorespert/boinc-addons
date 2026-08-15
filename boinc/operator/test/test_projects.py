@@ -220,7 +220,9 @@ class ConfigureProjectsTestCase(unittest.TestCase):
         self.assertEqual(self.managed_state(), {MANAGED_ATTACHED: [], MANAGED_DETACHING: []})
 
     @patch('projects.subprocess.run')
-    def test_should_report_a_project_it_could_not_attach_for_a_later_retry(self, run):
+    def test_should_report_a_project_it_could_not_attach(self, run):
+        # Reported rather than retried: nothing acts on this until the app restarts, so it has to
+        # reach the log where the user can see it.
         run.side_effect = [project_status(), completed(returncode=1)]
 
         self.assertEqual(configure_projects(self.data_folder, configured(EINSTEIN)), [EINSTEIN])
@@ -243,7 +245,7 @@ class ConfigureProjectsTestCase(unittest.TestCase):
         self.assertEqual(self.managed_state(), {MANAGED_ATTACHED: [EINSTEIN], MANAGED_DETACHING: []})
 
     @patch('projects.subprocess.run')
-    def test_should_retry_everything_when_the_client_cannot_be_asked(self, run):
+    def test_should_report_everything_when_the_client_cannot_be_asked(self, run):
         # Without the current state there is no diff to compute, and acting blind could attach a
         # project twice or detach one the operator does not own.
         run.side_effect = [completed(returncode=1)]

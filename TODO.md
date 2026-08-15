@@ -543,17 +543,22 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     have a detach fire silently days later. Re-adding sends `dont_detach_when_done` **and**
     `allowmorework`; BOINC's source pairs the two, but that pairing was the one thing not verified
     live, so it is asserted explicitly instead of assumed.
-  - **The retry loop earns much less than expected.** `--project_attach` is a *local* RPC that
-    returns instantly and persists even against an unresolvable host — the client then retries the
-    project's own scheduler by itself, indefinitely. So "the project is down" was never the
-    operator's problem. What remains is a bounded backoff (30s → 30min) for a client that is not
-    answering yet, run from the loop that already watches the client rather than a thread.
-  - **No background thread, and the main loop stopped polling.** A thread only earns its place if
-    the attach can block on the network, and it cannot. The wait loop is now `boinc_process.wait()`:
-    in CPython 3.13, `wait()` with no timeout is a blocking `waitpid()`, while `wait(timeout=...)` is
-    an explicit busy loop sleeping up to 50 ms — *worse* than the `sleep(0.5)` it replaced. The
-    operator is now idle in the steady state instead of waking twice a second for the life of the
-    container.
+  - **There is no retry at all, which took two goes to see.** `--project_attach` is a *local* RPC
+    that returns instantly and persists even against an unresolvable host — the client then retries
+    the project's own scheduler by itself, indefinitely. So "the project is down" was never the
+    operator's problem, which left only "the client is not answering yet" — and *that* window is
+    already closed by the initialization loop, since `configure_projects` runs only after
+    `boinccmd --get_state` has succeeded. A bounded backoff was written first and then deleted: it
+    guarded a case that cannot arise. A failed attach is now a warning naming the projects, retried
+    when the app restarts, which is when an options change takes effect anyway.
+  - **No background thread either, and nothing polls after startup.** A thread only earns its place
+    if the attach can block on the network, and it cannot. The wait loop is now a bare
+    `boinc_process.wait()`: in CPython 3.13, `wait()` with no timeout is a blocking `waitpid()`,
+    while `wait(timeout=...)` is an explicit busy loop sleeping up to 50 ms — *worse* than the
+    `sleep(0.5)` it replaced, and the trap waiting for anyone who reintroduces a periodic wake-up
+    here. Measured: the operator sits at `Threads: 1`, `State: S (sleeping)`. The one remaining
+    `sleep` is the initialization loop, which is inherent — it polls another process's readiness,
+    and there is no blocking primitive for that.
   - **Reconciliation runs at startup only.** Home Assistant cannot apply an options change without
     restarting the app, so there is nothing new to read afterwards. A periodic check was rejected
     for a second reason: combined with the re-attach behaviour below it would make BOINC Manager's

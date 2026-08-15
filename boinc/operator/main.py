@@ -5,7 +5,7 @@ import os
 import signal
 import subprocess
 import sys
-from time import monotonic, sleep
+from time import sleep
 
 from boinc import build_boinc_command
 from boinccmd import configure_boinc_projects, get_state
@@ -13,7 +13,7 @@ from cc_config import prepare_cc_config
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
 from gui_rpc_auth import prepare_gui_rpc_auth
-from projects import RETRY_INITIAL_DELAY, RETRY_MAX_DELAY, configure_projects, validate_projects
+from projects import configure_projects, validate_projects
 from redact import redact_secrets
 from remote_hosts import prepare_remote_hosts
 
@@ -99,8 +99,6 @@ while boinc_process.poll() is None and not boinc_process_initialized:
     else:
         logging.debug(f'Waiting for BOINC client to initialize')
 
-pending_projects = []
-
 # A stop requested during initialization (a signal, or the client dying on its own) already means
 # there is nothing left to configure: skipping this avoids running boinccmd against a client that
 # is no longer there to answer it, which would otherwise be misreported as a configuration failure.
@@ -120,7 +118,13 @@ if not stopping_boinc_process and boinc_process.poll() is None:
         sys.exit(1)
 
     if not stopping:
-        pending_projects = configure_projects(data_folder, options.get('projects'))
+        # Reconciling happens once, here: Home Assistant cannot apply an options change without
+        # restarting the app, so there is nothing new to read afterwards. Attaching is a local RPC
+        # against a client that has already answered --get_state, so a failure here is rare enough
+        # that saying so and moving on beats keeping the operator awake to try again.
+        unattached_projects = configure_projects(data_folder, options.get('projects'))
+        if unattached_projects:
+            logging.warning(f'These projects could not be attached and will be attempted again when the app restarts: {", ".join(unattached_projects)}')
 
 if args.exit_immediately:
     logging.warning(f'Exiting immediately after BOINC client is started')
@@ -128,22 +132,11 @@ if args.exit_immediately:
     boinc_process.send_signal(signal.SIGTERM)
     boinc_process.wait()
 
-# Reconciling the configured projects happens once, at startup: Home Assistant cannot apply an
-# options change without restarting the app, so there is nothing new to read afterwards. The only
-# reason left to wake up is an attach that failed, and only until it succeeds.
-retry_delay = RETRY_INITIAL_DELAY
-next_retry = monotonic() + retry_delay
-
-while pending_projects and boinc_process.poll() is None:
-    sleep(0.5)
-    if monotonic() >= next_retry:
-        pending_projects = configure_projects(data_folder, options.get('projects'))
-        retry_delay = min(retry_delay * 2, RETRY_MAX_DELAY)
-        next_retry = monotonic() + retry_delay
-
-# With nothing left to retry, block on the client rather than polling it: wait() with no timeout is
-# a blocking waitpid(), while wait(timeout=...) is a busy loop sleeping up to 50ms a turn -- worse
-# than the sleep(0.5) this replaces. It returns immediately if the client is already gone.
+# Everything is configured by this point, so block on the client rather than polling it. Keep this
+# a bare wait(): with no timeout it is a blocking waitpid(), while wait(timeout=...) is a busy loop
+# sleeping up to 50ms a turn -- worse than the sleep(0.5) it replaced -- so anything that needs to
+# wake up periodically here has to be built some other way. It returns immediately if the client is
+# already gone.
 boinc_process.wait()
 
 logging.debug(f'BOINC client stopped with code {boinc_process.returncode}')
