@@ -1,7 +1,6 @@
 import logging
 import re
 import subprocess
-from time import sleep
 
 from url import canonicalize_url
 
@@ -82,8 +81,10 @@ def configure_boinc_projects(data_folder: str, account_manager_url: str | None, 
             if not result:
                 return False
 
-            sleep(10)
-
+            # Nothing to wait for in between: detach is a single synchronous RPC
+            # (`rpc.acct_mgr_rpc("", "", "")` in client/boinc_cmd.cpp), so the client has already
+            # processed it by the time boinccmd returns. Only attach and sync poll, and they do it
+            # inside boinccmd itself.
             return attach_account_manager(data_folder, account_manager_url, account_manager_username, account_manager_password)
 
     elif current_account_manager_url is not None:
