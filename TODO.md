@@ -13,8 +13,38 @@ discarded; it is kept in condensed form so the same ground is not re-covered, no
 
 ## Bugs / correctness
 
-None known. The bugs found in the 2026-08-08 review all shipped in `boinc` 3.8.0–3.9.0 — see
-Resolved.
+- [ ] **Does "computer is in use" mean anything at all in this container? Four shipped options
+  depend on it.** The client logs this once per start, right after `Initialization completed`:
+
+  > `Currently BOINC uses legacy idle detection methods that might not work properly on all systems.
+  > Please consider installing a modern idle detection utility that works on Wayland and X11:`
+  > <https://github.com/jamescowens/idle_detect>
+
+  **Why it matters here rather than being noise.** `max_ncpus` / `cpu_usage_limit` apply *while the
+  computer is in use*, and `max_ncpus_idle` / `cpu_usage_limit_idle` (the `niu_` preferences, added
+  in 3.9.0) apply while it is not. `boinc/DOCS.md` promises the user exactly that distinction. But
+  idle detection on Linux is built around a desktop session, and a Home Assistant host is headless —
+  there is no X11 or Wayland, and the container has no `/dev/input`. If the client therefore reports
+  "not in use" permanently, then the in-use pair is dead configuration and the docs describe a
+  behaviour nobody can observe; if it reports the opposite, the `niu_` pair is. Either way one half
+  of a documented feature does nothing.
+
+  The 3.9.0 entry in Resolved already brushed against this — *"On a headless HA host 'not in use' is
+  the normal state, which is why nobody noticed"* — but that was reasoning about which preferences
+  got **written**, never a measurement of which state the client is actually **in**.
+
+  **What to check.** Whether the client ever reports the in-use state at all (it logs
+  `Suspending computation - computer is in use` when it does); what `users_idle()` falls back to with
+  no session and no input devices; and whether `<idle_time_to_run>` changes anything. If one state
+  is unreachable, the honest fix is documentation — say which pair actually applies — not more
+  options.
+
+  **The suggested remedy is probably wrong advice for this audience**, which is a second, smaller
+  item: `idle_detect` is a helper for X11/Wayland desktops, and a Home Assistant OS user cannot
+  install anything on the host. The line lands in their **Log** tab telling them to do something
+  impossible, so it may deserve a note in `DOCS.md` saying it is harmless and why.
+
+The bugs found in the 2026-08-08 review all shipped in `boinc` 3.8.0–3.9.0 — see Resolved.
 
 ## Security / permissions
 
