@@ -46,6 +46,32 @@ supervisor_running() {
     indocker 'docker inspect -f "{{.State.Status}}" hassio_supervisor 2>/dev/null' 2>/dev/null | grep -q running
 }
 
+container_running() {
+    [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null)" = "true" ]
+}
+
+# supervisor_run starts the devcontainer's own dockerd, but on a container that was stopped
+# uncleanly it finds a stale /var/run/docker.pid, concludes the daemon is already up, fails to
+# connect to it and gives up -- leaving the whole hassio stack down with nothing but
+# `Cannot connect to the Docker daemon` in /tmp/supervisor.log. Clearing the pidfile and starting
+# dockerd ourselves first is what makes a restart behave like a first boot.
+ensure_docker() {
+    indocker 'docker info' >/dev/null 2>&1 && return
+
+    echo "==> starting the devcontainer's Docker daemon"
+    docker exec -d "$CONTAINER" bash -lc 'rm -f /var/run/docker.pid && dockerd > /tmp/dockerd.log 2>&1'
+
+    local waited=0
+    until indocker 'docker info' >/dev/null 2>&1; do
+        sleep 2
+        waited=$((waited + 2))
+        if [ "$waited" -ge 60 ]; then
+            echo "error: dockerd did not start inside $CONTAINER; see /tmp/dockerd.log there" >&2
+            exit 1
+        fi
+    done
+}
+
 cmd_up() {
     if ! docker inspect "$CONTAINER" >/dev/null 2>&1; then
         echo "==> starting devcontainer $CONTAINER"
@@ -57,7 +83,14 @@ cmd_up() {
             -p 7123:8123 -p 7357:4357 -p 21416:31416 \
             "$IMAGE" sleep infinity >/dev/null
         indocker 'bash /usr/bin/supervisor_bootstrap'
+    elif ! container_running; then
+        # `docker inspect` succeeds for a stopped container too, so testing existence alone left
+        # every command below failing with `container ... is not running`.
+        echo "==> restarting existing devcontainer $CONTAINER"
+        docker start "$CONTAINER" >/dev/null
     fi
+
+    ensure_docker
 
     if supervisor_running; then
         echo "==> Supervisor already running"
@@ -90,6 +123,17 @@ cmd_install() {
         echo "error: Supervisor is not running, run '$(basename "$0") up' first" >&2
         exit 1
     }
+
+    # Supervisor refuses to install over an existing app with `App ... is already installed`, so
+    # every iteration used to need a manual uninstall first. Reinstalling is also the only way to
+    # re-read config.yaml and translations, which Supervisor snapshots into apps.json at install
+    # time -- editing them and restarting keeps serving the old values.
+    # Note this discards the app's /data, which is the point when testing a schema and a nuisance
+    # when testing an upgrade: for that, edit the version and use `ha apps update` by hand instead.
+    if ha "apps info local_$addon" >/dev/null 2>&1; then
+        echo "==> uninstalling the previously installed local_$addon"
+        ha "apps uninstall local_$addon" >/dev/null
+    fi
 
     echo "==> staging $addon into the local store"
     # A copy, not a bind mount: Supervisor keeps submounts from its own start in its mount

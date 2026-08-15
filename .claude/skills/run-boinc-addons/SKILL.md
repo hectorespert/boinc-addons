@@ -195,10 +195,22 @@ Gotchas.
      stack is gone. `docker restart ha-addons-dev` alone does **not** bring it back —
      re-run `supervisor.sh up`, which is idempotent and recovers in about a minute
      since the images are already in the volume. Use `restart`, never `stop`.
+  7. **A devcontainer that is merely stopped needs two fixes before it boots again**,
+     both now handled by `up`. `docker inspect` succeeds for a stopped container, so
+     testing existence is not enough — `up` used to skip straight to `docker exec` and
+     die with `container ... is not running`. And after an unclean stop, `supervisor_run`
+     reads a stale `/var/run/docker.pid`, decides `dockerd` is already up, cannot connect
+     and gives up, leaving only `Cannot connect to the Docker daemon` followed by
+     `Sending SIGTERM to docker daemon <stale pid>` in `/tmp/supervisor.log`. `up` now
+     starts the container and clears that pidfile before launching `supervisor_run`.
 - **An installed add-on's metadata is a snapshot.** Supervisor stores the parsed
   `config.yaml`/`translations` in `/mnt/supervisor/apps.json` at install time, so
   `ha apps info` keeps serving the old values after you edit those files — even
-  across a Supervisor restart. Re-run `install` to re-read them.
+  across a Supervisor restart. Re-run `install` to re-read them: it uninstalls the
+  previous copy first, since Supervisor otherwise refuses with `App ... is already
+  installed`. **That discards the app's `/data`**, which is what you want when
+  testing a schema and not what you want when testing an upgrade — for an upgrade,
+  bump the version and run `ha apps update local_<addon>` by hand.
 - **`ha apps logs local_boinctui` is legitimately empty** until something connects
   through ingress: `ttyd` writes nothing on startup. `local_boinc` logs immediately.
 - **Operator unit tests silently under-report** if `dict2xml` isn't installed:
