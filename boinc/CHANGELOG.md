@@ -8,6 +8,8 @@ Removing a project from that list makes BOINC finish the work it already downloa
 
 Stop reporting a failure when the app is stopped while it is changing account manager
 
+Stop the app with an error, visible in the Log tab, when the BOINC client starts but never becomes reachable, instead of waiting for it forever
+
 ## 3.9.1
 
 The Account Manager URL field now rejects an address that is not a valid URL as you type it, instead of failing later when the app starts

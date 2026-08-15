@@ -5,7 +5,7 @@ import os
 import signal
 import subprocess
 import sys
-from time import sleep
+from time import monotonic, sleep
 
 from boinc import build_boinc_command
 from boinccmd import configure_boinc_projects, get_state
@@ -24,6 +24,7 @@ parser.add_argument('--data', type=str, required=True, help='BOINC data folder')
 parser.add_argument('--config', type=str, required=True, help='Add-on config folder')
 parser.add_argument("--log-level", default=logging.INFO, type=lambda x: getattr(logging, x))
 parser.add_argument("--exit-immediately", action='store_true', help="Exit immediately after BOINC client is started")
+parser.add_argument("--initialization-timeout", type=float, default=300, help="Seconds to wait for the BOINC client to answer before giving up")
 
 args = parser.parse_args()
 logging.basicConfig(level=args.log_level, format='%(asctime)s %(levelname)s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
@@ -90,14 +91,38 @@ signal.signal(signal.SIGTERM, signal_handler)
 # tests that need to signal this process and know the signal will actually be handled.
 logging.info(f'BOINC Add-on Operator started')
 
+# Polling is unavoidable here: this waits for another process to become ready, and there is no
+# blocking primitive for that -- a connect to a port with no listener is refused immediately rather
+# than blocking. It is bounded, though. Left unbounded, a client that starts but never answers
+# leaves the operator spawning boinccmd twice a second forever while Home Assistant reports the app
+# as started. The deadline is deliberately generous: taking a while normally means a slow host
+# reading a large client_state.xml, and stopping an app that was merely slow is the worse mistake.
+INITIALIZATION_POLL_INTERVAL = 0.5
+
 boinc_process_initialized = False
+initialization_deadline = monotonic() + args.initialization_timeout
+
 while boinc_process.poll() is None and not boinc_process_initialized:
-    sleep(0.5)
+    # Asked before the first sleep, not after it: the client is usually ready straight away, and
+    # sleeping first made every single start pay the interval for nothing.
     boinc_process_initialized = get_state(data_folder)
     if boinc_process_initialized:
         logging.debug(f'BOINC client initialized')
+    elif monotonic() >= initialization_deadline:
+        logging.error(f'BOINC client did not answer within {args.initialization_timeout} seconds')
+        break
     else:
         logging.debug(f'Waiting for BOINC client to initialize')
+        sleep(INITIALIZATION_POLL_INTERVAL)
+
+# Only when the client is still running: one that died on its own is not this failure, and the exit
+# code check at the end of this file already reports it. Without this branch the configuration below
+# would run against a client that cannot answer and blame the configuration for it.
+if not boinc_process_initialized and not stopping_boinc_process and boinc_process.poll() is None:
+    boinc_process.send_signal(signal.SIGTERM)
+    boinc_process.wait()
+    logging.error(f'BOINC Add-on Operator stopped: the BOINC client never became reachable')
+    sys.exit(1)
 
 # A stop requested during initialization (a signal, or the client dying on its own) already means
 # there is nothing left to configure: skipping this avoids running boinccmd against a client that

@@ -225,6 +225,19 @@ class MainTestCase(unittest.TestCase):
         self.assertEqual(self.read_signal(), 'TERM')
         self.assertNotIn('failed to configure', self.log_contents())
 
+    def test_operator_stops_when_the_client_never_answers(self):
+        # --get_state always failing stands in for a client that starts but never answers RPCs.
+        # Unbounded, this used to spawn boinccmd twice a second forever while Home Assistant showed
+        # the app as started.
+        self.start_operator('--initialization-timeout', '1', env={'FAKE_BOINCCMD_GET_STATE_FAIL': '1'})
+        self.proc.wait(timeout=15)
+
+        self.assertEqual(self.proc.returncode, 1)
+        self.assertEqual(self.read_signal(), 'TERM')
+        # The client is what failed, so the log must not blame the configuration for it.
+        self.assertIn('never became reachable', self.log_contents())
+        self.assertNotIn('failed to configure', self.log_contents())
+
     def test_configured_projects_are_attached(self):
         self.write_options({'projects': [{'url': 'https://einsteinathome.org/', 'account_key': 'a key'}]})
 

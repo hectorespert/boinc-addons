@@ -557,8 +557,25 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     while `wait(timeout=...)` is an explicit busy loop sleeping up to 50 ms — *worse* than the
     `sleep(0.5)` it replaced, and the trap waiting for anyone who reintroduces a periodic wake-up
     here. Measured: the operator sits at `Threads: 1`, `State: S (sleeping)`. The one remaining
-    `sleep` is the initialization loop, which is inherent — it polls another process's readiness,
-    and there is no blocking primitive for that.
+    `sleep` is the initialization loop, which stays — see below.
+  - **The initialization loop is now bounded, which was the real defect in it.** It had no deadline:
+    a client that starts but never answers RPCs left the operator spawning `boinccmd` twice a second
+    *forever* while Home Assistant reported the app as started — more polling than the retry loop
+    above ever did. Now it gives up after `--initialization-timeout` (300 s by default, generous
+    because taking a while normally means a slow host reading a large `client_state.xml`, and
+    stopping an app that was merely slow is the worse mistake), stops the client and exits 1 with a
+    message about the client rather than about the configuration. The probe also moved *before* the
+    first sleep, so a normal start no longer pays the interval for nothing.
+  - **Removing that last `sleep` with inotify was evaluated and rejected on price, not on
+    impossibility** — which corrects an earlier claim here that no blocking primitive existed. One
+    does: BOINC creates a Unix domain socket (`GUI_RPC_FILE`) and `bind()`s + `listen()`s on it
+    *before* setting up the TCP socket (`client/gui_rpc_server.cpp`), so there is a filesystem event
+    at the exact moment it starts accepting RPCs. What makes it a bad trade: the watch has to be
+    armed *before* `Popen` or the file can appear in the gap and block forever; BOINC `unlink()`s a
+    stale socket before binding, so a leftover from the previous start would fool a plain existence
+    check; a deadline and a confirming `--get_state` would still be needed; and all of that plus a
+    new Dockerfile dependency (`python3-watchdog`, or ~40 lines of `ctypes`) buys about three fewer
+    `boinccmd` spawns, once per container start.
   - **Reconciliation runs at startup only.** Home Assistant cannot apply an options change without
     restarting the app, so there is nothing new to read afterwards. A periodic check was rejected
     for a second reason: combined with the re-attach behaviour below it would make BOINC Manager's
