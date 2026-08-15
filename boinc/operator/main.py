@@ -91,12 +91,15 @@ signal.signal(signal.SIGTERM, signal_handler)
 # tests that need to signal this process and know the signal will actually be handled.
 logging.info(f'BOINC Add-on Operator started')
 
-# Polling is unavoidable here: this waits for another process to become ready, and there is no
-# blocking primitive for that -- a connect to a port with no listener is refused immediately rather
-# than blocking. It is bounded, though. Left unbounded, a client that starts but never answers
-# leaves the operator spawning boinccmd twice a second forever while Home Assistant reports the app
-# as started. The deadline is deliberately generous: taking a while normally means a slow host
-# reading a large client_state.xml, and stopping an app that was merely slow is the worse mistake.
+# Polling, because the cheap alternatives do not exist: a connect to a port with no listener is
+# refused immediately rather than blocking. A blocking primitive does exist -- BOINC binds a Unix
+# domain socket before the TCP one, so inotify would wake at exactly the right moment -- but it
+# costs a dependency and two race conditions to save three boinccmd spawns per start; the full
+# reasoning is in TODO.md so it is not re-derived here.
+# Bounded, though. Left unbounded, a client that starts but never answers leaves the operator
+# spawning boinccmd twice a second forever while Home Assistant reports the app as started. The
+# deadline is deliberately generous: taking a while normally means a slow host reading a large
+# client_state.xml, and stopping an app that was merely slow is the worse mistake.
 INITIALIZATION_POLL_INTERVAL = 0.5
 
 boinc_process_initialized = False

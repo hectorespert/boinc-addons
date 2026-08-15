@@ -56,6 +56,13 @@ projects:
 which projects you compute for, so the two would keep undoing each other. Set one or the other — if
 both are filled in, the app will not start, and the **Log** tab says so.
 
+**If the account key is wrong, nothing looks broken.** The project is added anyway, the app keeps
+running, and it simply never receives any work. The project's website is what turns you away, not
+this app, so the only sign is in the app's **Log** tab: look for the project's name next to
+*Invalid or missing account key*. If you see it, correct the key and restart the app. This is worth
+knowing because it is easy to copy the wrong value — the account key is a long string of letters and
+numbers, not your password and not your email.
+
 What the app does with this list:
 
 - **Adding a project** attaches it the next time the app starts.
