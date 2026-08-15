@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+On a computer screen your machines now sit side by side, up to three across, instead of in one narrow column with empty space either side of it. Several machines fit without scrolling
+
+On a phone nothing changes: one machine after another, top to bottom. The page decides for itself how many fit, so a tablet gets two and a wide monitor three
+
+A task's progress bar and the percentage beside it no longer split across two lines when the space is tight
+
 ## 1.0.0
 
 The three old settings for a single BOINC client — address, port and password — are gone. If you are still using them instead of the BOINC clients list, this update leaves the app with no machines configured and the page will tell you so; add them to the list and it works again. If you already use the list, nothing changes
