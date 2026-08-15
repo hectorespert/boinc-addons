@@ -13,14 +13,40 @@
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     line-height: 1.5;
     margin: 0 auto;
-    max-width: 48rem;
+    /* Three machine columns at their widest, and no more: past that the eye has to travel across an
+       ultrawide monitor to compare two machines, which is the thing this layout is for. */
+    max-width: 102rem;
     padding: 1.5rem 1rem;
   }
   h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
   .muted { opacity: 0.7; font-size: 0.9rem; }
+  /* Prose does not get the full width even when there is one: a line of text spanning 102rem is
+     unreadable regardless of how large the screen is. */
+  .intro, .card { max-width: 48rem; }
+  /* One column on a phone, more as the window allows, decided without a single breakpoint: auto-fill
+     lays down as many 24rem columns as fit and never makes one narrower than that. `min(24rem, 100%)`
+     is what keeps it honest below 24rem, where a bare 24rem minimum would overflow a small phone
+     instead of collapsing to one column.
+     auto-fill rather than auto-fit on purpose -- auto-fit collapses the empty tracks, which would
+     stretch a lone machine across the whole page.
+     `1fr` as the maximum, not a fixed width: a fixed one leaves a column narrower than the page used
+     to be whenever only one of them fits, which is a tablet held upright. What stops a fourth column
+     appearing is the body's own max-width, which has room for exactly three of these. */
+  .machines {
+    align-items: start;
+    display: grid;
+    gap: 1.75rem 2.5rem;
+    grid-template-columns: repeat(auto-fill, minmax(min(24rem, 100%), 1fr));
+    margin: 1.75rem 0;
+  }
+  /* One machine keeps the width the page had before there was a grid. Otherwise the commonest setup
+     of all -- one Home Assistant, one BOINC client on it -- would come out of this change narrower
+     than it went in. */
+  .machines:has(> .machine:only-child) {
+    grid-template-columns: minmax(min(24rem, 100%), 48rem);
+  }
   .machine {
     border-left: 3px solid currentColor;
-    margin: 1.75rem 0;
     padding-left: 0.9rem;
   }
   .machine.problem { opacity: 0.85; }
@@ -37,8 +63,21 @@
   th, td { text-align: left; padding: 0.3rem 0.6rem 0.3rem 0; vertical-align: baseline; }
   th { font-weight: 600; border-bottom: 1px solid currentColor; font-size: 0.85rem; }
   td.due { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  progress { width: 100%; max-width: 8rem; vertical-align: middle; }
-  .pct { font-variant-numeric: tabular-nums; font-size: 0.9rem; }
+  /* The bar and its percentage are one reading, so they stay on one line and the bar gives up width
+     first -- it can lose most of its length and still say roughly how far along the task is, while a
+     percentage pushed onto a second line reads as belonging to the row below.
+     A flex row rather than `white-space: nowrap`: nowrap gives the cell a minimum the table cannot
+     honour on a phone, and the columns then overlap instead of narrowing. It still wraps when there
+     is genuinely no room -- without that the table's minimum width alone made the page scroll
+     sideways on a phone, which is a worse fault than the one being fixed. */
+  .bar { align-items: center; display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  /* max-width as well as the flex basis, redundant as it looks: without it the bar contributes its
+     full 8rem to the table's minimum width and the page scrolls sideways on a phone. */
+  progress { flex: 1 1 8rem; min-width: 2rem; max-width: 8rem; }
+  /* Wide enough for "100%", so every row in a table needs the same width and they all wrap together
+     or not at all. Left to size itself, "8%" fits beside its bar on a column width where "42%" does
+     not, and the table comes out ragged. */
+  .pct { flex: none; font-variant-numeric: tabular-nums; font-size: 0.9rem; min-width: 2.4rem; }
   button {
     border: 1px solid currentColor;
     border-radius: 0.375rem;
@@ -90,7 +129,7 @@
 </head>
 <body>
 <h1>BOINC UI</h1>
-<p class="muted">Shows what your BOINC clients are doing, and lets you start and stop their
+<p class="muted intro">Shows what your BOINC clients are doing, and lets you start and stop their
 computing.</p>
 
 {% if machines is none %}
@@ -110,6 +149,10 @@ computing.</p>
 </div>
 
 {% else %}
+<!-- One wrapper around every machine, with nothing else inside it: the layout is a grid over these
+     children, and the single-machine rule reads `.machine:only-child`. Putting anything else in here
+     would silently widen a page that has one machine and one stray element. -->
+<div class="machines">
   {% for machine in machines %}
   <div class="machine{% if machine.error %} problem{% endif %}">
     <h2>{{ machine.name }}</h2>
@@ -172,8 +215,10 @@ computing.</p>
           <td>{{ task.project }}</td>
           <td>
             {% if task.fraction_done is not none %}
-            <progress value="{{ task.fraction_done }}" max="1"></progress>
-            <span class="pct">{{ '%.0f' | format(task.fraction_done * 100) }}%</span>
+            <span class="bar">
+              <progress value="{{ task.fraction_done }}" max="1"></progress>
+              <span class="pct">{{ '%.0f' | format(task.fraction_done * 100) }}%</span>
+            </span>
             {% else %}—{% endif %}
           </td>
           <td class="due">{{ task.deadline | due }}</td>
@@ -197,6 +242,7 @@ computing.</p>
     {% endif %}
   </div>
   {% endfor %}
+</div>
 {% endif %}
 
 <form method="post" action="refresh">

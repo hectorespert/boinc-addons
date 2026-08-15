@@ -118,6 +118,101 @@ distinguish this app from `boinctui` and from the HACS integration; what disting
 that it is graphical and usable from a phone. That is a legitimate answer, just not the one that was
 originally planned — worth knowing before someone re-adds the aggregate view expecting it to be new.
 
+## The page is mobile first and grows into a desktop, with no breakpoint anywhere
+
+One section per machine reads well on a phone and wasted a desktop: at 1920px the old `max-width:
+48rem` used **768 of 1920 pixels — 40%** — and four machines made the page **1848px tall**, so the
+fourth was below the fold on a monitor with room for all four at once. Widening the column alone
+would have bought almost nothing, because a machine's own content is already capped well below it
+(`.modes` at 27rem, `progress` at 8rem); the column would just have stretched the task table.
+
+So the machines are a grid, and the whole of it is this:
+
+```css
+grid-template-columns: repeat(auto-fill, minmax(min(24rem, 100%), 1fr));
+```
+
+There is **no media query in this file, and there should not be one**. `auto-fill` lays down as many
+24rem columns as fit and never makes one narrower, which is the same rule at every size — a phone
+gets one column because only one fits, not because a breakpoint said so. Measured:
+
+| viewport | columns | column width | page height |
+|---|---|---|---|
+| 390px | 1 | 358px | 2028px |
+| 768px | 1 | 736px | 1788px |
+| 1024px | 2 | 476px | 1212px |
+| 1920px | 3 | 506px | 953px |
+| 2560px | 3 | 517px | 953px |
+
+Three pieces of that declaration are load-bearing and each was got wrong first:
+
+- **`min(24rem, 100%)`, not `24rem`.** Below 24rem a bare minimum overflows the viewport instead of
+  collapsing to one column, and the page scrolls sideways on a small phone.
+- **`auto-fill`, not `auto-fit`.** `auto-fit` collapses the empty tracks, so a single machine stretches
+  across the whole page — a three-column task table 1500px wide. `auto-fill` keeps the tracks and the
+  lone machine stays one column, left-aligned.
+- **`1fr` as the maximum, not a fixed width.** A fixed 32rem maximum left a column *narrower than the
+  page used to be* whenever only one fits, which is a tablet held upright: 512px where it had been
+  736px. What stops a fourth column appearing is the body's own `max-width: 102rem`, which has room
+  for exactly three — a fourth would need 105.5rem.
+
+Past three the eye has to travel across an ultrawide monitor to compare two machines, which is the
+thing this layout exists to make easy.
+
+### A lone machine keeps the width it had
+
+`.machines:has(> .machine:only-child)` gives a single machine a 48rem track, exactly the old page
+width. Without it the commonest setup of all — one Home Assistant, one BOINC client running on it —
+would come out of a change meant to use more space **narrower than it went in**, at one column of a
+three-column grid. In a browser too old for `:has()` that is what happens, which is a worse page but
+not a broken one.
+
+It also means the wrapper must contain machines and nothing else: one machine plus one stray element
+stops being an only child and the page silently widens. `test_app.py` asserts the wrapper's children,
+because nothing about that is visible in the stylesheet.
+
+### The stacked activity buttons are untouched, and the reason still holds
+
+The obvious follow-on — lay the three modes across the row now that there is width — does not apply:
+a column is about 30rem, no wider than the single column the stacking decision was made for. Three
+labels with their descriptions still do not fit across one. The argument above about phones is
+unchanged, not overridden.
+
+### What it costs
+
+Grid rows are as tall as their tallest machine, so a short machine in the last row leaves the rest of
+that row empty. Masonry would fix it and is not portable enough to rely on. Accepted: the alternative
+is measuring heights in JavaScript, in an app that deliberately ships none.
+
+## The progress bar gives up width before the percentage moves
+
+They are one reading, so they stay on one line, and `.bar` is a flex row that shrinks the bar down to
+2rem before anything wraps. A bar can lose most of its length and still say roughly how far along a
+task is; a percentage pushed onto the next line reads as belonging to the row below it.
+
+`white-space: nowrap` was tried first and is wrong twice over. It gives the cell a minimum the table
+cannot honour on a phone, so at 390px the columns **overlapped** — *"42%in 2 days"*. Making the bar
+shrinkable instead fixed the overlap and then made the whole page scroll sideways, because the table's
+own minimum width still exceeded the viewport. `flex-wrap: wrap` is what settles it: one line whenever
+there is room, and the old two-line fallback when there genuinely is not.
+
+Narrow columns are why this surfaced now — it was already possible in one wide column, and the first
+machine in a four-machine screenshot was already doing it.
+
+So a phone still shows the percentage under its bar, exactly as before, and a wide enough column
+shows it beside. Shrinking the flex basis to 6rem to win the phone case as well was tried and
+reverted: flex wraps a line before it shrinks an item, so it only moved which widths were affected.
+
+**`.pct` has a `min-width` wide enough for `100%`, and that is what stops the table looking ragged.**
+Left to size themselves, `8%` fits beside its bar at a column width where `42%` does not, so rows in
+the *same table* disagreed — measured at 1440px, where three of five bars wrapped and the other two
+did not. A fixed width makes every row need the same space, so they all wrap or none do. Tables still
+differ from each other, which is fine: they are different machines with different project names.
+
+Two declarations look redundant and are not. `max-width` alongside the flex basis: without it the bar
+contributes its full 8rem to the table's minimum width and the page scrolls sideways on a phone.
+`min-width: 2rem`: it is the floor the bar shrinks to before the line gives up and wraps.
+
 ## Only running tasks are listed
 
 `get_results()` returns every task. A machine with a normal work buffer has dozens, which is

@@ -83,6 +83,46 @@ def modes_in(page):
     return collector.buttons
 
 
+# Elements that never get a closing tag, so counting depth has to skip them or it only ever goes up.
+VOID_ELEMENTS = frozenset(('area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+                           'link', 'meta', 'param', 'source', 'track', 'wbr'))
+
+
+class GridChildCollector(HTMLParser):
+    """The classes of the direct children of the machine grid, in order."""
+
+    def __init__(self):
+        super().__init__()
+        self.children = []
+        self._depth = None
+
+    def handle_starttag(self, tag, attrs):
+        classes = dict(attrs).get('class', '')
+        if self._depth is None:
+            if 'machines' in classes.split():
+                self._depth = 0
+            return
+        if tag in VOID_ELEMENTS:
+            return
+        if self._depth == 0:
+            self.children.append(classes)
+        self._depth += 1
+
+    def handle_endtag(self, tag):
+        if self._depth is None or tag in VOID_ELEMENTS:
+            return
+        self._depth -= 1
+        # Back past the wrapper's own closing tag: anything after it is not part of the grid.
+        if self._depth < 0:
+            self._depth = None
+
+
+def grid_children_in(page):
+    collector = GridChildCollector()
+    collector.feed(page)
+    return collector.children
+
+
 def client_for(snapshot, clients=None):
     app = create_app(snapshot)
     app.config.update(TESTING=True, CLIENTS=clients if clients is not None else [])
@@ -157,6 +197,37 @@ class TestStates(unittest.TestCase):
         page = self.page_for(snapshot_of(machine(name='first'), machine(name='second')))
 
         self.assertLess(page.index('first'), page.index('second'))
+
+
+class TestMachineGrid(unittest.TestCase):
+    """The structure the layout is built on.
+
+    The machines are laid out as a grid over the children of one wrapper, and the rule that keeps a
+    lone machine at the width the page had before the grid existed reads `.machine:only-child`. Both
+    are invisible in the stylesheet if something else is ever rendered inside that wrapper: a single
+    machine plus one stray element stops being an only child, and the page silently widens.
+    """
+
+    def page_for(self, snapshot):
+        return client_for(snapshot).get('/').get_data(as_text=True)
+
+    def test_should_hold_nothing_but_machines(self):
+        page = self.page_for(snapshot_of(
+            machine(name='first', running=[task()]),
+            machine(name='second', error='boom', error_kind='cannot_connect'),
+        ))
+
+        self.assertEqual(grid_children_in(page), ['machine', 'machine problem'])
+
+    def test_should_leave_a_single_machine_as_the_only_child(self):
+        page = self.page_for(snapshot_of(machine(name='alone')))
+
+        self.assertEqual(len(grid_children_in(page)), 1)
+
+    def test_should_have_one_grid_for_the_stylesheet_to_find(self):
+        page = self.page_for(snapshot_of(machine(name='first'), machine(name='second')))
+
+        self.assertEqual(page.count('class="machines"'), 1)
 
 
 class TestFormatDue(unittest.TestCase):
