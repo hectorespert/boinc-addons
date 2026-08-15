@@ -60,6 +60,11 @@ class ValidateProjectsTestCase(unittest.TestCase):
         # undoing each other for as long as the app ran.
         self.assertFalse(validate_projects(configured(EINSTEIN), 'https://scienceunited.org'))
 
+    def test_should_accept_projects_when_the_account_manager_url_is_empty(self):
+        # configure_boinc_projects reads an empty string as "not configured"; disagreeing here
+        # would refuse to start a projects-only configuration that it considers perfectly valid.
+        self.assertTrue(validate_projects(configured(EINSTEIN), ''))
+
     def test_should_reject_a_project_without_an_account_key(self):
         self.assertFalse(validate_projects([{'url': EINSTEIN}], None))
 

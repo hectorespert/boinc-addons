@@ -25,7 +25,11 @@ def validate_projects(projects: list[dict] | None, account_manager_url: str | No
     if not projects:
         return True
 
-    if account_manager_url is not None:
+    # Truthiness, not `is not None`, so an empty string counts as unset exactly the way
+    # configure_boinc_projects reads it. The two would otherwise disagree about what "configured"
+    # means, and today they only agree because the schema types this option `url?` and rejects an
+    # empty string -- an accident of the schema, not a decision this module makes.
+    if account_manager_url:
         # An account manager owns the project list and re-asserts it on every sync, so the two
         # would undo each other on a loop for as long as the app ran. Like half an account manager,
         # this has no safe reading, so it stops the app instead of oscillating quietly.
