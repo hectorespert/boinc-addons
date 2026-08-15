@@ -1,4 +1,7 @@
 configuration:
+  projects:
+    name: Projects
+    description: "The science projects to compute for, each with its address and your account key for it. Cannot be combined with the account manager options; setting both stops the app from starting"
   gui_rpc_password:
     name: "GUI RPC password"
     description: "Password to control this BOINC client remotely, e.g. from boinctui. Set one if you plan to connect remotely — see the app documentation for what leaving it empty does"

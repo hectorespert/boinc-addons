@@ -81,9 +81,8 @@ class ConfigureBoincProjectsTestCase(unittest.TestCase):
 
         self.assertEqual(executed_commands(run), [['--acct_mgr', 'info'], ['--acct_mgr', 'sync']])
 
-    @patch('boinccmd.sleep')
     @patch('boinccmd.subprocess.run')
-    def test_should_replace_an_account_manager_on_the_same_host_with_a_different_path(self, run, sleep):
+    def test_should_replace_an_account_manager_on_the_same_host_with_a_different_path(self, run):
         # Only comparing the host (the old netloc-only comparison) would have called this the same
         # account manager and synced against the wrong one.
         run.side_effect = [account_manager_info('https://host/a'), completed(), completed()]
@@ -96,9 +95,8 @@ class ConfigureBoincProjectsTestCase(unittest.TestCase):
             ['--acct_mgr', 'attach', 'https://host/b', ACCOUNT_MANAGER_USERNAME, ACCOUNT_MANAGER_PASSWORD],
         ])
 
-    @patch('boinccmd.sleep')
     @patch('boinccmd.subprocess.run')
-    def test_should_replace_a_different_account_manager(self, run, sleep):
+    def test_should_replace_a_different_account_manager(self, run):
         run.side_effect = [account_manager_info('https://another.account.manager'), completed(), completed()]
 
         self.assertTrue(configure_boinc_projects('a data folder', ACCOUNT_MANAGER_URL, ACCOUNT_MANAGER_USERNAME, ACCOUNT_MANAGER_PASSWORD))

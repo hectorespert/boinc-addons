@@ -4,7 +4,7 @@ Standing backlog for this repo: known gaps, platform conformance items, and feat
 review. Consult it before starting work — what you are about to investigate may already be written
 up here with file:line references — and update it as items are resolved or discarded.
 
-Last reviewed 2026-08-11. Everything in **Resolved** below has shipped or been deliberately
+Last reviewed 2026-08-15. Everything in **Resolved** below has shipped or been deliberately
 discarded; it is kept in condensed form so the same ground is not re-covered, not as work to do.
 
 ---
@@ -18,12 +18,20 @@ Resolved.
 
 ## Security / permissions
 
-- [ ] **`apparmor: false` on both add-ons, against an explicit documented recommendation.** These
-  add-ons disable AppArmor *and* request `host_pid`, `host_uts`, `docker_api` and `video`, so they
-  sit at the low end of the platform's 1–6 rating by construction. Ties to the dead
+- [ ] **`apparmor: false` on all three add-ons, against an explicit documented recommendation.**
+  These add-ons disable AppArmor *and* request `host_pid`, `host_uts`, `docker_api` and `video`, so
+  they sit at the low end of the platform's 1–6 rating by construction. Ties to the dead
   `boinc/apparmor.txt.disable` under Housekeeping: writing a real profile matching the actual
   process tree fixes both at once. Realistically a large task, not a quick win — but it should be a
   recorded decision rather than an unexamined default.
+
+  **What a profile can and cannot buy here, since it is not the usual case.** BOINC's whole purpose
+  is to download third-party binaries from projects and execute them out of `slots/`, so a profile
+  cannot meaningfully restrict *what runs* — it has to permit executing arbitrary downloaded code,
+  or the add-on does nothing. What it can still do is bound the *blast radius* of that code: keep it
+  out of `/config`, off the host paths `host_pid` exposes, and away from the Docker socket
+  `docker_api` grants. That is worth having, but it is a different claim from the one "AppArmor
+  enabled" usually implies, and the item should be judged on it rather than on the rating.
 
 ## Conformance with the official HA apps docs
 
@@ -46,13 +54,6 @@ findings measured directly against the Supervisor in `.devcontainer`.
   The other half of the item is settled: the effective mount is already read-only (`docker inspect`
   on the running add-on reports `/config rw=false`), so the switch would not change access when it
   eventually happens.
-
-- [ ] **`account_manager_url` is typed `str?` when the schema language has a `url` type.**
-  `boinc/config.yaml:21`. The `url` type exists (`supervisor/apps/options.py:25`) and gives
-  validation in the Supervisor UI instead of a runtime error from `boinccmd --acct_mgr attach`.
-  Same category: `remote_hosts` entries are `- "str?"`, and `?` marks optional *fields*, not
-  optional element types, so on a list element it likely means nothing — verify against Supervisor
-  before changing it to `- "str"`.
 
 - [ ] **`build.yaml` itself is deprecated.** Supervisor, on every store scan: `App local_boinc uses
   build.yaml which is deprecated. Move build parameters into the Dockerfile directly.` Both
@@ -79,6 +80,32 @@ findings measured directly against the Supervisor in `.devcontainer`.
   architectures by name (`amd64`, `aarch64`), so a new arch needs that `case` extended.
 
 ### Confirmed correct — checked, no action needed
+
+- **Option types are right as they stand, and the old item about them was half stale (2026-08-15).**
+  `account_manager_url` has been `url?` since 3.9.1, not the `str?` that item claimed. The other
+  half is now measured against a running Supervisor rather than guessed: `remote_hosts` keeps
+  `- "str?"`, because changing it to `- "str"` would demonstrate nothing. The element type is
+  enforced either way (`[1234]` → `expected str`); the `?` does not make elements nullable
+  (`[null]` is rejected, confusingly, as `Missing required option 'remote_hosts'` — Supervisor reads
+  a null first element as the option being absent); and the option is optional regardless, since
+  options posted with no `remote_hosts` key are accepted.
+  **A list of *dicts* behaves the opposite way**, which is worth knowing before adding another one:
+  options posted without `projects` are rejected with `Missing option 'projects' in root`, hence the
+  mandatory `options: projects: []` in `config.yaml`. That does not break existing installs —
+  verified by updating a real 3.9.1 install with five options and no `projects` key in place with
+  `ha apps update`: it came up `started`, every option preserved, `projects: []` filled in from the
+  schema default.
+- **The Dockerfile labels already agree; that item was stale too (2026-08-15).** It described
+  `image.vendor` disagreeing between add-ons, three spellings of the licence, and `image.url`
+  pointing at the repo in one place and the docs site in another. None of it is true now: the three
+  `LABEL` blocks are identical apart from the add-on's own name, every `licenses` is the SPDX
+  `Apache-2.0` in both the Dockerfiles and the `build.yaml` files, `vendor` is "Hector Espert"
+  everywhere and `url` is the docs site everywhere. The only place those old spellings survived was
+  the TODO entry describing them.
+  One real difference is left and it belongs to the `build.yaml` item above, not here: the
+  `build.yaml` labels use their own title and description ("Boinc add-on") and hardcode `source`,
+  where the Dockerfile uses `${BUILD_REPOSITORY}`. Worth settling *if* `build.yaml` survives; there
+  is no point tidying a file slated for removal.
 
 - **Every permission this repo requests is now explained to the user.** `host_pid`/`host_uts` by the
   Protection Mode warning, and `video`/`docker_api` by the *What else this app asks for* section
@@ -115,6 +142,38 @@ findings measured directly against the Supervisor in `.devcontainer`.
 
 ## Test coverage
 
+- [ ] **No project has ever been attached to a *real* BOINC project.** Everything verifying the
+  `projects` option in 3.10.0 — unit tests, the end-to-end lifecycle, the Supervisor run — used
+  `http://example.invalid/...` with invented account keys. That proves the operator issues the right
+  calls and that the client persists them; it proves nothing about a real project **accepting** the
+  key and sending work. Two things ride on it:
+  1. **Whether an account key in this option actually authenticates.** A rejected key still leaves
+     the project attached, so the failure is quiet: the client logs `Invalid or missing account key`
+     and the app looks fine. Nothing in the operator notices.
+  2. **`detach_when_done` draining real work**, which is the promise `DOCS.md` makes to the user —
+     *"finish the work it has already downloaded and then leave"*. Our test projects had zero tasks,
+     so that behaviour is asserted from BOINC's semantics, never measured.
+
+  **Procedure, for whoever picks it up.** Work in a gitignored scratch directory; the account key is
+  a secret and must not reach the repo or a transcript.
+  1. Register on a project with a steady Linux x86_64 work supply — Einstein@Home. World Community
+     Grid has had work droughts, which would waste the run.
+  2. Copy the *account key* from the project's own account page (look for "account keys"). The
+     alternative, `boinccmd --lookup_account`, is a GUI RPC so it needs a running client, and it
+     wants the project password as well.
+  3. Start the built image with that `options.json` and real network access.
+  4. **The check that matters**: `--get_project_status` must show a real `name:` and `user_name:`.
+     Those come from the scheduler's reply, so they stay empty when the key was rejected — which is
+     exactly the distinction `example.invalid` cannot make.
+  5. `--get_task_summary` should show work arriving.
+  6. Remove the project from the options and restart: expect `don't request more work: yes`, the
+     project **still attached**, and its tasks intact. That is the drain promise, on real work.
+  7. Re-add and restart: expect `don't request more work: no`.
+  8. Free extra: run at DEBUG and confirm `redact.py` masks a genuine key as `***`.
+
+  A full drain takes hours or days, so step 6 verifies the mechanism, not the completion. Detach
+  properly afterwards so the project is not left with an orphan host record.
+
 - [ ] **Nothing exercises the Home Assistant surface in CI**, only the container. Everything under
   Conformance above is invisible to `docker build`/`docker run`: `config.yaml`/`build.yaml`
   validation, the option schema, translations, ingress, protection mode, watchdog. There is a local
@@ -125,10 +184,6 @@ findings measured directly against the Supervisor in `.devcontainer`.
   docker-in-docker needs `--privileged`, a TTY, a health-check override and a ~2GB pull, so it is
   slow and fragile. Realistic middle ground: keep it a documented manual step before releasing a
   change to `config.yaml`/`build.yaml`/`translations/`, and revisit a nightly (not per-PR) job.
-
-- [ ] **`supervisor.sh install <addon>` fails with `App … is already installed`** instead of
-  reinstalling, so every iteration needs a manual uninstall first. Small quality-of-life fix in the
-  driver, noticed while verifying the changes above.
 
 ## Config schema — breaking redesign, for a future major
 
@@ -272,42 +327,25 @@ of cost.
 
 ### `boinc` operator
 
-- [ ] **Declare projects to attach in the add-on options** (a `projects:` list). Attractive, but a
-  much bigger step than the existing scalar options, because it turns reconciliation into *set*
-  reconciliation with a destructive removal branch:
-  - **Detach is destructive**, unlike the account-manager detach the operator already does:
-    `boinccmd --project <url> detach` aborts in-progress tasks and deletes downloaded files. So
-    `actual − desired` must *not* map to detach. The BOINC-native soft equivalent is `nomorework`:
-    stop fetching, let current tasks drain. Default to draining; hard detach only on explicit opt-in.
-  - **Ownership needs persisted state**, because BOINC has no labels/annotations on a project.
-    Without a marker, a project the user attached from `boinctui` is indistinguishable from one the
-    operator attached and the user then removed from the options. Same `kubectl apply` trick already
-    used for preferences: keep a `managed_projects` file under `/data` and compute removals as
-    `previously-managed − desired`, never `actual − desired`.
-  - **Mutually exclusive with the account manager**, which owns the project list and re-asserts it
-    on every sync. Reject that combination at startup rather than letting it oscillate.
-  - **Project URLs need canonicalising before diffing** — reuse `boinc/operator/url.py`, which
-    exists for exactly this.
-  - **Credentials**: attach takes an account key, so `--lookup_account <url> <email> <password>`
-    first — a network call per project that can fail or rate-limit.
-  - **This is the first place a real retry loop earns its keep.** Projects go offline for days; a
-    one-shot attach at startup means "project was down at boot → silently never attached". Retry the
-    *additive* half with backoff, never police the removal half on a timer.
-  - **Partial failure becomes normal**: per-project error isolation plus an aggregated result, and
-    the outcome has to reach the exit code.
+None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 
 ## Housekeeping
 
 - [ ] `boinc/apparmor.txt.disable` is unmodified add-on template boilerplate (references
   `/etc/services.d`, `/etc/cont-init.d`, bashio, s6-overlay `/init`) — none of which this add-on
-  uses; its entrypoint is a plain `python3 /opt/operator/main.py`. Inert today (`apparmor: false`),
-  but it would need a full rewrite, not just re-enabling. Either rewrite it to match the real
-  process tree or delete it so it does not mislead a future contributor.
-- [ ] The Dockerfile labels disagree between add-ons without reason: `image.vendor` is
-  "Hector Espert" in one and "Home Assistant Boinc Add-ons" in the other; `image.licenses` is
-  "Apache 2.0", "Apache2" and "Apache License 2.0" depending on where you look, counting the
-  `build.yaml` files; and `image.url` points at the repo in one and the docs site in the other.
-  Pick one set — SPDX `Apache-2.0`, vendor "Hector Espert", the docs site — and apply it to both.
+  uses; its entrypoint is a plain `python3 /opt/operator/main.py`. It still carries the template's
+  `my_program` placeholders and its commented-out "here is how to build the list" instructions, so
+  nobody ever adapted it. **Doubly inert**: `apparmor: false`, *and* Supervisor looks for
+  `apparmor.txt`, so the `.disable` suffix means it was never read either way. Only `boinc` has one;
+  `boinctui` and `boincui` declare `apparmor: false` with no file at all, so deleting it would make
+  the three consistent.
+  Either rewrite it to match the real process tree or delete it so it does not mislead a future
+  contributor. **If deleting: `CLAUDE.md` cites this exact path** as the example of why
+  `monitored_files` is a regex that can over-match (`app` would also match
+  `boinc/apparmor.txt.disable`), so that example needs a different filename or the note needs
+  rewording.
+- The Dockerfile labels item was **stale and is closed** — see *Confirmed correct* under
+  Conformance. They already agree across all three add-ons.
 
 ---
 
@@ -531,6 +569,118 @@ of cost.
   new code**: the `niu_` keys stayed in `MANAGED_PREFERENCES`, so a stale value the operator wrote
   itself falls into the removal branch that has existed since 3.8.1, while one set by the user from
   `boinctui` is untouched.
+
+## Shipped in `boinc` 3.10.0
+
+- [x] **`projects:` — declare the projects to attach in the add-on options.** New
+  `boinc/operator/projects.py` reconciling three sets on every start: `desired` (the option,
+  canonicalized through `url.py`), `actual` (`--get_project_status`), and `managed`
+  (`.managed_projects.json`, the `kubectl apply` pattern already used for preferences). The
+  ownership file has **two** lists, `attached` and `detaching`. Five of the seven constraints
+  written up here survived contact; the design notes below are what measurement changed, so the
+  same ground is not re-covered:
+  - **Credentials: an `account_key` per project, not email + password.** That removes
+    `--lookup_account` entirely, and with it two traps found in BOINC 8.2.15: it takes its exit
+    code from the *initial* RPC rather than the poll, so a failed lookup prints
+    `poll status: can't resolve hostname` and still **exits 0**; and its poll loop has no sleep and
+    no break when the poll RPC itself errors, i.e. an infinite busy loop upstream. Success is only
+    detectable as `account key: <auth>` on stdout.
+  - **Removal is `detach_when_done`, not `nomorework` and not a bare `detach`.** It drains first and
+    detaches after, so no completed work is destroyed. Its flag is **not** among the fields
+    `--get_project_status` prints, which is the whole reason the state file needs a second list: a
+    pending detach is invisible from outside, so a project removed and then re-added would otherwise
+    have a detach fire silently days later. Re-adding sends `dont_detach_when_done` **and**
+    `allowmorework`; BOINC's source pairs the two, but that pairing was the one thing not verified
+    live, so it is asserted explicitly instead of assumed.
+  - **There is no retry at all, which took two goes to see.** `--project_attach` is a *local* RPC
+    that returns instantly and persists even against an unresolvable host — the client then retries
+    the project's own scheduler by itself, indefinitely. So "the project is down" was never the
+    operator's problem, which left only "the client is not answering yet" — and *that* window is
+    already closed by the initialization loop, since `configure_projects` runs only after
+    `boinccmd --get_state` has succeeded. A bounded backoff was written first and then deleted: it
+    guarded a case that cannot arise. A failed attach is now a warning naming the projects, retried
+    when the app restarts, which is when an options change takes effect anyway.
+  - **No background thread either, and nothing polls after startup.** A thread only earns its place
+    if the attach can block on the network, and it cannot. The wait loop is now a bare
+    `boinc_process.wait()`: in CPython 3.13, `wait()` with no timeout is a blocking `waitpid()`,
+    while `wait(timeout=...)` is an explicit busy loop sleeping up to 50 ms — *worse* than the
+    `sleep(0.5)` it replaced, and the trap waiting for anyone who reintroduces a periodic wake-up
+    here. Measured: the operator sits at `Threads: 1`, `State: S (sleeping)`. The one remaining
+    `sleep` is the initialization loop, which stays — see below.
+  - **The initialization loop is now bounded, which was the real defect in it.** It had no deadline:
+    a client that starts but never answers RPCs left the operator spawning `boinccmd` twice a second
+    *forever* while Home Assistant reported the app as started — more polling than the retry loop
+    above ever did. Now it gives up after `--initialization-timeout` (300 s by default, generous
+    because taking a while normally means a slow host reading a large `client_state.xml`, and
+    stopping an app that was merely slow is the worse mistake), stops the client and exits 1 with a
+    message about the client rather than about the configuration. The probe also moved *before* the
+    first sleep, so a normal start no longer pays the interval for nothing.
+  - **Removing that last `sleep` with inotify was evaluated and rejected on price, not on
+    impossibility** — which corrects an earlier claim here that no blocking primitive existed. One
+    does: BOINC creates a Unix domain socket (`GUI_RPC_FILE`) and `bind()`s + `listen()`s on it
+    *before* setting up the TCP socket (`client/gui_rpc_server.cpp`), so there is a filesystem event
+    at the exact moment it starts accepting RPCs. What makes it a bad trade: the watch has to be
+    armed *before* `Popen` or the file can appear in the gap and block forever; BOINC `unlink()`s a
+    stale socket before binding, so a leftover from the previous start would fool a plain existence
+    check; a deadline and a confirming `--get_state` would still be needed; and all of that plus a
+    new Dockerfile dependency (`python3-watchdog`, or ~40 lines of `ctypes`) buys about three fewer
+    `boinccmd` spawns, once per container start.
+  - **Reconciliation runs at startup only.** Home Assistant cannot apply an options change without
+    restarting the app, so there is nothing new to read afterwards. A periodic check was rejected
+    for a second reason: combined with the re-attach behaviour below it would make BOINC Manager's
+    detach button useless for any listed project.
+  - **A project detached outside the options comes back on the next start**, deliberately and with
+    no special-cased log line — it is simply `desired − actual`. Consistent with the operator
+    re-asserting its own preference keys on every start. Documented in `DOCS.md`.
+  - **The account manager is refused, not merged**: `projects` plus any `account_manager_url` is a
+    startup failure, before the client is even launched. Separately, a project reported as
+    `attached via Account Manager: yes` is excluded from the diff entirely, which covers a manager
+    attached outside the options.
+  - **Verified end to end against a real client**, not only in unit tests: attach with URL
+    canonicalization, removal → `detach_when_done`, a project attached by hand left untouched, the
+    state file self-healing once the client lets a project go, re-add re-attaching, and the account
+    manager conflict exiting 1 without starting BOINC.
+  - **And against a real Supervisor** (`supervisor.sh`, 2026-08-15), which is the half CI cannot
+    see. Supervisor parses the option as `type: schema`, `multiple: true`, with `url` carrying
+    `format: url` and `account_key` `format: password`; both translations render; the
+    `options: projects: []` default lets a fresh install validate; and **the schema rejects at
+    tier 1**, before the container starts, with the message shown in the UI — `expected a URL` for a
+    malformed address and `Missing option 'account_key' in projects` for a half-filled entry. The
+    runtime conflict then reports **`state: error`**, not the `stopped` the 3.8.4 note predicted;
+    that note describes a failure minutes into a run, while this one exits within a second of start,
+    so the two are not necessarily in conflict — but a fast hard failure is visibly an error.
+
+- [x] **`boinccmd.py`'s vestigial `while not current_account_manager_read:` loop — removed.** It
+  always ran exactly once, since its body either returned or set the flag; probably a retry loop
+  that lost its retry. Found next to the `sleep(10)` below.
+
+- [x] **`sleep(10)` between detaching and attaching an account manager — deleted, not shortened.**
+  BOINC's `--acct_mgr detach` is `rpc.acct_mgr_rpc("", "", "")`, a single synchronous RPC
+  (`client/boinc_cmd.cpp`); only `attach` and `sync` poll, and they do it inside `boinccmd`. So the
+  wait was for something that had already happened. It also mattered because of what it exposed:
+  `time.sleep()` is *resumed* after a signal handler runs rather than cut short (PEP 475, measured —
+  handler at 0.31 s, `sleep(3)` still returning at 3.01 s), so a stop during that window ended in an
+  attach against a dead client and a **misleading `exit 1`**. `main.py` now re-checks for a stop
+  *after* `configure_boinc_projects` returns, not only before calling it — the same distinction
+  3.8.5 drew for a stop during initialization.
+
+## Shipped alongside `boinc` 3.10.0 — repo tooling, not an add-on
+
+- [x] **`supervisor.sh` could not be run twice (2026-08-15).** Three failures, all hit while
+  validating the `projects` schema against a real Supervisor:
+  - `install <addon>` refused with `App … is already installed`, so every iteration needed a manual
+    uninstall. It uninstalls first now — which is also the only way to make Supervisor re-read
+    `config.yaml` and `translations/`, since it snapshots them into `apps.json` at install time.
+    **That discards the app's `/data`**, so an *upgrade* still has to be tested by bumping the
+    version and running `ha apps update` by hand, which is how the 3.9.1 → 3.10.0 check above ran.
+  - `up` treated an existing-but-stopped container as running, because `docker inspect` succeeds for
+    a stopped one, and then died on the first `docker exec`.
+  - After an unclean stop, `supervisor_run` reads a stale `/var/run/docker.pid`, concludes dockerd
+    is up, fails to connect and gives up — leaving only `Cannot connect to the Docker daemon` and a
+    `SIGTERM` aimed at a pid from the previous boot. `up` now clears that pidfile and starts dockerd
+    itself.
+
+  Between them, the recovery that gotcha 6 in `SKILL.md` documents actually works unattended now.
 
 ## Shipped as `boincui`, 0.1.0 → 1.0.0
 

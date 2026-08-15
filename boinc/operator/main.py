@@ -5,7 +5,7 @@ import os
 import signal
 import subprocess
 import sys
-from time import sleep
+from time import monotonic, sleep
 
 from boinc import build_boinc_command
 from boinccmd import configure_boinc_projects, get_state
@@ -13,6 +13,7 @@ from cc_config import prepare_cc_config
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
 from gui_rpc_auth import prepare_gui_rpc_auth
+from projects import configure_projects, validate_projects
 from redact import redact_secrets
 from remote_hosts import prepare_remote_hosts
 
@@ -23,6 +24,7 @@ parser.add_argument('--data', type=str, required=True, help='BOINC data folder')
 parser.add_argument('--config', type=str, required=True, help='Add-on config folder')
 parser.add_argument("--log-level", default=logging.INFO, type=lambda x: getattr(logging, x))
 parser.add_argument("--exit-immediately", action='store_true', help="Exit immediately after BOINC client is started")
+parser.add_argument("--initialization-timeout", type=float, default=300, help="Seconds to wait for the BOINC client to answer before giving up")
 
 args = parser.parse_args()
 logging.basicConfig(level=args.log_level, format='%(asctime)s %(levelname)s %(message)s', datefmt="%Y-%m-%d %H:%M:%S")
@@ -41,6 +43,12 @@ logging.info(f'Configuration loaded from {args.options.name}')
 
 options = json.load(args.options)
 logging.debug(f'Current configuration\n{json.dumps(redact_secrets(options), indent=2)}')
+
+# Checked before anything is started because it needs no client to answer it: a contradiction
+# between the options is the one kind of failure that is cheaper to report than to act on.
+if not validate_projects(options.get('projects'), options.get('account_manager_url')):
+    logging.error(f'BOINC Add-on Operator stopped: the configured projects cannot be applied')
+    sys.exit(1)
 
 data_folder = args.data
 logging.info(f'BOINC data folder {data_folder}')
@@ -83,25 +91,68 @@ signal.signal(signal.SIGTERM, signal_handler)
 # tests that need to signal this process and know the signal will actually be handled.
 logging.info(f'BOINC Add-on Operator started')
 
+# Polling, because the cheap alternatives do not exist: a connect to a port with no listener is
+# refused immediately rather than blocking. A blocking primitive does exist -- BOINC binds a Unix
+# domain socket before the TCP one, so inotify would wake at exactly the right moment -- but it
+# costs a dependency and two race conditions to save three boinccmd spawns per start; the full
+# reasoning is in TODO.md so it is not re-derived here.
+# Bounded, though. Left unbounded, a client that starts but never answers leaves the operator
+# spawning boinccmd twice a second forever while Home Assistant reports the app as started. The
+# deadline is deliberately generous: taking a while normally means a slow host reading a large
+# client_state.xml, and stopping an app that was merely slow is the worse mistake.
+INITIALIZATION_POLL_INTERVAL = 0.5
+
 boinc_process_initialized = False
+initialization_deadline = monotonic() + args.initialization_timeout
+
 while boinc_process.poll() is None and not boinc_process_initialized:
-    sleep(0.5)
+    # Asked before the first sleep, not after it: the client is usually ready straight away, and
+    # sleeping first made every single start pay the interval for nothing.
     boinc_process_initialized = get_state(data_folder)
     if boinc_process_initialized:
         logging.debug(f'BOINC client initialized')
+    elif monotonic() >= initialization_deadline:
+        logging.error(f'BOINC client did not answer within {args.initialization_timeout} seconds')
+        break
     else:
         logging.debug(f'Waiting for BOINC client to initialize')
+        sleep(INITIALIZATION_POLL_INTERVAL)
+
+# Only when the client is still running: one that died on its own is not this failure, and the exit
+# code check at the end of this file already reports it. Without this branch the configuration below
+# would run against a client that cannot answer and blame the configuration for it.
+if not boinc_process_initialized and not stopping_boinc_process and boinc_process.poll() is None:
+    boinc_process.send_signal(signal.SIGTERM)
+    boinc_process.wait()
+    logging.error(f'BOINC Add-on Operator stopped: the BOINC client never became reachable')
+    sys.exit(1)
 
 # A stop requested during initialization (a signal, or the client dying on its own) already means
 # there is nothing left to configure: skipping this avoids running boinccmd against a client that
 # is no longer there to answer it, which would otherwise be misreported as a configuration failure.
 if not stopping_boinc_process and boinc_process.poll() is None:
     projects_configured = configure_boinc_projects(data_folder, options.get('account_manager_url'), options.get('account_manager_username'), options.get('account_manager_password'))
-    if not projects_configured:
+
+    # Asked again after the call and not only before it: attaching an account manager polls it over
+    # the network from inside boinccmd, so a stop arriving meanwhile leaves it talking to a client
+    # that is already gone. That is a stop, not a configuration mistake, and 3.8.5 drew the same
+    # line for a stop during initialization.
+    stopping = stopping_boinc_process or boinc_process.poll() is not None
+
+    if not projects_configured and not stopping:
         boinc_process.send_signal(signal.SIGTERM)
         boinc_process.wait()
         logging.error(f'BOINC Add-on Operator stopped: failed to configure BOINC projects')
         sys.exit(1)
+
+    if not stopping:
+        # Reconciling happens once, here: Home Assistant cannot apply an options change without
+        # restarting the app, so there is nothing new to read afterwards. Attaching is a local RPC
+        # against a client that has already answered --get_state, so a failure here is rare enough
+        # that saying so and moving on beats keeping the operator awake to try again.
+        unattached_projects = configure_projects(data_folder, options.get('projects'))
+        if unattached_projects:
+            logging.warning(f'These projects could not be attached and will be attempted again when the app restarts: {", ".join(unattached_projects)}')
 
 if args.exit_immediately:
     logging.warning(f'Exiting immediately after BOINC client is started')
@@ -109,8 +160,12 @@ if args.exit_immediately:
     boinc_process.send_signal(signal.SIGTERM)
     boinc_process.wait()
 
-while boinc_process.poll() is None:
-    sleep(0.5)
+# Everything is configured by this point, so block on the client rather than polling it. Keep this
+# a bare wait(): with no timeout it is a blocking waitpid(), while wait(timeout=...) is a busy loop
+# sleeping up to 50ms a turn -- worse than the sleep(0.5) it replaced -- so anything that needs to
+# wake up periodically here has to be built some other way. It returns immediately if the client is
+# already gone.
+boinc_process.wait()
 
 logging.debug(f'BOINC client stopped with code {boinc_process.returncode}')
 

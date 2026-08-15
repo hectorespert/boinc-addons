@@ -35,6 +35,49 @@ account_manager_username: "youremail@email.com"
 account_manager_password: "yoursecretpassword"
 ```
 
+### Choosing projects yourself (Advanced)
+
+If you would rather pick the science projects yourself instead of letting an account manager choose,
+list them in the app configuration. Each one needs its address and your **account key** for it.
+
+To find your account key: sign in on the project's own website, open your account page, and look for
+the account key — most projects show it there, sometimes behind a link called *account keys*. It is
+not your project password.
+
+```yaml
+projects:
+  - url: "https://einsteinathome.org/"
+    account_key: "your account key for this project"
+  - url: "https://www.worldcommunitygrid.org/"
+    account_key: "your account key for that project"
+```
+
+**You cannot use this together with an account manager.** An account manager decides on its own
+which projects you compute for, so the two would keep undoing each other. Set one or the other — if
+both are filled in, the app will not start, and the **Log** tab says so.
+
+**If the account key is wrong, nothing looks broken.** The project is added anyway, the app keeps
+running, and it simply never receives any work. The project's website is what turns you away, not
+this app, so the only sign is in the app's **Log** tab: look for the project's name next to
+*Invalid or missing account key*. If you see it, correct the key and restart the app. This is worth
+knowing because it is easy to copy the wrong value — the account key is a long string of letters and
+numbers, not your password and not your email.
+
+What the app does with this list:
+
+- **Adding a project** attaches it the next time the app starts.
+- **Removing a project** from the list tells BOINC to finish the work it has already downloaded and
+  then leave the project. Nothing you have already computed is thrown away, so it may stay listed in
+  boinctui for a while until its last tasks are done and reported.
+- **Projects you attached yourself** — from the boinctui app, a remote BOINC Manager, or an account
+  manager — are never removed by this list. It only manages the projects it attached.
+- **Changes only take effect when the app restarts**, which Home Assistant asks you to do after you
+  save the configuration.
+
+One consequence worth knowing: if you leave a project in this list but detach it yourself from
+boinctui or BOINC Manager, the app attaches it again the next time it starts, because the list still
+asks for it. Remove it from the list to remove it for good.
+
 ### Remote Control (Advanced)
 
 [Remote GUI RPC](https://boinc.berkeley.edu/wiki/Controlling_BOINC_remotely) can be enabled in the app configuration and used to manage the BOINC client remotely.
@@ -101,6 +144,19 @@ stays attached. Detach it the same way you attached it.
 
 **Set only one or two of the three and the app will not start.** Open the app's **Log** tab to see
 why.
+
+#### Project Options
+
+- **projects** (optional, list)
+  - The science projects to compute for, chosen by you instead of by an account manager
+  - Each entry needs a **url** (the project's address, for example `https://einsteinathome.org/`)
+    and an **account_key** (found on your account page on that project's website)
+  - Leave the list empty to not manage projects from here at all
+  - Cannot be combined with the account manager options above — set one or the other, or the app
+    will not start
+
+See [Choosing projects yourself](#choosing-projects-yourself-advanced) above for how to find an
+account key and what happens when you add or remove a project.
 
 #### Remote Control Options
 
@@ -171,6 +227,16 @@ time, is ignored — BOINC computes all the time — and a warning explaining wh
 account_manager_url: "https://scienceunited.org"
 account_manager_username: "youremail@example.com"
 account_manager_password: "your_password"
+```
+
+#### Choosing Projects Instead of an Account Manager
+
+```yaml
+projects:
+  - url: "https://einsteinathome.org/"
+    account_key: "your_account_key_for_einstein"
+  - url: "https://www.worldcommunitygrid.org/"
+    account_key: "your_account_key_for_wcg"
 ```
 
 #### Computing Only at Night (22:00 to 07:00)
