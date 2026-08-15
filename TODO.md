@@ -126,6 +126,38 @@ findings measured directly against the Supervisor in `.devcontainer`.
 
 ## Test coverage
 
+- [ ] **No project has ever been attached to a *real* BOINC project.** Everything verifying the
+  `projects` option in 3.10.0 — unit tests, the end-to-end lifecycle, the Supervisor run — used
+  `http://example.invalid/...` with invented account keys. That proves the operator issues the right
+  calls and that the client persists them; it proves nothing about a real project **accepting** the
+  key and sending work. Two things ride on it:
+  1. **Whether an account key in this option actually authenticates.** A rejected key still leaves
+     the project attached, so the failure is quiet: the client logs `Invalid or missing account key`
+     and the app looks fine. Nothing in the operator notices.
+  2. **`detach_when_done` draining real work**, which is the promise `DOCS.md` makes to the user —
+     *"finish the work it has already downloaded and then leave"*. Our test projects had zero tasks,
+     so that behaviour is asserted from BOINC's semantics, never measured.
+
+  **Procedure, for whoever picks it up.** Work in a gitignored scratch directory; the account key is
+  a secret and must not reach the repo or a transcript.
+  1. Register on a project with a steady Linux x86_64 work supply — Einstein@Home. World Community
+     Grid has had work droughts, which would waste the run.
+  2. Copy the *account key* from the project's own account page (look for "account keys"). The
+     alternative, `boinccmd --lookup_account`, is a GUI RPC so it needs a running client, and it
+     wants the project password as well.
+  3. Start the built image with that `options.json` and real network access.
+  4. **The check that matters**: `--get_project_status` must show a real `name:` and `user_name:`.
+     Those come from the scheduler's reply, so they stay empty when the key was rejected — which is
+     exactly the distinction `example.invalid` cannot make.
+  5. `--get_task_summary` should show work arriving.
+  6. Remove the project from the options and restart: expect `don't request more work: yes`, the
+     project **still attached**, and its tasks intact. That is the drain promise, on real work.
+  7. Re-add and restart: expect `don't request more work: no`.
+  8. Free extra: run at DEBUG and confirm `redact.py` masks a genuine key as `***`.
+
+  A full drain takes hours or days, so step 6 verifies the mechanism, not the completion. Detach
+  properly afterwards so the project is not left with an orphan host record.
+
 - [ ] **Nothing exercises the Home Assistant surface in CI**, only the container. Everything under
   Conformance above is invisible to `docker build`/`docker run`: `config.yaml`/`build.yaml`
   validation, the option schema, translations, ingress, protection mode, watchdog. There is a local
