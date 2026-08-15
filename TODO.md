@@ -18,12 +18,20 @@ Resolved.
 
 ## Security / permissions
 
-- [ ] **`apparmor: false` on both add-ons, against an explicit documented recommendation.** These
-  add-ons disable AppArmor *and* request `host_pid`, `host_uts`, `docker_api` and `video`, so they
-  sit at the low end of the platform's 1–6 rating by construction. Ties to the dead
+- [ ] **`apparmor: false` on all three add-ons, against an explicit documented recommendation.**
+  These add-ons disable AppArmor *and* request `host_pid`, `host_uts`, `docker_api` and `video`, so
+  they sit at the low end of the platform's 1–6 rating by construction. Ties to the dead
   `boinc/apparmor.txt.disable` under Housekeeping: writing a real profile matching the actual
   process tree fixes both at once. Realistically a large task, not a quick win — but it should be a
   recorded decision rather than an unexamined default.
+
+  **What a profile can and cannot buy here, since it is not the usual case.** BOINC's whole purpose
+  is to download third-party binaries from projects and execute them out of `slots/`, so a profile
+  cannot meaningfully restrict *what runs* — it has to permit executing arbitrary downloaded code,
+  or the add-on does nothing. What it can still do is bound the *blast radius* of that code: keep it
+  out of `/config`, off the host paths `host_pid` exposes, and away from the Docker socket
+  `docker_api` grants. That is worth having, but it is a different claim from the one "AppArmor
+  enabled" usually implies, and the item should be judged on it rather than on the rating.
 
 ## Conformance with the official HA apps docs
 
@@ -323,12 +331,19 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 
 ## Housekeeping
 
-
 - [ ] `boinc/apparmor.txt.disable` is unmodified add-on template boilerplate (references
   `/etc/services.d`, `/etc/cont-init.d`, bashio, s6-overlay `/init`) — none of which this add-on
-  uses; its entrypoint is a plain `python3 /opt/operator/main.py`. Inert today (`apparmor: false`),
-  but it would need a full rewrite, not just re-enabling. Either rewrite it to match the real
-  process tree or delete it so it does not mislead a future contributor.
+  uses; its entrypoint is a plain `python3 /opt/operator/main.py`. It still carries the template's
+  `my_program` placeholders and its commented-out "here is how to build the list" instructions, so
+  nobody ever adapted it. **Doubly inert**: `apparmor: false`, *and* Supervisor looks for
+  `apparmor.txt`, so the `.disable` suffix means it was never read either way. Only `boinc` has one;
+  `boinctui` and `boincui` declare `apparmor: false` with no file at all, so deleting it would make
+  the three consistent.
+  Either rewrite it to match the real process tree or delete it so it does not mislead a future
+  contributor. **If deleting: `CLAUDE.md` cites this exact path** as the example of why
+  `monitored_files` is a regex that can over-match (`app` would also match
+  `boinc/apparmor.txt.disable`), so that example needs a different filename or the note needs
+  rewording.
 - The Dockerfile labels item was **stale and is closed** — see *Confirmed correct* under
   Conformance. They already agree across all three add-ons.
 
