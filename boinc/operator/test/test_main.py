@@ -1,3 +1,4 @@
+import json
 import os
 import signal
 import stat
@@ -42,6 +43,13 @@ FAKE_BOINC = textwrap.dedent("""\
 FAKE_BOINCCMD = textwrap.dedent("""\
     #!/usr/bin/env bash
     set -u
+
+    echo "$*" >> "$BOINCCMD_LOG_FILE"
+
+    if [ "$1" = "--get_project_status" ]; then
+        echo "======== Projects ========"
+        exit 0
+    fi
 
     if [ "$1" = "--get_state" ]; then
         if [ -n "${FAKE_BOINCCMD_GET_STATE_FAIL:-}" ]; then
@@ -96,11 +104,13 @@ class MainTestCase(unittest.TestCase):
 
         self.marker_file = base / 'boinc-started'
         self.signal_file = base / 'boinc-signal'
+        self.boinccmd_log_file = base / 'boinccmd-commands'
 
         self.env = dict(os.environ)
         self.env['PATH'] = f'{bin_dir}{os.pathsep}{self.env.get("PATH", "")}'
         self.env['BOINC_MARKER_FILE'] = str(self.marker_file)
         self.env['BOINC_SIGNAL_FILE'] = str(self.signal_file)
+        self.env['BOINCCMD_LOG_FILE'] = str(self.boinccmd_log_file)
 
         self.proc = None
 
@@ -158,6 +168,12 @@ class MainTestCase(unittest.TestCase):
     def read_signal(self) -> str:
         return self.signal_file.read_text().strip()
 
+    def boinccmd_commands(self) -> list[str]:
+        return self.boinccmd_log_file.read_text().splitlines() if self.boinccmd_log_file.exists() else []
+
+    def write_options(self, options: dict) -> None:
+        self.options_file.write_text(json.dumps(options))
+
     def test_exit_immediately_flag_takes_no_value_and_stops_the_client(self):
         self.start_operator('--exit-immediately')
         self.wait_for_marker()
@@ -208,6 +224,32 @@ class MainTestCase(unittest.TestCase):
         self.assertEqual(self.proc.returncode, 0)
         self.assertEqual(self.read_signal(), 'TERM')
         self.assertNotIn('failed to configure', self.log_contents())
+
+    def test_configured_projects_are_attached(self):
+        self.write_options({'projects': [{'url': 'https://einsteinathome.org/', 'account_key': 'a key'}]})
+
+        self.start_operator('--exit-immediately')
+        self.proc.wait(timeout=10)
+
+        self.assertEqual(self.proc.returncode, 0)
+        self.assertIn('--project_attach https://einsteinathome.org/ a key', self.boinccmd_commands())
+
+    def test_projects_alongside_an_account_manager_stop_the_operator_before_it_starts_anything(self):
+        self.write_options({
+            'account_manager_url': 'https://scienceunited.org',
+            'account_manager_username': 'a username',
+            'account_manager_password': 'a password',
+            'projects': [{'url': 'https://einsteinathome.org/', 'account_key': 'a key'}],
+        })
+
+        self.start_operator()
+        self.proc.wait(timeout=10)
+
+        self.assertEqual(self.proc.returncode, 1)
+        # A contradiction between the options needs no client to answer it, so it is caught before
+        # the client is launched rather than after.
+        self.assertFalse(self.marker_file.exists())
+        self.assertEqual(self.boinccmd_commands(), [])
 
 
 if __name__ == '__main__':

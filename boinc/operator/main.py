@@ -5,7 +5,7 @@ import os
 import signal
 import subprocess
 import sys
-from time import sleep
+from time import monotonic, sleep
 
 from boinc import build_boinc_command
 from boinccmd import configure_boinc_projects, get_state
@@ -13,6 +13,7 @@ from cc_config import prepare_cc_config
 from folders import prepare_data_folders
 from global_prefs_override import link_global_prefs_override
 from gui_rpc_auth import prepare_gui_rpc_auth
+from projects import RETRY_INITIAL_DELAY, RETRY_MAX_DELAY, configure_projects, validate_projects
 from redact import redact_secrets
 from remote_hosts import prepare_remote_hosts
 
@@ -41,6 +42,12 @@ logging.info(f'Configuration loaded from {args.options.name}')
 
 options = json.load(args.options)
 logging.debug(f'Current configuration\n{json.dumps(redact_secrets(options), indent=2)}')
+
+# Checked before anything is started because it needs no client to answer it: a contradiction
+# between the options is the one kind of failure that is cheaper to report than to act on.
+if not validate_projects(options.get('projects'), options.get('account_manager_url')):
+    logging.error(f'BOINC Add-on Operator stopped: the configured projects cannot be applied')
+    sys.exit(1)
 
 data_folder = args.data
 logging.info(f'BOINC data folder {data_folder}')
@@ -92,16 +99,28 @@ while boinc_process.poll() is None and not boinc_process_initialized:
     else:
         logging.debug(f'Waiting for BOINC client to initialize')
 
+pending_projects = []
+
 # A stop requested during initialization (a signal, or the client dying on its own) already means
 # there is nothing left to configure: skipping this avoids running boinccmd against a client that
 # is no longer there to answer it, which would otherwise be misreported as a configuration failure.
 if not stopping_boinc_process and boinc_process.poll() is None:
     projects_configured = configure_boinc_projects(data_folder, options.get('account_manager_url'), options.get('account_manager_username'), options.get('account_manager_password'))
-    if not projects_configured:
+
+    # Asked again after the call and not only before it: attaching an account manager polls it over
+    # the network from inside boinccmd, so a stop arriving meanwhile leaves it talking to a client
+    # that is already gone. That is a stop, not a configuration mistake, and 3.8.5 drew the same
+    # line for a stop during initialization.
+    stopping = stopping_boinc_process or boinc_process.poll() is not None
+
+    if not projects_configured and not stopping:
         boinc_process.send_signal(signal.SIGTERM)
         boinc_process.wait()
         logging.error(f'BOINC Add-on Operator stopped: failed to configure BOINC projects')
         sys.exit(1)
+
+    if not stopping:
+        pending_projects = configure_projects(data_folder, options.get('projects'))
 
 if args.exit_immediately:
     logging.warning(f'Exiting immediately after BOINC client is started')
@@ -109,8 +128,23 @@ if args.exit_immediately:
     boinc_process.send_signal(signal.SIGTERM)
     boinc_process.wait()
 
-while boinc_process.poll() is None:
+# Reconciling the configured projects happens once, at startup: Home Assistant cannot apply an
+# options change without restarting the app, so there is nothing new to read afterwards. The only
+# reason left to wake up is an attach that failed, and only until it succeeds.
+retry_delay = RETRY_INITIAL_DELAY
+next_retry = monotonic() + retry_delay
+
+while pending_projects and boinc_process.poll() is None:
     sleep(0.5)
+    if monotonic() >= next_retry:
+        pending_projects = configure_projects(data_folder, options.get('projects'))
+        retry_delay = min(retry_delay * 2, RETRY_MAX_DELAY)
+        next_retry = monotonic() + retry_delay
+
+# With nothing left to retry, block on the client rather than polling it: wait() with no timeout is
+# a blocking waitpid(), while wait(timeout=...) is a busy loop sleeping up to 50ms a turn -- worse
+# than the sleep(0.5) this replaces. It returns immediately if the client is already gone.
+boinc_process.wait()
 
 logging.debug(f'BOINC client stopped with code {boinc_process.returncode}')
 

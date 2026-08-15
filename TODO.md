@@ -4,7 +4,7 @@ Standing backlog for this repo: known gaps, platform conformance items, and feat
 review. Consult it before starting work — what you are about to investigate may already be written
 up here with file:line references — and update it as items are resolved or discarded.
 
-Last reviewed 2026-08-11. Everything in **Resolved** below has shipped or been deliberately
+Last reviewed 2026-08-15. Everything in **Resolved** below has shipped or been deliberately
 discarded; it is kept in condensed form so the same ground is not re-covered, not as work to do.
 
 ---
@@ -272,31 +272,14 @@ of cost.
 
 ### `boinc` operator
 
-- [ ] **Declare projects to attach in the add-on options** (a `projects:` list). Attractive, but a
-  much bigger step than the existing scalar options, because it turns reconciliation into *set*
-  reconciliation with a destructive removal branch:
-  - **Detach is destructive**, unlike the account-manager detach the operator already does:
-    `boinccmd --project <url> detach` aborts in-progress tasks and deletes downloaded files. So
-    `actual − desired` must *not* map to detach. The BOINC-native soft equivalent is `nomorework`:
-    stop fetching, let current tasks drain. Default to draining; hard detach only on explicit opt-in.
-  - **Ownership needs persisted state**, because BOINC has no labels/annotations on a project.
-    Without a marker, a project the user attached from `boinctui` is indistinguishable from one the
-    operator attached and the user then removed from the options. Same `kubectl apply` trick already
-    used for preferences: keep a `managed_projects` file under `/data` and compute removals as
-    `previously-managed − desired`, never `actual − desired`.
-  - **Mutually exclusive with the account manager**, which owns the project list and re-asserts it
-    on every sync. Reject that combination at startup rather than letting it oscillate.
-  - **Project URLs need canonicalising before diffing** — reuse `boinc/operator/url.py`, which
-    exists for exactly this.
-  - **Credentials**: attach takes an account key, so `--lookup_account <url> <email> <password>`
-    first — a network call per project that can fail or rate-limit.
-  - **This is the first place a real retry loop earns its keep.** Projects go offline for days; a
-    one-shot attach at startup means "project was down at boot → silently never attached". Retry the
-    *additive* half with backoff, never police the removal half on a timer.
-  - **Partial failure becomes normal**: per-project error isolation plus an aggregated result, and
-    the outcome has to reach the exit code.
+None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 
 ## Housekeeping
+
+- [ ] **`boinccmd.py:51` has a vestigial `while not current_account_manager_read:` loop** that always
+  runs exactly once, because its body either returns or sets the flag. Probably a retry loop that
+  lost its retry. Noticed while removing the `sleep(10)` next to it in 3.10.0 and deliberately left
+  alone to keep that change small.
 
 - [ ] `boinc/apparmor.txt.disable` is unmodified add-on template boilerplate (references
   `/etc/services.d`, `/etc/cont-init.d`, bashio, s6-overlay `/init`) — none of which this add-on
@@ -531,6 +514,65 @@ of cost.
   new code**: the `niu_` keys stayed in `MANAGED_PREFERENCES`, so a stale value the operator wrote
   itself falls into the removal branch that has existed since 3.8.1, while one set by the user from
   `boinctui` is untouched.
+
+## Shipped in `boinc` 3.10.0
+
+- [x] **`projects:` — declare the projects to attach in the add-on options.** New
+  `boinc/operator/projects.py` reconciling three sets on every start: `desired` (the option,
+  canonicalized through `url.py`), `actual` (`--get_project_status`), and `managed`
+  (`.managed_projects.json`, the `kubectl apply` pattern already used for preferences). The
+  ownership file has **two** lists, `attached` and `detaching`. Five of the seven constraints
+  written up here survived contact; the design notes below are what measurement changed, so the
+  same ground is not re-covered:
+  - **Credentials: an `account_key` per project, not email + password.** That removes
+    `--lookup_account` entirely, and with it two traps found in BOINC 8.2.15: it takes its exit
+    code from the *initial* RPC rather than the poll, so a failed lookup prints
+    `poll status: can't resolve hostname` and still **exits 0**; and its poll loop has no sleep and
+    no break when the poll RPC itself errors, i.e. an infinite busy loop upstream. Success is only
+    detectable as `account key: <auth>` on stdout.
+  - **Removal is `detach_when_done`, not `nomorework` and not a bare `detach`.** It drains first and
+    detaches after, so no completed work is destroyed. Its flag is **not** among the fields
+    `--get_project_status` prints, which is the whole reason the state file needs a second list: a
+    pending detach is invisible from outside, so a project removed and then re-added would otherwise
+    have a detach fire silently days later. Re-adding sends `dont_detach_when_done` **and**
+    `allowmorework`; BOINC's source pairs the two, but that pairing was the one thing not verified
+    live, so it is asserted explicitly instead of assumed.
+  - **The retry loop earns much less than expected.** `--project_attach` is a *local* RPC that
+    returns instantly and persists even against an unresolvable host — the client then retries the
+    project's own scheduler by itself, indefinitely. So "the project is down" was never the
+    operator's problem. What remains is a bounded backoff (30s → 30min) for a client that is not
+    answering yet, run from the loop that already watches the client rather than a thread.
+  - **No background thread, and the main loop stopped polling.** A thread only earns its place if
+    the attach can block on the network, and it cannot. The wait loop is now `boinc_process.wait()`:
+    in CPython 3.13, `wait()` with no timeout is a blocking `waitpid()`, while `wait(timeout=...)` is
+    an explicit busy loop sleeping up to 50 ms — *worse* than the `sleep(0.5)` it replaced. The
+    operator is now idle in the steady state instead of waking twice a second for the life of the
+    container.
+  - **Reconciliation runs at startup only.** Home Assistant cannot apply an options change without
+    restarting the app, so there is nothing new to read afterwards. A periodic check was rejected
+    for a second reason: combined with the re-attach behaviour below it would make BOINC Manager's
+    detach button useless for any listed project.
+  - **A project detached outside the options comes back on the next start**, deliberately and with
+    no special-cased log line — it is simply `desired − actual`. Consistent with the operator
+    re-asserting its own preference keys on every start. Documented in `DOCS.md`.
+  - **The account manager is refused, not merged**: `projects` plus any `account_manager_url` is a
+    startup failure, before the client is even launched. Separately, a project reported as
+    `attached via Account Manager: yes` is excluded from the diff entirely, which covers a manager
+    attached outside the options.
+  - **Verified end to end against a real client**, not only in unit tests: attach with URL
+    canonicalization, removal → `detach_when_done`, a project attached by hand left untouched, the
+    state file self-healing once the client lets a project go, re-add re-attaching, and the account
+    manager conflict exiting 1 without starting BOINC.
+
+- [x] **`sleep(10)` between detaching and attaching an account manager — deleted, not shortened.**
+  BOINC's `--acct_mgr detach` is `rpc.acct_mgr_rpc("", "", "")`, a single synchronous RPC
+  (`client/boinc_cmd.cpp`); only `attach` and `sync` poll, and they do it inside `boinccmd`. So the
+  wait was for something that had already happened. It also mattered because of what it exposed:
+  `time.sleep()` is *resumed* after a signal handler runs rather than cut short (PEP 475, measured —
+  handler at 0.31 s, `sleep(3)` still returning at 3.01 s), so a stop during that window ended in an
+  attach against a dead client and a **misleading `exit 1`**. `main.py` now re-checks for a stop
+  *after* `configure_boinc_projects` returns, not only before calling it — the same distinction
+  3.8.5 drew for a stop during initialization.
 
 ## Shipped as `boincui`, 0.1.0 → 1.0.0
 

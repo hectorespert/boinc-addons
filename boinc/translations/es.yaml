@@ -1,4 +1,7 @@
 configuration:
+  projects:
+    name: Proyectos
+    description: "Los proyectos científicos para los que computar, cada uno con su dirección y tu clave de cuenta en él. No se puede combinar con las opciones del Gestor de Cuentas: si configuras ambas cosas, la app no arranca"
   gui_rpc_password:
     name: "Contraseña GUI RPC"
     description: "Contraseña para controlar este cliente BOINC de forma remota, por ejemplo desde boinctui. Configúrala si vas a conectarte de forma remota — consulta la documentación de la app para saber qué ocurre si la dejas vacía"

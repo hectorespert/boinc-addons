@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.10.0
+
+Added `projects`, to choose the science projects yourself instead of letting an account manager choose them. Each one needs its address and your account key for it, and it cannot be combined with the account manager options
+
+Removing a project from that list makes BOINC finish the work it already downloaded before leaving the project, so nothing you have computed is thrown away. Projects you attached yourself are never removed
+
+Stop reporting a failure when the app is stopped while it is changing account manager
+
 ## 3.9.1
 
 The Account Manager URL field now rejects an address that is not a valid URL as you type it, instead of failing later when the app starts

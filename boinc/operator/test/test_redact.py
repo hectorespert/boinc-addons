@@ -45,6 +45,29 @@ class RedactTestCase(unittest.TestCase):
 
         self.assertEqual(options, {'gui_rpc_password': 'a gui rpc password'})
 
+    def test_should_redact_the_account_key_of_every_project(self):
+        # Nested inside a list, where the flat pass over the top level cannot reach it. CI runs the
+        # image at DEBUG, so a miss here would put every user's key in a public build log.
+        options = {'projects': [
+            {'url': 'https://einsteinathome.org/', 'account_key': 'a key'},
+            {'url': 'https://boinc.bakerlab.org/rosetta/', 'account_key': 'another key'},
+        ]}
+
+        self.assertEqual(redact_secrets(options), {'projects': [
+            {'url': 'https://einsteinathome.org/', 'account_key': '***'},
+            {'url': 'https://boinc.bakerlab.org/rosetta/', 'account_key': '***'},
+        ]})
+
+    def test_should_not_modify_the_original_projects(self):
+        options = {'projects': [{'url': 'https://einsteinathome.org/', 'account_key': 'a key'}]}
+
+        redact_secrets(options)
+
+        self.assertEqual(options, {'projects': [{'url': 'https://einsteinathome.org/', 'account_key': 'a key'}]})
+
+    def test_should_keep_an_empty_project_list(self):
+        self.assertEqual(redact_secrets({'projects': []}), {'projects': []})
+
 
 if __name__ == '__main__':
     unittest.main()
