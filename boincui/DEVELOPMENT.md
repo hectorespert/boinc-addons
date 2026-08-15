@@ -144,6 +144,18 @@ gets one column because only one fits, not because a breakpoint said so. Measure
 | 1920px | 3 | 506px | 953px |
 | 2560px | 3 | 517px | 953px |
 
+**Those are viewport widths, and through ingress the viewport is not the monitor.** Home Assistant
+renders this app in an iframe beside its own sidebar — 256px expanded, 56px collapsed, hidden
+entirely on a narrow screen — so a 1920px monitor gives the page **1664px** and the column count
+drops a step earlier than the table suggests. That costs nothing here precisely because there are no
+breakpoints: the rule reads whatever width the iframe has. A layout tuned to monitor sizes would have
+been wrong by a sidebar. Measured at the real panel widths: 1664px → 3 columns, 1184px → 2, 1024px →
+2, 768px (a 1024px screen with the sidebar out) → 1, which is what that case already got.
+
+At 1664px the page fills the panel exactly, with no margin either side: `max-width: 102rem` is a
+content-box width, so the body totals 104rem with its padding — 1664px. Coincidence, but a
+convenient one, and a reason not to switch this file to `border-box` without re-measuring.
+
 Three pieces of that declaration are load-bearing and each was got wrong first:
 
 - **`min(24rem, 100%)`, not `24rem`.** Below 24rem a bare minimum overflows the viewport instead of
