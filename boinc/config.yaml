@@ -6,6 +6,11 @@ url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
 arch:
   - aarch64
   - amd64
+# Not for the documented reason ("the image has its own init system") — this one has none. The
+# operator has to *be* PID 1: it detects Protection Mode by checking for it (operator/main.py),
+# which works only because Supervisor grants host_pid solely when Protection Mode is off. Setting
+# `init: true` would put Docker's init at PID 1 and silently disable that warning. Nothing is left
+# unreaped either, since host_pid puts the container in the host's namespace.
 init: false
 ports:
   31416/tcp: null

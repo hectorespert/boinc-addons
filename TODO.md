@@ -115,23 +115,6 @@ findings measured directly against the Supervisor in `.devcontainer`.
   Dockerfile. Work out the supported replacement before removing anything — the `build_from` regex
   bug fixed in `boinc` 3.8.0 / `boinctui` 2.4.1 was found exactly here.
 
-- [ ] **`init: false` is not justified by the documented reason, and `main.py` silently depends on
-  it.** The docs say to disable `init` only when the image has its own init system (s6-overlay);
-  neither image does. Two consequences before changing it:
-  1. The Protection Mode detection at `boinc/operator/main.py:31` (`if current_pid == 1`) is an
-     *undocumented implicit dependency on `init: false`* — it works only because nothing else
-     occupies PID 1. Setting `init: true` would put Docker's init there and silently disable the
-     warning the whole README leads with. This coupling deserves a comment in the code at minimum.
-  2. With no init process, orphaned grandchildren are never reaped. For `boinc` this is masked by
-     `host_pid: true`; for `boinctui`, `ttyd` is PID 1 and spawns `bash` → `boinctui` per session,
-     so zombie accumulation across many ingress sessions is plausible. Check `ps` inside a
-     long-lived `boinctui` container before deciding.
-
-- [ ] **Only `build-addons.yaml` still hardcodes an add-on name**, in the post-build test step
-  (`if: inputs.addon == 'boinc'`). Everything else discovers add-ons by globbing for `config.yaml`.
-  Worth generalising if a second add-on ever wants a post-build check. Its `manifest` job also maps
-  architectures by name (`amd64`, `aarch64`), so a new arch needs that `case` extended.
-
 ### Confirmed correct — checked, no action needed
 
 - **Option types are right as they stand, and the old item about them was half stale (2026-08-15).**
@@ -394,6 +377,44 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 # Resolved — kept so it is not re-litigated
 
 ## Discarded after investigation
+
+- [x] **`init: false` is right in all three, for a reason the HA docs do not list (measured
+  2026-08-16).** The item asked why it was set, since the documented justification — the image ships
+  its own init (s6-overlay) — is false here: all three build from bare `debian:13.5-slim` and the
+  `ENTRYPOINT` *is* the working process. Both halves are now settled and written into the three
+  `config.yaml` files next to the flag, which is where someone about to flip it will be looking.
+  - **`boinc` must keep it, and it is load-bearing.** The Protection Mode warning
+    (`boinc/operator/main.py:39`) works by testing `os.getpid() == 1`: Supervisor grants `host_pid`
+    only when Protection Mode is *off*, so PID 1 is exactly the confined case. `init: true` would put
+    Docker's init at PID 1 and silently drop the warning the whole README leads with — no error, no
+    failing test. `main.py:35-38` already carried a comment saying so; the gap was `config.yaml`
+    saying nothing.
+  - **The zombie worry was unfounded, and the process tree is not what the item assumed.** It
+    predicted `ttyd → bash → boinctui` per session, accumulating unreaped grandchildren across
+    ingress sessions. Measured against the built image: during a live session the table is `1 ttyd`
+    and `65 boinctui` with **PPID 1** — no shell in between, because `run.sh:20` is
+    `bash -c "… exec boinctui"` and the `exec` replaces it. A direct child is reaped by its parent,
+    not by init. Ten sessions opened and abruptly closed (raw websocket client against `/ws`, which
+    is what actually makes ttyd spawn — a TCP connect does not) left **zero processes in state `Z`**.
+    `run.sh`'s own `mkdir`/`chown`/`id` leave nothing either: it `exec`s into ttyd, so bash is gone.
+  - `boincui` never had a question: `main.py` is PID 1 and starts no child process at all.
+  - Signal forwarding, the other thing an init would provide, is already handled by hand —
+    `main.py` forwards `SIGHUP`/`SIGINT`/`SIGQUIT`/`SIGTERM` to the client (see `boinc` 3.8.5).
+  - No behaviour changed, so no version bump: this was comments and backlog.
+
+- [x] **The hardcoded `boinc` in `build-addons.yaml` stays as it is (decided 2026-08-16).** The
+  post-build smoke test is guarded by `if: inputs.addon == 'boinc'`
+  (`.github/workflows/build-addons.yaml:101-116`) — the only place in the pipeline that names an
+  add-on, since everything else discovers them by globbing for `config.yaml`. Generalising it (a
+  per-add-on `test.sh` the workflow runs when present, say) buys nothing today: the command is
+  genuinely `boinc`-specific — `--pid=host`, `--uts=host`, the `/data` volume, the operator's
+  `options.json` — so the abstraction would have exactly one implementation. Revisit only if a
+  second add-on actually gets a post-build check in CI.
+  **The arch `case` in the `manifest` job is the part with a real failure mode**, and it is left
+  standing knowingly: it maps `amd64`/`aarch64` and treats anything else as
+  `::warning:: … skipping check`, so adding `armv7`/`armhf`/`i386` to a `build.yaml` would let a
+  missing platform pass the manifest verification in green. Nothing builds those today; extend the
+  `case` in the same commit if that ever changes.
 
 - [x] **A Home Assistant entity surface is not this repo's job (decided 2026-08-11).** Three items
   used to sit here — link SpuelMett's integration, build HA-native sensors, expose a Prometheus
