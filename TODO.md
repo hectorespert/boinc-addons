@@ -388,6 +388,16 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
   also unblocked adding `apparmor.txt` to `monitored_files` — see Resolved.
 - The Dockerfile labels item was **stale and is closed** — see *Confirmed correct* under
   Conformance. They already agree across all three add-ons.
+- **PR #147 is parked in draft, waiting to be grouped with the next real change.** It closes the
+  `init: false` item — comments in the three `config.yaml` files plus the `TODO.md` entry, no
+  behaviour change — and cannot be merged alone: `config.yaml` is in `monitored_files`, so
+  `check-version` marks all three add-ons as changed and rejects them for having versions that
+  already carry a tag (`check-version.yaml:54`). Whoever merges it must bump **all three** patch
+  versions, not just the one the real change touches, and write each `CHANGELOG.md` entry about
+  that real change rather than about the comments. Delete this line in the same merge.
+  The fix that would stop this recurring — and it will recur, all three `config.yaml` files already
+  carry long comments explaining decisions — is teaching `find-changed-addons.yaml` to ignore
+  comment-only diffs. Not attempted.
 
 ---
 
