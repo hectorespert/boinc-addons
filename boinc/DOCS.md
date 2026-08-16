@@ -224,6 +224,47 @@ time, is ignored — BOINC computes all the time — and a warning explaining wh
     `cpu_usage_limit`
   - Leave unset to use the same limit in both cases
 
+#### Disk Space Options
+
+Three separate limits. They do not replace each other — BOINC applies whichever one is strictest at
+the time, so you can set one, two or all three. Leave one empty and that particular limit simply
+does not apply.
+
+- **disk_max_used_gb** (optional, minimum: 0)
+  - Never use more than this many gigabytes for science data
+  - Example: `20` keeps everything BOINC downloads and computes under 20 GB
+  - Leave empty for no limit of this kind. `0` also means no limit, not "allow nothing"
+
+- **disk_max_used_pct** (optional, range: 0-100)
+  - Never use more than this percentage of the total size of the disk
+  - Leave empty to keep BOINC's own default of 90%
+  - `0` means no limit of this kind
+
+- **disk_min_free_gb** (optional, minimum: 0)
+  - Always leave at least this many gigabytes free on the disk
+  - The one to reach for on a small machine: it protects the disk itself, so a growing project
+    cannot fill the space Home Assistant needs, whatever the other two say
+
+#### Work Buffer Options
+
+How much work to keep downloaded and waiting. A bigger buffer keeps computing going while the
+internet is down, and costs you in two ways: **your backups get bigger**, because downloaded work is
+included in them, and tasks are likelier to miss their deadlines because they sit in the queue
+longer.
+
+- **work_buf_min_days** (optional, range: 0-30)
+  - How many days of work to keep queued at all times
+  - Example: `0.5` keeps about half a day of work in hand
+  - Leave empty to keep BOINC's own default, which is a small buffer of a few hours
+
+- **work_buf_additional_days** (optional, range: 0-30)
+  - Extra days of work to fetch on top of the minimum, whenever BOINC contacts a project anyway
+  - Raising this makes BOINC ask for work less often, in bigger batches
+  - Set both this and `work_buf_min_days` to `0` to download tasks only as they are needed, which
+    is the smallest this app can get on disk and in backups
+
+Projects may send less work than you ask for — how much they hand out is their decision, not yours.
+
 ### Example Configurations
 
 #### Basic Setup with Account Manager
@@ -262,6 +303,18 @@ account_manager_username: "youremail@example.com"
 account_manager_password: "your_password"
 max_ncpus: 50
 cpu_usage_limit: 75
+```
+
+#### Keeping the Disk and the Backups Small
+
+```yaml
+account_manager_url: "https://scienceunited.org"
+account_manager_username: "youremail@example.com"
+account_manager_password: "your_password"
+disk_max_used_gb: 10
+disk_min_free_gb: 5
+work_buf_min_days: 0
+work_buf_additional_days: 0
 ```
 
 #### Full Speed Only When the Computer Is Not in Use
@@ -307,11 +360,17 @@ file — see [Preferences Override](https://github.com/BOINC/boinc/wiki/PrefsOve
 format. Place it in this app's config folder, which appears as `addon_configs/…_boinc` in the
 File editor and Samba apps.
 
-When that file is present, the app uses it as-is and the `start_hour`, `end_hour`, `max_ncpus`,
-`cpu_usage_limit`, `max_ncpus_idle` and `cpu_usage_limit_idle` options are ignored.
+When that file is present, the app uses it as-is and every option below is ignored: `start_hour`,
+`end_hour`, `max_ncpus`, `cpu_usage_limit`, `max_ncpus_idle`, `cpu_usage_limit_idle`,
+`disk_max_used_gb`, `disk_max_used_pct`, `disk_min_free_gb`, `work_buf_min_days` and
+`work_buf_additional_days`.
 
-Otherwise, the app only manages those six settings. Anything else you set from boinctui or a
-remote BOINC Manager — disk limits, memory, network, work buffer, even a schedule using the same
-start/end time fields — is preserved across restarts and updates. Setting one of the six options
-applies it, and removing it from the options clears it again, without touching preferences you set
-yourself elsewhere.
+Otherwise, the app only manages those eleven settings. Anything else you set from boinctui or a
+remote BOINC Manager — memory, network, and the rest — is preserved across restarts and updates.
+Setting one of the eleven options applies it, and removing it from the options clears it again,
+without touching preferences you set yourself elsewhere.
+
+One thing to know if you already set the disk limits or the work buffer from boinctui or BOINC
+Manager: those values are kept as they are until the first time you fill in the matching option
+here. From then on this app owns that setting, and clearing the option restores BOINC's default
+rather than the value you had set elsewhere.

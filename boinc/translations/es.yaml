@@ -38,5 +38,20 @@ configuration:
   cpu_usage_limit_idle:
     name: Porcentaje Máximo de Uso de CPU (Sin Usar)
     description: "Porcentaje máximo de tiempo que puede usarse cada CPU mientras el equipo no está en uso, en lugar de Porcentaje Máximo de Uso de CPU"
+  disk_max_used_gb:
+    name: Espacio Máximo en Disco (GB)
+    description: "No usar nunca más de estos gigabytes para datos científicos. Vacío deja sin poner este límite; de los tres límites se aplica el más estricto"
+  disk_max_used_pct:
+    name: Espacio Máximo en Disco (Porcentaje)
+    description: "No usar nunca más de este porcentaje del disco. Vacío mantiene el valor por defecto de BOINC, el 90%; de los tres límites se aplica el más estricto"
+  disk_min_free_gb:
+    name: Espacio Libre Mínimo en Disco (GB)
+    description: "Dejar siempre libres al menos estos gigabytes. El más seguro de los tres en un equipo pequeño: protege el disco en vez de limitar los datos"
+  work_buf_min_days:
+    name: Reserva Mínima de Trabajo (Días)
+    description: "Días de trabajo a mantener en cola, para seguir computando sin internet. Una reserva grande agranda las copias de seguridad y arriesga incumplir plazos"
+  work_buf_additional_days:
+    name: Reserva Adicional de Trabajo (Días)
+    description: "Días de trabajo extra sobre el mínimo, para que BOINC pida trabajo menos a menudo. Pon ambos a cero para descargar tareas solo según hagan falta"
 network:
   31416/tcp: Puerto GUI RPC del cliente BOINC (por defecto 31416)

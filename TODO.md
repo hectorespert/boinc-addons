@@ -115,23 +115,6 @@ findings measured directly against the Supervisor in `.devcontainer`.
   Dockerfile. Work out the supported replacement before removing anything — the `build_from` regex
   bug fixed in `boinc` 3.8.0 / `boinctui` 2.4.1 was found exactly here.
 
-- [ ] **`init: false` is not justified by the documented reason, and `main.py` silently depends on
-  it.** The docs say to disable `init` only when the image has its own init system (s6-overlay);
-  neither image does. Two consequences before changing it:
-  1. The Protection Mode detection at `boinc/operator/main.py:31` (`if current_pid == 1`) is an
-     *undocumented implicit dependency on `init: false`* — it works only because nothing else
-     occupies PID 1. Setting `init: true` would put Docker's init there and silently disable the
-     warning the whole README leads with. This coupling deserves a comment in the code at minimum.
-  2. With no init process, orphaned grandchildren are never reaped. For `boinc` this is masked by
-     `host_pid: true`; for `boinctui`, `ttyd` is PID 1 and spawns `bash` → `boinctui` per session,
-     so zombie accumulation across many ingress sessions is plausible. Check `ps` inside a
-     long-lived `boinctui` container before deciding.
-
-- [ ] **Only `build-addons.yaml` still hardcodes an add-on name**, in the post-build test step
-  (`if: inputs.addon == 'boinc'`). Everything else discovers add-ons by globbing for `config.yaml`.
-  Worth generalising if a second add-on ever wants a post-build check. Its `manifest` job also maps
-  architectures by name (`amd64`, `aarch64`), so a new arch needs that `case` extended.
-
 ### Confirmed correct — checked, no action needed
 
 - **Option types are right as they stand, and the old item about them was half stale (2026-08-15).**
@@ -271,15 +254,11 @@ findings measured directly against the Supervisor in `.devcontainer`.
 
 ## Config schema — feature gaps vs. upstream BOINC preferences
 
-`boinc/config.yaml` covers the account manager, remote RPC, a computing window and four CPU knobs.
-Common BOINC global preferences not exposed, each roughly one key away in
-`global_prefs_override.py`:
+`boinc/config.yaml` covers the account manager, remote RPC, a computing window, four CPU knobs and —
+since 3.12.0, see Resolved — the three disk limits and the work buffer. Common BOINC global
+preferences still not exposed, each roughly one key away in `global_prefs_override.py`:
 
-- [ ] `work_buf_min_days` / `work_buf_additional_days` — how much work to keep queued; probably the
-  most-requested BOINC knob after CPU limits. **Also the real lever on backup size** — see the
-  closed `backup_exclude` item in Resolved, which found that the exclusion list is not.
 - [ ] GPU usage toggle (`no_gpus` / `exclude_gpu`) — relevant given `video: true` is already granted.
-- [ ] `disk_max_used_gb` / `disk_max_used_pct` — useful on small HA hosts.
 - [ ] `run_on_batteries` — mostly N/A for typical HA hardware, but trivial to add.
 - [ ] A `suspend`/`no_new_work` boolean, to pause computation from the add-on config without
   detaching.
@@ -388,22 +367,59 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
   also unblocked adding `apparmor.txt` to `monitored_files` — see Resolved.
 - The Dockerfile labels item was **stale and is closed** — see *Confirmed correct* under
   Conformance. They already agree across all three add-ons.
-- **PR #147 is parked in draft, waiting to be grouped with the next real change.** It closes the
-  `init: false` item — comments in the three `config.yaml` files plus the `TODO.md` entry, no
-  behaviour change — and cannot be merged alone: `config.yaml` is in `monitored_files`, so
-  `check-version` marks all three add-ons as changed and rejects them for having versions that
-  already carry a tag (`check-version.yaml:54`). Whoever merges it must bump **all three** patch
-  versions, not just the one the real change touches, and write each `CHANGELOG.md` entry about
-  that real change rather than about the comments. Delete this line in the same merge.
-  The fix that would stop this recurring — and it will recur, all three `config.yaml` files already
-  carry long comments explaining decisions — is teaching `find-changed-addons.yaml` to ignore
-  comment-only diffs. Not attempted.
+- **A comment-only edit to a `config.yaml` cannot ship on its own, so two are parked in draft.**
+  `config.yaml` is in `monitored_files`, so `find-changed-addons` marks the add-on as changed and
+  `check-version` then rejects a version that already carries a tag (`check-version.yaml:54`) — a
+  comment forces a release or waits for one. The `init: false` rationale was written for all three
+  add-ons and split accordingly: `boinc`'s rode along with 3.12.0, and the other two wait for a
+  release of their own. Delete this line once both have merged.
+  The fix that would stop this recurring — and it will recur, all three `config.yaml` files carry
+  long comments explaining decisions — is teaching `find-changed-addons.yaml` to ignore
+  comment-only diffs. Not attempted, and not free: a bug in it would silently skip a real release.
 
 ---
 
 # Resolved — kept so it is not re-litigated
 
 ## Discarded after investigation
+
+- [x] **`init: false` is right in all three, for a reason the HA docs do not list (measured
+  2026-08-16).** The item asked why it was set, since the documented justification — the image ships
+  its own init (s6-overlay) — is false here: all three build from bare `debian:13.5-slim` and the
+  `ENTRYPOINT` *is* the working process. Both halves are now settled and written into the three
+  `config.yaml` files next to the flag, which is where someone about to flip it will be looking.
+  - **`boinc` must keep it, and it is load-bearing.** The Protection Mode warning
+    (`boinc/operator/main.py:39`) works by testing `os.getpid() == 1`: Supervisor grants `host_pid`
+    only when Protection Mode is *off*, so PID 1 is exactly the confined case. `init: true` would put
+    Docker's init at PID 1 and silently drop the warning the whole README leads with — no error, no
+    failing test. `main.py:35-38` already carried a comment saying so; the gap was `config.yaml`
+    saying nothing.
+  - **The zombie worry was unfounded, and the process tree is not what the item assumed.** It
+    predicted `ttyd → bash → boinctui` per session, accumulating unreaped grandchildren across
+    ingress sessions. Measured against the built image: during a live session the table is `1 ttyd`
+    and `65 boinctui` with **PPID 1** — no shell in between, because `run.sh:20` is
+    `bash -c "… exec boinctui"` and the `exec` replaces it. A direct child is reaped by its parent,
+    not by init. Ten sessions opened and abruptly closed (raw websocket client against `/ws`, which
+    is what actually makes ttyd spawn — a TCP connect does not) left **zero processes in state `Z`**.
+    `run.sh`'s own `mkdir`/`chown`/`id` leave nothing either: it `exec`s into ttyd, so bash is gone.
+  - `boincui` never had a question: `main.py` is PID 1 and starts no child process at all.
+  - Signal forwarding, the other thing an init would provide, is already handled by hand —
+    `main.py` forwards `SIGHUP`/`SIGINT`/`SIGQUIT`/`SIGTERM` to the client (see `boinc` 3.8.5).
+  - No behaviour changed, so no version bump: this was comments and backlog.
+
+- [x] **The hardcoded `boinc` in `build-addons.yaml` stays as it is (decided 2026-08-16).** The
+  post-build smoke test is guarded by `if: inputs.addon == 'boinc'`
+  (`.github/workflows/build-addons.yaml:101-116`) — the only place in the pipeline that names an
+  add-on, since everything else discovers them by globbing for `config.yaml`. Generalising it (a
+  per-add-on `test.sh` the workflow runs when present, say) buys nothing today: the command is
+  genuinely `boinc`-specific — `--pid=host`, `--uts=host`, the `/data` volume, the operator's
+  `options.json` — so the abstraction would have exactly one implementation. Revisit only if a
+  second add-on actually gets a post-build check in CI.
+  **The arch `case` in the `manifest` job is the part with a real failure mode**, and it is left
+  standing knowingly: it maps `amd64`/`aarch64` and treats anything else as
+  `::warning:: … skipping check`, so adding `armv7`/`armhf`/`i386` to a `build.yaml` would let a
+  missing platform pass the manifest verification in green. Nothing builds those today; extend the
+  `case` in the same commit if that ever changes.
 
 - [x] **A Home Assistant entity surface is not this repo's job (decided 2026-08-11).** Three items
   used to sit here — link SpuelMett's integration, build HA-native sensors, expose a Prometheus
@@ -621,6 +637,34 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
   new code**: the `niu_` keys stayed in `MANAGED_PREFERENCES`, so a stale value the operator wrote
   itself falls into the removal branch that has existed since 3.8.1, while one set by the user from
   `boinctui` is untouched.
+
+## Shipped in `boinc` 3.12.0
+
+- [x] **The three disk limits and the work buffer are now options** — `disk_max_used_gb`,
+  `disk_max_used_pct`, `disk_min_free_gb`, `work_buf_min_days`, `work_buf_additional_days`. Five
+  entries in `MANAGED_PREFERENCES` and five blocks in `build_managed_preferences`; the three-way
+  merge from 3.8.1 carried the rest unchanged. What the work turned up:
+  - **All three disk limits are exposed, not the pair the old item proposed.** They are independent
+    and the client applies the *least* of the three (`CLIENT_STATE::allowed_disk_usage`,
+    `client/cs_prefs.cpp`), so shipping two of three would have made the third's absence look like a
+    limit that does not exist. `disk_min_free_gb` is also the most useful of them on an HA host: it
+    protects the disk rather than capping science data.
+  - **Zero is meaningful and is not the same as unset.** The client skips a limit whose value is
+    falsy, so `disk_max_used_gb: 0` means *no limit*, while leaving the option out removes the tag
+    and restores BOINC's default. Both paths are covered by tests; the docs say so explicitly,
+    because "0 = unlimited" reads as "0 = allow nothing" to everyone who has not read the source.
+  - **Verified against a running client, since parsing proves nothing** — the client silently drops
+    tags it does not know. `boinccmd` cannot dump effective preferences, so the check went over the
+    GUI RPC (`get_global_prefs_working`, the reply BOINC Manager reads): all five arrived, and after
+    removing four of the five options they came back as exactly the defaults `lib/prefs.cpp` declares
+    (`0`, `90`, `0.1`, `0.5`), while the one still set stayed put.
+  - **Three existing tests had quietly stopped testing what they were named for.** They used
+    `disk_max_used_gb` as the stand-in for "a preference set outside the add-on", which this change
+    made managed — they kept passing while asserting something else. Switched to
+    `ram_max_used_busy_pct`, with a comment naming the trap for whoever exposes that one next.
+  - **Schema note:** `float(0,)` with no upper bound is valid (`RE_SCHEMA_ELEMENT` makes both ends
+    optional) and is used for the two GB limits, because a host can have any amount of storage and
+    an invented ceiling would only ever be wrong.
 
 ## Shipped in `boinc` 3.10.0
 

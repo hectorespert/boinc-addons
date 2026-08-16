@@ -101,6 +101,66 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
         self.assertEqual(self.read_preferences(self.global_prefs_override),
                          '<global_preferences>\n  <niu_max_ncpus_pct>10</niu_max_ncpus_pct>\n  <niu_cpu_usage_limit>20.0</niu_cpu_usage_limit>\n</global_preferences>')
 
+    def test_should_create_global_prefs_override_with_disk_configurations(self):
+        link_global_prefs_override(self.data_dir, self.config_dir, {
+            'disk_max_used_gb': 20.0,
+            'disk_max_used_pct': 50.0,
+            'disk_min_free_gb': 5.0
+        })
+
+        self.assertFalse(os.path.islink(self.global_prefs_override))
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n'
+                         '  <disk_max_used_gb>20.0</disk_max_used_gb>\n'
+                         '  <disk_max_used_pct>50.0</disk_max_used_pct>\n'
+                         '  <disk_min_free_gb>5.0</disk_min_free_gb>\n'
+                         '</global_preferences>')
+
+    def test_should_write_a_zero_disk_limit_because_boinc_reads_it_as_no_limit(self):
+        # Zero is not the same as unset here: the client skips a falsy limit
+        # (CLIENT_STATE::allowed_disk_usage), so writing 0 lifts the cap, while leaving the option
+        # out removes the tag and restores BOINC's own default.
+        link_global_prefs_override(self.data_dir, self.config_dir, {'disk_max_used_pct': 0})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n  <disk_max_used_pct>0</disk_max_used_pct>\n</global_preferences>')
+        self.assertEqual(self.read_managed_state(), {'disk_max_used_pct': 0})
+
+    def test_should_create_global_prefs_override_with_work_buffer_configurations(self):
+        link_global_prefs_override(self.data_dir, self.config_dir, {
+            'work_buf_min_days': 0.5,
+            'work_buf_additional_days': 1.5
+        })
+
+        self.assertFalse(os.path.islink(self.global_prefs_override))
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n'
+                         '  <work_buf_min_days>0.5</work_buf_min_days>\n'
+                         '  <work_buf_additional_days>1.5</work_buf_additional_days>\n'
+                         '</global_preferences>')
+
+    def test_should_remove_a_disk_limit_it_wrote_when_its_option_is_gone(self):
+        self.write_managed_state({'disk_min_free_gb': 5.0})
+        self.write_preferences(self.global_prefs_override,
+                               '<global_preferences>\n  <disk_min_free_gb>5.0</disk_min_free_gb>\n</global_preferences>')
+
+        link_global_prefs_override(self.data_dir, self.config_dir, {})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n</global_preferences>')
+        self.assertEqual(self.read_managed_state(), {})
+
+    def test_should_keep_a_disk_limit_set_from_boinctui(self):
+        # Same key, opposite outcome to the test above, and the managed-state file is the only
+        # thing that tells them apart: nothing wrote this one, so it is not the operator's to remove.
+        self.write_preferences(self.global_prefs_override,
+                               '<global_preferences>\n  <disk_min_free_gb>5.0</disk_min_free_gb>\n</global_preferences>')
+
+        link_global_prefs_override(self.data_dir, self.config_dir, {})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n  <disk_min_free_gb>5.0</disk_min_free_gb>\n</global_preferences>')
+
     def test_should_write_all_managed_preferences_in_boinc_manager_order(self):
         link_global_prefs_override(self.data_dir, self.config_dir, {
             'start_hour': '00:35',
@@ -108,11 +168,16 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
             'max_ncpus': 50,
             'cpu_usage_limit': 75.0,
             'max_ncpus_idle': 10,
-            'cpu_usage_limit_idle': 20.0
+            'cpu_usage_limit_idle': 20.0,
+            'disk_max_used_gb': 20.0,
+            'disk_max_used_pct': 50.0,
+            'disk_min_free_gb': 5.0,
+            'work_buf_min_days': 0.5,
+            'work_buf_additional_days': 1.5
         })
 
-        # In-use pair, then not-in-use pair, the same order BOINC Manager's own preferences dialog
-        # presents them in.
+        # In-use pair, then not-in-use pair, then disk and the work buffer, the same order BOINC
+        # Manager's own preferences dialog presents them in.
         self.assertEqual(self.read_preferences(self.global_prefs_override),
                          '<global_preferences>\n'
                          '  <start_hour>0.35</start_hour>\n'
@@ -121,6 +186,11 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
                          '  <cpu_usage_limit>75.0</cpu_usage_limit>\n'
                          '  <niu_max_ncpus_pct>10</niu_max_ncpus_pct>\n'
                          '  <niu_cpu_usage_limit>20.0</niu_cpu_usage_limit>\n'
+                         '  <disk_max_used_gb>20.0</disk_max_used_gb>\n'
+                         '  <disk_max_used_pct>50.0</disk_max_used_pct>\n'
+                         '  <disk_min_free_gb>5.0</disk_min_free_gb>\n'
+                         '  <work_buf_min_days>0.5</work_buf_min_days>\n'
+                         '  <work_buf_additional_days>1.5</work_buf_additional_days>\n'
                          '</global_preferences>')
 
     def test_should_migrate_a_stale_niu_preference_the_operator_wrote_to_the_in_use_key(self):
@@ -197,33 +267,37 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
         self.assertEqual(self.read_preferences(self.global_prefs_override),
                          '<global_preferences>\n</global_preferences>')
 
+    # ram_max_used_busy_pct stands in for "a preference the operator does not own" in the three
+    # tests below. It used to be disk_max_used_gb, which stopped being unmanaged when the disk
+    # limits were added -- leaving the tests passing while no longer testing what they are named
+    # for. Pick another unmanaged preference if this one is ever exposed as an option too.
     def test_should_keep_preferences_set_outside_the_add_on(self):
         self.write_preferences(self.global_prefs_override,
-                               '<global_preferences>\n  <disk_max_used_gb>100</disk_max_used_gb>\n</global_preferences>')
+                               '<global_preferences>\n  <ram_max_used_busy_pct>50</ram_max_used_busy_pct>\n</global_preferences>')
 
         link_global_prefs_override(self.data_dir, self.config_dir, {'max_ncpus': 50})
 
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <disk_max_used_gb>100</disk_max_used_gb>\n  <max_ncpus_pct>50</max_ncpus_pct>\n</global_preferences>')
+                         '<global_preferences>\n  <ram_max_used_busy_pct>50</ram_max_used_busy_pct>\n  <max_ncpus_pct>50</max_ncpus_pct>\n</global_preferences>')
 
     def test_should_update_a_managed_preference_in_place(self):
         self.write_preferences(self.global_prefs_override,
-                               '<global_preferences>\n  <start_hour>22.0</start_hour>\n  <disk_max_used_gb>100</disk_max_used_gb>\n</global_preferences>')
+                               '<global_preferences>\n  <start_hour>22.0</start_hour>\n  <ram_max_used_busy_pct>50</ram_max_used_busy_pct>\n</global_preferences>')
 
         link_global_prefs_override(self.data_dir, self.config_dir, {'start_hour': '00:35', 'end_hour': '08:59'})
 
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <start_hour>0.35</start_hour>\n  <disk_max_used_gb>100</disk_max_used_gb>\n  <end_hour>8.59</end_hour>\n</global_preferences>')
+                         '<global_preferences>\n  <start_hour>0.35</start_hour>\n  <ram_max_used_busy_pct>50</ram_max_used_busy_pct>\n  <end_hour>8.59</end_hour>\n</global_preferences>')
 
     def test_should_remove_a_managed_preference_it_wrote_when_its_option_is_gone(self):
         self.write_managed_state({'start_hour': 22.0})
         self.write_preferences(self.global_prefs_override,
-                               '<global_preferences>\n  <start_hour>22.0</start_hour>\n  <disk_max_used_gb>100</disk_max_used_gb>\n</global_preferences>')
+                               '<global_preferences>\n  <start_hour>22.0</start_hour>\n  <ram_max_used_busy_pct>50</ram_max_used_busy_pct>\n</global_preferences>')
 
         link_global_prefs_override(self.data_dir, self.config_dir, {})
 
         self.assertEqual(self.read_preferences(self.global_prefs_override),
-                         '<global_preferences>\n  <disk_max_used_gb>100</disk_max_used_gb>\n</global_preferences>')
+                         '<global_preferences>\n  <ram_max_used_busy_pct>50</ram_max_used_busy_pct>\n</global_preferences>')
         self.assertEqual(self.read_managed_state(), {})
 
     def test_should_keep_a_managed_preference_it_never_wrote(self):
