@@ -22,7 +22,7 @@ jobs:
     needs: test
     uses: ./.github/workflows/find-changed-addons.yaml
     with:
-      monitored_files: 'build.yaml config.yaml Dockerfile operator server'
+      monitored_files: 'build.yaml config.yaml Dockerfile apparmor.txt operator server'
 
   check_version:
     needs: find_changed

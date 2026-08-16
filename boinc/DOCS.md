@@ -15,6 +15,11 @@ Assistant older than 2026.2, that menu is called **Add-ons**.
 **Security Note:** Disabling Protection Mode grants this app elevated access to host resources.
 Only install it if you understand and accept that.
 
+The app now ships with a security profile: a written list of everything it, and the science
+applications it downloads, are expected to need. For now the list is only being checked against what
+really happens, so that a later update can start enforcing it without interrupting your computing.
+Until then it changes nothing — neither what Protection Mode does, nor the access described above.
+
 ## How to use
 
 ### Account Manager (Easy)
