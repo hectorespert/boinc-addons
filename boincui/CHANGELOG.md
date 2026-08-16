@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0
+
+BOINC UI now comes with a security profile: a list of the only things the app should ever need to do, which is read its own settings and talk to the BOINC machines you listed
+
+In this version the profile only watches. It records anything the app does beyond that list without stopping it, so that the list can be proved right on real installations before it starts being enforced. A later version will switch it on, and that is when it will actually stop the app doing anything else
+
+So nothing changes in how the app works, and nothing can break because of this. Note that the security rating on the app's Info page already goes from 6 to 8 out of 8, which is Home Assistant counting the profile as soon as it exists — it runs ahead of the protection itself until the version that switches it on
+
 ## 1.2.0
 
 Each machine now shows the processor it runs on and how many cores it has, under its name — useful when you have several and their names do not say what they are

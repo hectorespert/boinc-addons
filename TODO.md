@@ -4,7 +4,7 @@ Standing backlog for this repo: known gaps, platform conformance items, and feat
 review. Consult it before starting work — what you are about to investigate may already be written
 up here with file:line references — and update it as items are resolved or discarded.
 
-Last reviewed 2026-08-15. Everything in **Resolved** below has shipped or been deliberately
+Last reviewed 2026-08-16. Everything in **Resolved** below has shipped or been deliberately
 discarded; it is kept in condensed form so the same ground is not re-covered, not as work to do.
 
 ---
@@ -48,20 +48,31 @@ The bugs found in the 2026-08-08 review all shipped in `boinc` 3.8.0–3.9.0 —
 
 ## Security / permissions
 
-- [ ] **`apparmor: false` on all three add-ons, against an explicit documented recommendation.**
-  These add-ons disable AppArmor *and* request `host_pid`, `host_uts`, `docker_api` and `video`, so
-  they sit at the low end of the platform's 1–6 rating by construction. Ties to the dead
-  `boinc/apparmor.txt.disable` under Housekeeping: writing a real profile matching the actual
-  process tree fixes both at once. Realistically a large task, not a quick win — but it should be a
-  recorded decision rather than an unexamined default.
+- [ ] **`apparmor: false` on `boinc` and `boinctui`.** `boincui` now ships a real profile — watching
+  rather than enforcing for now, see Resolved — which leaves the two harder ones. Both were left alone deliberately, not forgotten:
+  each is a different problem from `boincui`, and neither is a quick win.
 
-  **What a profile can and cannot buy here, since it is not the usual case.** BOINC's whole purpose
-  is to download third-party binaries from projects and execute them out of `slots/`, so a profile
-  cannot meaningfully restrict *what runs* — it has to permit executing arbitrary downloaded code,
-  or the add-on does nothing. What it can still do is bound the *blast radius* of that code: keep it
-  out of `/config`, off the host paths `host_pid` exposes, and away from the Docker socket
-  `docker_api` grants. That is worth having, but it is a different claim from the one "AppArmor
-  enabled" usually implies, and the item should be judged on it rather than on the rating.
+  **`boinc`: the rating cannot move, so the profile has to be justified on blast radius alone.**
+  `rating_security` (`supervisor/apps/utils.py`) ends with `if app.access_docker_api or
+  app.with_full_access: rating = 1` — an assignment, not an adjustment, so it overrides everything
+  before it. This add-on requests `docker_api`, so it is pinned at 1/8 whether or not it has a
+  profile. Any argument for writing one here is about what the profile actually prevents, and the
+  number Home Assistant shows will not reward it.
+
+  **And what it prevents is unusually limited.** BOINC's whole purpose is to download third-party
+  binaries from projects and execute them out of `slots/`, so a profile cannot restrict *what runs*
+  — it has to permit executing arbitrary downloaded code, or the add-on does nothing. What it can
+  still do is bound that code's reach: keep it out of `/config`, off the host paths `host_pid`
+  exposes, and away from the Docker socket `docker_api` grants. Worth having, but a different claim
+  from the one "AppArmor enabled" usually implies.
+
+  Ties to the dead `boinc/apparmor.txt.disable` under Housekeeping — that file is template
+  boilerplate for an s6-overlay image this add-on is not, so it is a starting point for nothing.
+
+  **`boinctui` is confining an interactive shell**, which is why it is not simply the `boincui` job
+  again. `run.sh` launches `ttyd`, which spawns `bash` → `boinctui` per ingress session, so the set
+  of executables reachable is "whatever the user types". Its rating is 6 by the same arithmetic
+  `boincui` had (5, −1 for AppArmor, +2 for ingress) — derived from the formula above, not measured.
 
 ## Conformance with the official HA apps docs
 
@@ -274,6 +285,21 @@ The "build a graphical web UI" item that used to dominate this file was answered
 see Resolved for what was decided and why. What follows is what it did **not** settle, in rough order
 of cost.
 
+- [ ] **Switch `boincui`'s AppArmor profile from `complain` to enforcing.** 1.3.0 ships it watching
+  only, and its `CHANGELOG.md` promises a later version that switches it on, so this is a commitment
+  to a user rather than an idea. **The work is deleting `,complain` from the flags line** in
+  `boincui/apparmor.txt`; everything else is deciding when.
+
+  **The gate:** `ha host logs -t kernel | grep 'apparmor="ALLOWED"'` comes back with nothing naming
+  the profile, on a host that has been running the app normally for a while — ideally more than one,
+  since the point of releasing in `complain` was to get evidence from machines that are not this
+  repo's devcontainer. Every line it does return names an operation and an exact path, which is
+  directly the rule to add.
+
+  Until it flips, the app reports 8/8 while confining nothing — see the 1.3.0 entry in Resolved for
+  why that is, and why the changelog says so out loud. **The rating will not change when it flips**,
+  which is worth knowing so nobody reads the unchanged number as the release having done nothing.
+
 - [ ] **Localise `boincui`'s page.** Only `translations/*.yaml` is translated today, and that covers
   configuration fields, not the page itself. If it is ever done, the activity control's wording
   should come from BOINC's own catalogue rather than a third phrasing — `locale/es/BOINC-Manager.po`
@@ -374,6 +400,10 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
   `monitored_files` is a regex that can over-match (`app` would also match
   `boinc/apparmor.txt.disable`), so that example needs a different filename or the note needs
   rewording.
+  **There is now a second reason to delete it**, and it is no longer only cosmetic: while it exists,
+  `apparmor.txt` cannot be added to `monitored_files` without a profile-only change to `boincui`
+  dragging `boinc` into the release gate — see the `boincui` 1.3.0 entry in Resolved. Deleting the
+  file unblocks that one-word CI fix.
 - The Dockerfile labels item was **stale and is closed** — see *Confirmed correct* under
   Conformance. They already agree across all three add-ons.
 
@@ -711,6 +741,71 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     itself.
 
   Between them, the recovery that gotcha 6 in `SKILL.md` documents actually works unattended now.
+
+## Shipped in `boincui` 1.3.0
+
+- [x] **An AppArmor profile for `boincui`, taking it from 6/8 to 8/8** (measured on a running
+  Supervisor before and after: `rating` 6 → 8, `apparmor` `disable` → `profile`). This is the
+  tractable third of the three-add-on item still open above, and it was picked first for a reason:
+  `boincui` executes no downloaded code and has no shell in its path, so the profile can say
+  something strong instead of having to permit everything.
+  - **Enabling it is a deletion.** `ATTR_APPARMOR` defaults to true and Supervisor uses
+    `apparmor.txt` as the profile whenever the file is present, so `config.yaml` declares neither —
+    the add-on linter rejects redeclaring a default.
+  - **The profile's own name does not matter.** `install_apparmor` runs `adjust_profile(self.slug,
+    …)`, which rewrites the `^profile <name>` line to the slug before `validate_profile` compares
+    them; the stored copy reads `profile local_boincui`. Note `get_profile_name` rejects a file with
+    two lines matching `^profile `, so a nested sub-profile must stay indented.
+  - **Every rule was measured, not guessed.** A `strace -f -e trace=file,network` run of the real
+    image against a real BOINC client — startup, a rendered page, an activity change, a clean stop —
+    showed **exactly one `execve`** (the interpreter at startup), **not one file opened for
+    writing**, and three socket families: AF_INET stream, AF_INET dgram (DNS) and AF_UNIX stream
+    (asyncio's self-pipe socketpair). The trace file list is what the rules were written against.
+  - **`abstractions/base` covers more than expected**, which is why the profile is short:
+    `signal (receive) peer=unconfined` (so Docker's SIGTERM still reaches it and the clean shutdown
+    survives), `unix (create)` and `unix peer=(label=@{profile_name})` (asyncio), and
+    `/{usr/,}lib{,32,64}/** r` — which is the whole Python stdlib plus flask and waitress. It does
+    **not** grant any `network` rule; those come from `abstractions/nameservice`, which is also the
+    only reason DNS works. Both abstractions are safe to rely on: the profile is parsed by the
+    *host*, and the official `dnsmasq` add-on profile uses `nameservice`, so HA OS ships it.
+  - **`/` is stat'd by Python at startup and no abstraction grants it**, so the profile does. Found
+    by reading the trace, not by it failing — which is the point, since nothing here could fail.
+  - **Music Assistant's profile is an anti-example worth knowing about**: it declares `capability,`
+    and `file,`, which grant everything, so it earns the +1 rating while confining nothing. The
+    `dnsmasq` one is the honest idiom — permissive outer profile for the s6/bashio layer, real
+    confinement in a nested profile around the binary. `boincui` needs neither, because `python3` is
+    PID 1 and the outer profile *is* the confinement.
+  - **What is verified, and what is not.** Verified: the profile parses under a real
+    `apparmor_parser`; Supervisor reads, renames, validates, stores and registers it; the app starts
+    and works with it declared. **Not verified: that it confines anything.** The devcontainer reports
+    `unsupported: ["apparmor"]`, so `AppArmorControl.available` is false and `docker/app.py` launches
+    the container with `apparmor=unconfined` — confirmed on the running container's `SecurityOpt`.
+    Docker Desktop's VM has no AppArmor either, and no Linux VM tooling is installed on the dev
+    machine. **Enforcement is therefore exercised for the first time on a real HA OS host**, and the
+    strace evidence above is what stands in for a `complain`-mode run. If a user ever reports the app
+    failing to start after this, that is the first place to look.
+  - **1.3.0 ships in `complain` mode and enforces nothing — a deliberate decision, taken knowing the
+    cost.** In that mode AppArmor blocks nothing and logs every access that would have been blocked,
+    so the rules meet a real kernel for the first time on users' hosts instead of on one developer
+    machine, and a rule missing from the profile costs a log line rather than an app that will not
+    start. Given that enforcement could not be tested at all locally (see above), that buys far
+    broader evidence than any pre-release pass on a single host would have.
+    **The cost, measured rather than assumed:** installed in the devcontainer with `complain` set,
+    Supervisor still reported **`rating: 8`** and `apparmor: profile`, because the `apparmor` property
+    (`apps/model.py`) only asks whether a profile of that name is registered and never looks at its
+    mode. So this release shows the maximum security rating while confining nothing — structurally
+    the same gap as the Music Assistant profile above, and the `CHANGELOG.md` entry says so in plain
+    words rather than letting the shield speak for itself. The flag survives `adjust_profile`, which
+    rewrites only the profile name.
+    Also worth knowing for the local-testing route, which still works: copy `boincui/` to the
+    `addons` share and **comment out `image:`**, or Supervisor pulls the published image and 404s on
+    an unreleased version (gotcha 4 in `SKILL.md`).
+  - **`apparmor.txt` is deliberately absent from CI's `monitored_files`**, so a change to the profile
+    alone triggers no build or version check. The pattern list is matched as an *unanchored bash
+    regex* against the whole changed-file string, so adding `apparmor.txt` would also match
+    `boinc/apparmor.txt.disable` and demand a `boinc` version bump on release — the exact over-match
+    CLAUDE.md warns about. There is no anchor that fixes it (`$` matches the end of the entire
+    string, not of one path). Add it once that dead file is deleted; see Housekeeping.
 
 ## Shipped as `boincui`, 0.1.0 → 1.0.0
 
