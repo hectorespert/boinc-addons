@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.0
+
+boinctui now comes with a security profile: the list of the only things it should ever need to do, with the terminal session you actually use held to the shortest list of all. For now the profile only watches and stops nothing, so the list can be proved right on real installations before a later version switches it on. The security rating on the Info page goes from 6 to 8 out of 8 as soon as the profile exists, so it runs ahead of the protection itself until then. Nothing changes in how the app works
+
 ## 2.4.2
 
 The app icon is no longer slightly squashed in the app store

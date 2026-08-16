@@ -48,9 +48,8 @@ The bugs found in the 2026-08-08 review all shipped in `boinc` 3.8.0–3.9.0 —
 
 ## Security / permissions
 
-- [ ] **`apparmor: false` on `boinc` and `boinctui`.** `boincui` now ships a real profile — watching
-  rather than enforcing for now, see Resolved — which leaves the two harder ones. Both were left alone deliberately, not forgotten:
-  each is a different problem from `boincui`, and neither is a quick win.
+- [ ] **`apparmor: false` on `boinc`.** `boincui` and `boinctui` both ship real profiles now —
+  watching rather than enforcing, see Resolved — which leaves the one that is genuinely hard.
 
   **`boinc`: the rating cannot move, so the profile has to be justified on blast radius alone.**
   `rating_security` (`supervisor/apps/utils.py`) ends with `if app.access_docker_api or
@@ -68,11 +67,6 @@ The bugs found in the 2026-08-08 review all shipped in `boinc` 3.8.0–3.9.0 —
 
   Ties to the dead `boinc/apparmor.txt.disable` under Housekeeping — that file is template
   boilerplate for an s6-overlay image this add-on is not, so it is a starting point for nothing.
-
-  **`boinctui` is confining an interactive shell**, which is why it is not simply the `boincui` job
-  again. `run.sh` launches `ttyd`, which spawns `bash` → `boinctui` per ingress session, so the set
-  of executables reachable is "whatever the user types". Its rating is 6 by the same arithmetic
-  `boincui` had (5, −1 for AppArmor, +2 for ingress) — derived from the formula above, not measured.
 
 ## Conformance with the official HA apps docs
 
@@ -285,10 +279,11 @@ The "build a graphical web UI" item that used to dominate this file was answered
 see Resolved for what was decided and why. What follows is what it did **not** settle, in rough order
 of cost.
 
-- [ ] **Switch `boincui`'s AppArmor profile from `complain` to enforcing.** 1.3.0 ships it watching
-  only, and its `CHANGELOG.md` promises a later version that switches it on, so this is a commitment
-  to a user rather than an idea. **The work is deleting `,complain` from the flags line** in
-  `boincui/apparmor.txt`; everything else is deciding when.
+- [ ] **Switch the AppArmor profiles from `complain` to enforcing — `boincui` and `boinctui` both.**
+  `boincui` 1.3.0 and `boinctui` 2.5.0 ship them watching only, and both changelogs promise a later
+  version that switches them on, so this is a commitment to a user rather than an idea. **The work is
+  deleting `complain` from the flags line** — but in `boinctui/apparmor.txt` there are **two** such
+  lines, because a nested profile carries its own mode and the inner one is the half that matters.
 
   **The gate:** `ha host logs -t kernel | grep 'apparmor="ALLOWED"'` comes back with nothing naming
   the profile, on a host that has been running the app normally for a while — ideally more than one,
@@ -741,6 +736,38 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     itself.
 
   Between them, the recovery that gotcha 6 in `SKILL.md` documents actually works unattended now.
+
+## Shipped in `boinctui` 2.5.0
+
+- [x] **An AppArmor profile for `boinctui`, 6/8 → 8/8, nested and in `complain` like `boincui`'s.**
+  - **The old entry here was wrong, and measuring it is what corrected it.** It claimed this add-on
+    "is confining an interactive shell … the set of executables reachable is whatever the user
+    types", and used that to file it as the harder job. Neither half holds. `ttyd` runs
+    `bash -c "HOME=… exec boinctui"`, and that `exec` replaces the shell, so no prompt is ever
+    reachable; and the `boinctui` binary contains no `system`, `popen`, `exec*` or `fork` and no
+    reference to a shell or `$EDITOR` — checked with a method verified against the same binary,
+    which does find `socket`, `connect` and `curses` in it. A traced session confirms it: the set of
+    programs ever executed is closed and is six — `bash`, `mkdir`, `chown`, `id`, `ttyd`, `boinctui`.
+  - **Nested, unlike `boincui`'s flat profile, because there really are two privilege domains.**
+    `run.sh` runs as root and needs exactly three capabilities — `chown` for `chown -R` on the data
+    directory (measured: `fchownat(… , 1000, 1000)`), and `setuid`/`setgid` for ttyd's `-u`/`-g`. The
+    session ttyd then spawns runs as uid 1000 and needs none, and it is the only part exposed to
+    what a BOINC client sends and to what the user does in the browser. It gets a `cx -> session`
+    sub-profile with no capability rule at all.
+  - **The transition is on `boinctui`, not on `bash`**, because `run.sh` and the session shell are
+    the same binary and no rule can tell them apart. Harmless: the shell only ever execs `boinctui`,
+    and ttyd has already dropped privileges by then, so the window is one exec long and unprivileged
+    anyway — the kernel drops the capabilities at `setuid` regardless of what the profile grants.
+  - **`/usr/bin/env` needs its own `x` rule** and omitting it would stop the app before a line of
+    `run.sh` ran: the script starts `#!/usr/bin/env bash`, so the kernel execs `env` as the
+    interpreter and AppArmor mediates that exec too. Found by reading the trace.
+  - **`/usr/share/terminfo/**` is not covered by `abstractions/base`** and ncurses needs it. The pty
+    (`/dev/ptmx`, `/dev/pts/*`, `/dev/tty`) needs rules as well.
+  - **No rule may name either profile.** `adjust_profile` rewrites only the first line matching
+    `^profile `, so a `peer=boinctui` would survive the rename and then point at a profile that does
+    not exist. The signal rules are therefore written without a `peer=`. Verified on a running
+    Supervisor: the outer profile is stored as `local_boinctui` while the indented `profile session`
+    keeps its own name, and both carry the `complain` flag.
 
 ## Shipped in `boincui` 1.3.0
 
