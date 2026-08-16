@@ -1,5 +1,5 @@
 name: boinctui
-version: "2.4.2"
+version: "2.5.0"
 slug: boinctui
 description: Fullscreen text mode manager for BOINC client
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinctui"
@@ -11,5 +11,6 @@ ingress: true
 ingress_port: 7681
 panel_icon: mdi:console
 image: "ghcr.io/hectorespert/addon-boinctui"
-apparmor: false
+# `apparmor` defaults to true, and Supervisor loads apparmor.txt as the profile when the file is
+# present, so neither is declared here -- the add-on linter rejects redeclaring a default.
 backup: cold

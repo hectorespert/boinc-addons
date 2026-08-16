@@ -1,0 +1,140 @@
+#include <tunables/global>
+
+# Confinement for the boinctui app.
+#
+# Supervisor renames this profile to the app's slug when it installs it (`adjust_profile`), so the
+# name below is only what the file calls itself. It rewrites the first line matching `^profile ` and
+# nothing else, which is why the nested profile further down stays indented and keeps its own name,
+# and why no rule here may refer to either profile by name -- a `peer=boinctui` would survive the
+# rename and then point at a profile that does not exist.
+#
+# This add-on has two privilege domains, and that is the whole reason the profile is nested rather
+# than flat:
+#
+#   * `/run.sh` runs as root. It creates /data/boinctui, chowns it to the boinctui user, and execs
+#     ttyd, which itself drops to that user with `-u`/`-g`. That part legitimately needs three
+#     capabilities.
+#   * the session ttyd then spawns -- `bash -c "exec boinctui"` -- runs as uid 1000 and needs no
+#     capability at all. It is also the only part exposed to anything hostile: whatever a BOINC
+#     client sends back over the network, and whatever the user does in the browser. So it gets its
+#     own profile below, with no capability rules whatsoever.
+#
+# Everything here was measured against a real ttyd session driven through a browser, talking to a
+# real BOINC client, traced with `strace -f` across the whole process tree. What that showed:
+#   * the set of programs ever executed is closed and is six: bash, mkdir, chown, id, ttyd and
+#     boinctui. No other `x` rule is needed, and none is granted.
+#   * `boinctui` cannot start a process at all -- its binary contains no `system`, `popen`, `exec*`
+#     or `fork`, and no reference to a shell or to $EDITOR, checked with a method that does find
+#     `socket`, `connect` and `curses` in that same binary. `bash -c "exec boinctui"` replaces
+#     itself, so no shell is reachable from the terminal the user is looking at.
+#   * the only privileged operations are `fchownat` on /data/boinctui as root, and ttyd's own drop
+#     to uid/gid 1000.
+#   * sockets: AF_INET stream (the RPC connection and ttyd's listener), AF_INET dgram and
+#     AF_NETLINK raw (DNS), and AF_UNIX stream (libwebsockets' internals).
+#
+# LIKE `boincui`, THIS SHIPS IN `complain` MODE AND ENFORCES NOTHING. AppArmor blocks nothing and
+# instead logs every access that would have been blocked, so a missing rule shows up as a log line
+# on a real host rather than as an app that will not start -- which matters more here than it did
+# for boincui, because this one changes privileges and allocates a pty. No rule below has ever
+# actually blocked anything: neither the repo's devcontainer nor Docker Desktop has AppArmor in the
+# kernel. Read the results on any host running this app with:
+#
+#   ha host logs -t kernel | grep 'apparmor="ALLOWED"'
+#
+# TO FINISH THE JOB: once that comes back empty after normal use, delete `complain` from the flags
+# on BOTH profiles below. A nested profile carries its own mode, so removing it from the outer one
+# alone would leave the session still merely watched -- and that is the half that matters.
+#
+# Until then Home Assistant shows this app at 8/8, because Supervisor rates an app on whether a
+# profile of its name is registered and never looks at the mode. The rating is ahead of the reality,
+# deliberately and temporarily.
+profile boinctui flags=(attach_disconnected,mediate_deleted,complain) {
+  #include <abstractions/base>
+  # `id` and bash resolve the boinctui user through this; it also carries the rules DNS needs.
+  #include <abstractions/nameservice>
+
+  # Only usable while the process is still root, which is `run.sh` and ttyd's own startup: the
+  # kernel drops them the moment ttyd calls setuid, so nothing downstream can use them even in the
+  # outer profile. `chown` is for `chown -R` on the data directory, the other two are ttyd's `-u`
+  # and `-g`.
+  capability chown,
+  capability setuid,
+  capability setgid,
+
+  # ttyd signals a session when its browser tab goes away. Written without a `peer=` on purpose --
+  # naming either profile here would not survive Supervisor's rename, see the note at the top.
+  signal (send) set=(kill,term,int,hup,cont),
+  signal (receive),
+
+  # ttyd's listener on 7681, which is what ingress connects to.
+  network inet stream,
+  network inet6 stream,
+
+  # Stat'd while resolving paths at startup, and granted by no abstraction. Reading the root
+  # directory entry gives away nothing on its own -- everything under it still needs a rule.
+  / r,
+
+  # The entrypoint. `/usr/bin/env` is here because run.sh starts with `#!/usr/bin/env bash`, so the
+  # kernel execs env as the interpreter and AppArmor mediates that too -- omitting it stops the app
+  # before a single line of the script runs.
+  /run.sh rix,
+  /usr/bin/env mrix,
+  /{usr/,}bin/bash mrix,
+
+  # The three helpers run.sh calls, and nothing else.
+  /usr/bin/{mkdir,chown,id} mrix,
+
+  # The terminal server itself.
+  /usr/local/bin/ttyd mrix,
+
+  # Allocating the pty each session runs on.
+  /dev/ptmx rw,
+  /dev/pts/* rw,
+  /dev/tty rw,
+
+  # The data directory: created, chowned, and used as the boinctui user's home.
+  /data/ r,
+  /data/boinctui/ rw,
+  /data/boinctui/** rw,
+
+  # ncurses reads the terminal description, and abstractions/base covers none of it. Both paths are
+  # needed and both forms of each: it searches /etc/terminfo first, and the directories themselves
+  # are stat'd, which `/**` alone does not match.
+  /etc/terminfo/{,**} r,
+  /usr/share/terminfo/{,**} r,
+
+  # The session, in its own profile with no capabilities. The transition is on boinctui rather than
+  # on bash because both this script and the session shell are the same binary and a rule cannot
+  # tell them apart -- but the shell only ever execs boinctui, and by then ttyd has already dropped
+  # privileges, so the window is a single exec long and unprivileged throughout.
+  /usr/bin/boinctui cx -> session,
+
+  profile session flags=(attach_disconnected,mediate_deleted,complain) {
+    #include <abstractions/base>
+    # Reaching a BOINC client configured by hostname, and reading /etc/passwd for the user's home.
+    #include <abstractions/nameservice>
+
+    # No capability rule appears here, deliberately: this is the part of the app that reads what a
+    # BOINC client sends and what the user types, and it needs none.
+
+    signal (receive),
+
+    # The GUI RPC connection to each BOINC client.
+    network inet stream,
+    network inet6 stream,
+
+    / r,
+    /usr/bin/boinctui mr,
+
+    # Its home: `.boinctui.cfg` holds the machines the user configured, and `boinctui.log`.
+    /data/boinctui/ r,
+    /data/boinctui/** rw,
+
+    /etc/terminfo/{,**} r,
+    /usr/share/terminfo/{,**} r,
+
+    # The terminal it draws on, already opened by ttyd.
+    /dev/pts/* rw,
+    /dev/tty rw,
+  }
+}
