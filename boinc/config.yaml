@@ -1,11 +1,16 @@
 name: BOINC
-version: "3.11.0"
+version: "3.12.0"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
 arch:
   - aarch64
   - amd64
+# Not for the documented reason ("the image has its own init system") — this one has none. The
+# operator has to *be* PID 1: it detects Protection Mode by checking for it (operator/main.py),
+# which works only because Supervisor grants host_pid solely when Protection Mode is off. Setting
+# `init: true` would put Docker's init at PID 1 and silently disable that warning. Nothing is left
+# unreaped either, since host_pid puts the container in the host's namespace.
 init: false
 ports:
   31416/tcp: null
@@ -36,6 +41,14 @@ schema:
   cpu_usage_limit: "float(0,100)?"
   max_ncpus_idle: "float(0,100)?"
   cpu_usage_limit_idle: "float(0,100)?"
+  # The disk limits have no upper bound worth inventing -- a host can have any amount of storage --
+  # so only the lower one is declared. Zero is deliberately allowed on the first two: BOINC reads it
+  # as "no limit" rather than "allow nothing".
+  disk_max_used_gb: "float(0,)?"
+  disk_max_used_pct: "float(0,100)?"
+  disk_min_free_gb: "float(0,)?"
+  work_buf_min_days: "float(0,30)?"
+  work_buf_additional_days: "float(0,30)?"
 image: "ghcr.io/hectorespert/addon-boinc"
 # `apparmor` defaults to true, and Supervisor loads apparmor.txt as the profile when the file is
 # present, so neither is declared here -- the add-on linter rejects redeclaring a default.

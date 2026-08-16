@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.12.0
+
+Added five options to control how much of your machine BOINC takes: a cap in gigabytes, a cap as a percentage of the disk, an amount of free space to always leave alone, and how many days of work to keep downloaded and waiting. The strictest disk limit you set is the one that applies. Keeping less work queued is also the way to make this app's backups smaller
+
 ## 3.11.0
 
 BOINC now comes with a security profile: the list of the only things it should ever need to do, with the science applications it downloads held to a far shorter list than the app itself — their own work folder, and no way out to the network or to the rest of your system. For now the profile only watches and stops nothing, so the list can be proved right against real work units before a later version switches it on. The security rating on the Info page does not change: this app needs access that holds it at the lowest score whatever else it does. Nothing changes in how the app works

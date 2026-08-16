@@ -6,13 +6,16 @@ import xml.etree.ElementTree as ElementTree
 ROOT_ELEMENT = 'global_preferences'
 
 # The preferences this operator owns, in the order they are written: the computing schedule pair,
-# then the in-use CPU limits, then their not-in-use ("niu_") counterparts -- the same order BOINC
-# Manager uses in its own preferences dialog. Everything else in global_prefs_override.xml belongs
-# to whoever put it there (boinctui, a remote BOINC Manager) and is preserved untouched.
+# then the in-use CPU limits, then their not-in-use ("niu_") counterparts, then the disk limits and
+# the work buffer -- the same order BOINC Manager uses in its own preferences dialog. Everything
+# else in global_prefs_override.xml belongs to whoever put it there (boinctui, a remote BOINC
+# Manager) and is preserved untouched.
 MANAGED_PREFERENCES = (
     'start_hour', 'end_hour',
     'max_ncpus_pct', 'cpu_usage_limit',
     'niu_max_ncpus_pct', 'niu_cpu_usage_limit',
+    'disk_max_used_gb', 'disk_max_used_pct', 'disk_min_free_gb',
+    'work_buf_min_days', 'work_buf_additional_days',
 )
 
 # What the operator wrote on its last run. BOINC cannot record this for us: the client writes the
@@ -71,6 +74,36 @@ def build_managed_preferences(data: dict) -> dict:
     max_cpu_usage_idle = data.get('cpu_usage_limit_idle')
     if max_cpu_usage_idle is not None:
         preferences['niu_cpu_usage_limit'] = max_cpu_usage_idle
+
+    # The three disk limits are independent and the client applies the *least* of them
+    # (CLIENT_STATE::allowed_disk_usage, client/cs_prefs.cpp), so setting one does not disable
+    # another -- which is why all three are exposed rather than a chosen pair. Zero is meaningful
+    # for the first two and means "no limit": the client skips a limit whose value is falsy, so
+    # writing 0 is not the same as leaving the option unset, which removes the tag entirely and
+    # restores BOINC's own default.
+    disk_max_used_gb = data.get('disk_max_used_gb')
+    if disk_max_used_gb is not None:
+        preferences['disk_max_used_gb'] = disk_max_used_gb
+
+    disk_max_used_pct = data.get('disk_max_used_pct')
+    if disk_max_used_pct is not None:
+        preferences['disk_max_used_pct'] = disk_max_used_pct
+
+    disk_min_free_gb = data.get('disk_min_free_gb')
+    if disk_min_free_gb is not None:
+        preferences['disk_min_free_gb'] = disk_min_free_gb
+
+    # How much work to keep queued. These two add up: the client asks for work until it holds
+    # work_buf_min_days, and tops up to work_buf_min_days + work_buf_additional_days when it talks
+    # to a project anyway. Both are clamped at zero by the client (GLOBAL_PREFS::parse), and the
+    # schema already refuses a negative, so nothing is validated here.
+    work_buf_min_days = data.get('work_buf_min_days')
+    if work_buf_min_days is not None:
+        preferences['work_buf_min_days'] = work_buf_min_days
+
+    work_buf_additional_days = data.get('work_buf_additional_days')
+    if work_buf_additional_days is not None:
+        preferences['work_buf_additional_days'] = work_buf_additional_days
 
     return preferences
 

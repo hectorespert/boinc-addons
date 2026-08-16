@@ -38,5 +38,20 @@ configuration:
   cpu_usage_limit_idle:
     name: Max CPU Usage Percentage (Not In Use)
     description: "Maximum percentage of time each CPU can be used while the computer is not in use, instead of Max CPU Usage Percentage"
+  disk_max_used_gb:
+    name: Maximum Disk Space (GB)
+    description: "Never use more than this many gigabytes for science data. Leave empty for no limit of this kind; whichever of the three disk limits is strictest wins"
+  disk_max_used_pct:
+    name: Maximum Disk Space (Percentage)
+    description: "Never use more than this percentage of the total disk. Leave empty to keep BOINC's default of 90%; whichever of the three disk limits is strictest wins"
+  disk_min_free_gb:
+    name: Minimum Free Disk Space (GB)
+    description: "Always leave at least this many gigabytes free. The safest of the three limits on a small machine, because it protects the disk rather than capping science data"
+  work_buf_min_days:
+    name: Minimum Work Buffer (Days)
+    description: "How many days of work to keep queued, so computing continues while the internet is down. Larger buffers make backups bigger and risk missing deadlines"
+  work_buf_additional_days:
+    name: Additional Work Buffer (Days)
+    description: "Extra days of work to fetch on top of the minimum, so BOINC asks for work less often. Set both to zero to download tasks only as they are needed"
 network:
   31416/tcp: BOINC client GUI RPC port (default 31416)
