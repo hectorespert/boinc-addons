@@ -1,5 +1,5 @@
 name: BOINC UI
-version: "1.2.0"
+version: "1.3.0"
 slug: boincui
 description: Graphical web interface to monitor and control the BOINC client
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boincui"
@@ -22,5 +22,6 @@ schema:
       port: "port?"
       password: "password"
 image: "ghcr.io/hectorespert/addon-boincui"
-apparmor: false
+# `apparmor` defaults to true, and Supervisor loads apparmor.txt as the profile when the file is
+# present, so neither is declared here -- the add-on linter rejects redeclaring a default.
 backup: cold

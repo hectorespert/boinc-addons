@@ -231,3 +231,9 @@ editing files outside a changed add-on's directory does not trigger its pipeline
   comments, or the PR description. Never point a user at a file or command they can't reach from
   the Home Assistant UI, the File editor add-on, or Samba. When an option's behavior changes,
   update its text in `translations/` too.
+- **A `CHANGELOG.md` entry is one paragraph, four or five lines at most.** It is read in a dialog by
+  someone deciding whether to press Update, not by a reviewer, so it says what changes for them and
+  stops. Everything that explains, justifies or qualifies the change — measurements, trade-offs,
+  what was rejected — goes in the PR description, `TODO.md` or a code comment, all of which have
+  room and the right audience. If an entry needs a second paragraph to stay honest, that is a sign
+  the release itself is doing two things.

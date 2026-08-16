@@ -1,0 +1,95 @@
+#include <tunables/global>
+
+# Confinement for the BOINC UI app.
+#
+# Supervisor renames this profile to the app's slug when it installs it (`adjust_profile`), so the
+# name below is only what the file calls itself; the loaded profile is named `local_boincui` or
+# `<repository>_boincui` depending on where the app was installed from.
+#
+# Unlike most Home Assistant apps this one has no s6-overlay or bashio layer to accommodate: the
+# container's entrypoint is `python3 /opt/boincui/main.py`, so the interpreter is PID 1 and this
+# outer profile is the confinement itself rather than a permissive wrapper around a nested one.
+# That is why there is no `file,` or `capability,` blanket rule here -- those grant everything, and
+# nothing in this app needs them.
+#
+# Every rule below was measured against a running container (startup, a rendered page, an activity
+# change against a real BOINC client, and a clean stop), not assumed. What that trace showed:
+#   * exactly one execve -- the interpreter itself, at startup;
+#   * not a single file opened for writing;
+#   * AF_INET stream (the ingress listener and the RPC connections), AF_INET dgram (DNS resolution)
+#     and AF_UNIX stream (asyncio's internal self-pipe socketpair).
+#
+# That trace is a stand-in for the check nobody can run on a development machine: neither the repo's
+# devcontainer nor Docker Desktop has AppArmor in the kernel, so no rule here has ever actually
+# blocked anything.
+#
+# WHICH IS WHY THIS PROFILE SHIPS IN `complain` MODE, AND ENFORCES NOTHING. In that mode AppArmor
+# blocks nothing at all and instead logs every access that *would* have been blocked, so a rule
+# missing from the list below shows up as a log line on a real user's host rather than as an app
+# that will not start. That is the whole point: the rules get their first contact with a real
+# kernel on many machines, at no risk to any of them.
+#
+# Reading the results, on any host running this app:
+#
+#   ha host logs -t kernel | grep 'apparmor="ALLOWED"'
+#
+# Every line naming this profile is a rule that is missing here; it gives the operation and the
+# exact path, so it translates straight into a line below. Expect repeats -- a missing rule on the
+# polling path is logged once per cycle.
+#
+# TO FINISH THE JOB: once that command comes back empty on a host that has been using the app
+# normally for a while, delete `,complain` from the flags line below and release it. Only then does
+# any of this actually confine anything.
+#
+# One caveat to hold on to until that happens: Supervisor rates an app on whether a profile of its
+# name is registered and never looks at the mode (`apparmor` in `apps/model.py`), so Home Assistant
+# already shows this app at 8/8 while the rules below are only being watched. The rating is ahead
+# of the reality, deliberately and temporarily.
+profile boincui flags=(attach_disconnected,mediate_deleted,complain) {
+  #include <abstractions/base>
+  # Resolving a machine configured by hostname rather than by address. Also brings the inet rules
+  # DNS itself needs, which is why there is no `network inet dgram` line below.
+  #include <abstractions/nameservice>
+
+  # No capabilities are granted at all. The app runs as root because Home Assistant apps do, but it
+  # binds an unprivileged port, changes no identity and opens no device, so it needs none -- and
+  # omitting them is what denies them.
+
+  # Talking to BOINC clients over GUI RPC, and serving the page back to ingress. Both directions are
+  # plain TCP; inet6 is here because a machine on the user's LAN may be reached over IPv6, even
+  # though the traced run only used IPv4.
+  network inet stream,
+  network inet6 stream,
+
+  # The interpreter. This is deliberately the only executable in the image the profile will run:
+  # with no other `x` rule, a flaw in the page or a hostile reply from a BOINC client cannot reach
+  # a shell, which is the strongest thing this profile buys.
+  /usr/bin/python3* mrix,
+
+  # Python stats the root directory once while working out its own paths at startup, and no
+  # abstraction grants it. Reading the directory entry gives away nothing on its own -- every path
+  # under it still has to be matched by a rule below.
+  / r,
+
+  # The app's own code and its templates. Read-only -- it never writes to them. The Python standard
+  # library and flask/waitress under /usr/lib are already readable through abstractions/base.
+  /opt/ r,
+  /opt/boincui/ r,
+  /opt/boincui/** r,
+
+  # A sys.path entry Python stats at startup and this image does not have. Allowed only so it fails
+  # as "absent" rather than as a denial in the host's audit log; nothing is ever loaded from it.
+  /usr/local/lib/python3*/dist-packages/ r,
+
+  # The app's own data volume, which is where Supervisor writes options.json. Only options.json is
+  # ever read today and nothing is ever written, but a private volume is not worth confining more
+  # tightly than this: the secrets it holds are read, not written, so denying writes would protect
+  # nothing while breaking any future version that wants to keep state.
+  /data/ r,
+  /data/** rw,
+
+  # Werkzeug spools a large enough request body to a temporary file while parsing a form. This app's
+  # forms are a few bytes, so the traced run never touched /tmp -- this is here so that a request
+  # crafted to be big enough fails as a bad request instead of as a server error.
+  /tmp/** rw,
+}
