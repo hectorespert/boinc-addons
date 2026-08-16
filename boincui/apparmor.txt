@@ -71,11 +71,24 @@ profile boincui flags=(attach_disconnected,mediate_deleted,complain) {
   # under it still has to be matched by a rule below.
   / r,
 
-  # The app's own code and its templates. Read-only -- it never writes to them. The Python standard
-  # library and flask/waitress under /usr/lib are already readable through abstractions/base.
+  # The app's own code and its templates. Read-only -- it never writes to them, and with
+  # PYTHONDONTWRITEBYTECODE set in the Dockerfile it never tries to leave a __pycache__ here either.
   /opt/ r,
   /opt/boincui/ r,
   /opt/boincui/** r,
+
+  # The interpreter's own tree: the standard library, and flask/waitress/jinja2 from Debian.
+  #
+  # 1.3.0 claimed abstractions/base already covered this and it does not. Base grants
+  # `/{usr/,}lib{,32,64}/**.so*  mr,` -- the extension modules and nothing else. Counted on a traced
+  # run: of the 326 paths this app opens under /usr/lib, **9** match that rule and **317** do not,
+  # the .pyc files of the standard library being most of them. Enforced without these two lines,
+  # Python could not import its own standard library and the app would not start at all.
+  #
+  # `mr` rather than `r` to match `boinc/apparmor.txt`: the mapping is what lib-dynload needs, and
+  # granting it on read-only interpreter files beside them costs nothing.
+  /usr/lib/python3*/{,**} mr,
+  /usr/lib/python3/dist-packages/{,**} mr,
 
   # A sys.path entry Python stats at startup and this image does not have. Allowed only so it fails
   # as "absent" rather than as a denial in the host's audit log; nothing is ever loaded from it.

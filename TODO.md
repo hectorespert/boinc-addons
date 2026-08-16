@@ -65,14 +65,8 @@ The bugs found in the 2026-08-08 review all shipped in `boinc` 3.8.0–3.9.0 —
   repo's devcontainer. Every line it does return names an operation and an exact path, which is
   directly the rule to add.
 
-  **One gap is already known without waiting for a log, in `boincui`.** Its profile grants
-  `/opt/boincui/** r` and the interpreter itself, but nothing for the interpreter's own tree, and
-  `abstractions/base` covers only `**.so*` — the extension modules, not the `.py` files beside them.
-  Enforced as written, Python could not import its standard library and the app would not start.
-  `boinc/apparmor.txt` has the rule (`/usr/lib/python3*/{,**} mr,` and the two dist-packages paths,
-  `mr` rather than `r`); `boincui` needs the same three lines. Deliberately **not** folded into
-  `boinc` 3.11.0: `apparmor.txt` is now in `monitored_files`, so touching that file releases
-  `boincui`, and one release should do one thing. `boinctui` is unaffected — no Python in it.
+  **The one gap that was known without waiting for a log is fixed** — `boincui` 1.3.1, see Resolved.
+  Nothing else is known to be missing, which is exactly what the soak is for.
 
   **`boinc` needs the longest soak, and can be flipped separately.** Its profile is the only one
   making a claim about code nobody here has read: the client executes binaries downloaded from
@@ -865,6 +859,25 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     dragged `boinc` into the release gate. A profile change now releases its own add-on and only its
     own. `CLAUDE.md`'s over-match example was rewritten around this, since it used to cite the
     deleted path.
+
+## Shipped in `boincui` 1.3.1
+
+- [x] **The 1.3.0 profile could not have been enforced: it granted nothing for the Python
+  interpreter's own tree.** Found while writing `boinc/apparmor.txt`, not by a log line, and the
+  profile's own comment asserted the opposite — that `abstractions/base` already covered the standard
+  library and flask/waitress. It does not: base grants `/{usr/,}lib{,32,64}/**.so*  mr,`, the
+  extension modules and nothing else. **Counted on a traced run: of the 326 paths `boincui` opens
+  under `/usr/lib`, 9 match that rule and 317 do not** — the standard library's `.pyc` files being
+  most of them. Enforced as written, Python could not have imported its own standard library and the
+  app would not have started.
+  - Fixed with two rules, `/usr/lib/python3*/{,**} mr,` and `/usr/lib/python3/dist-packages/{,**} mr,`
+    — the same lines `boinc/apparmor.txt` carries, and the false comment above them is now the
+    measurement instead.
+  - Nothing changed for a user: the profile is in `complain` mode, so a missing rule blocked nothing.
+    That is precisely the risk `complain` exists to absorb, and this is the first time it paid.
+  - `boinctui` is unaffected — no Python in it. `boinc` had the rules from the start.
+  - Kept out of `boinc` 3.11.0 on purpose: `apparmor.txt` had just joined `monitored_files`, so
+    touching that file releases its add-on, and one release should do one thing.
 
 ## Shipped as `boincui`, 0.1.0 → 1.0.0
 
