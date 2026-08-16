@@ -1,5 +1,5 @@
 name: BOINC
-version: "3.10.0"
+version: "3.11.0"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
@@ -37,7 +37,8 @@ schema:
   max_ncpus_idle: "float(0,100)?"
   cpu_usage_limit_idle: "float(0,100)?"
 image: "ghcr.io/hectorespert/addon-boinc"
-apparmor: false
+# `apparmor` defaults to true, and Supervisor loads apparmor.txt as the profile when the file is
+# present, so neither is declared here -- the add-on linter rejects redeclaring a default.
 backup: cold
 map:
   - addon_config

@@ -1,0 +1,217 @@
+#include <tunables/global>
+
+# Confinement for the BOINC app.
+#
+# Supervisor renames this profile to the app's slug when it installs it (`adjust_profile`), so the
+# name below is only what the file calls itself. It rewrites the first line matching `^profile ` and
+# nothing else, which is why the nested profile further down stays indented and keeps its own name,
+# and why no rule here may refer to either profile by name -- a `peer=boinc` would survive the
+# rename and then point at a profile that does not exist.
+#
+# WHAT THIS PROFILE IS FOR, AND WHAT IT IS NOT FOR
+#
+# The security rating Home Assistant shows for this app cannot move. `rating_security` ends with
+# `if app.access_docker_api or app.with_full_access: rating = 1` -- an assignment, not an
+# adjustment -- and this app requests `docker_api`, so it is pinned at 1 out of 8 with or without a
+# profile. Everything below is justified on blast radius alone.
+#
+# Nor can a profile restrict *what runs*: downloading third-party binaries from science projects and
+# executing them is the entire point of the app, so permitting that is not optional. What it can do
+# is bound where that code reaches, and here that is worth a great deal. Measured, not assumed:
+# `client/app_start.cpp` chdirs into `slots/N` and calls `execv("../../projects/<project>/<binary>")`,
+# taking the account-based sandbox branch only when the client can hand off to a `switcher` helper
+# that changes user first. This image has no such helper (`find / -name 'switcher*'` finds nothing)
+# and none of the `boinc_master`/`boinc_project` users it needs, and the trace showed no setuid,
+# setgid or capset anywhere. So today a binary a project sent us runs as root, in this container,
+# with the Docker socket in reach. The nested `science` profile below is the whole point of this
+# file.
+#
+# EVIDENCE
+#
+# Everything in the outer profile was measured with `strace -ff -e trace=file,network,process,signal`
+# against the real image, started by the operator exactly as the container does, with `--pid=host`
+# and `--uts=host`. What that showed:
+#   * programs executed: python3 (the operator), boinc, boinc again as `--detect_gpus` (the client
+#     re-execs itself so a bad driver cannot take it down), boinccmd, /bin/sh six times, docker three
+#     times, and stat. Nothing else. Probes for podman and lsb_release fail because neither is in the
+#     image.
+#   * the client runs `docker --version`, `docker compose version` and `docker run --rm hello-world`
+#     at startup to decide whether it can accept container-packaged work. That is what `docker_api`
+#     is for, and it is why the socket appears below.
+#   * 4117 reads of /proc/<pid>/stat, one sweep per process on the host. That is `host_pid: true`
+#     doing its job -- BOINC decides whether the machine is busy by looking at every process on it.
+#   * every single write landed under /data/boinc (client_state, lockfile, notices, logs -- relative
+#     paths, because the client chdirs into its data directory). Not one write anywhere else.
+#   * sockets: INET and INET6, stream and datagram; NETLINK raw for DNS; UNIX stream for the Docker
+#     socket and nscd.
+#   * no setuid, setgid, chown, capset, mount or unshare, which is why no capability rule appears
+#     below. The client is already root and never needed to become anything else.
+#
+# The GPU device rules are the one part that is reasoned rather than measured -- the machine this was
+# traced on has no GPU to detect. They are what `video: true` exists to grant.
+#
+# LIKE `boincui` AND `boinctui`, THIS SHIPS IN `complain` MODE AND ENFORCES NOTHING. AppArmor blocks
+# nothing and instead logs every access that would have been blocked, which matters more here than
+# for either of the others: this profile is the first to make a claim about code nobody in this
+# repository has read, running work units nobody here has seen. Read the results on any host running
+# this app with:
+#
+#   ha host logs -t kernel | grep 'apparmor="ALLOWED"'
+#
+# Two questions that only a real installation can answer, and that the log will answer:
+#   1. does any project the user actually runs ship a container-packaged app? Those need the Docker
+#      socket, which the `science` profile deliberately withholds -- see the note on it below.
+#   2. does any science app try to open a network connection? It should not: in BOINC's design the
+#      client does all the talking and the app only computes. `science` grants no network at all, so
+#      one that tries will say so in the log.
+#
+# TO FINISH THE JOB: once that comes back empty after real work units have run through, delete
+# `complain` from the flags on BOTH profiles below. A nested profile carries its own mode, so
+# removing it from the outer one alone would leave the downloaded code merely watched -- and that is
+# the half that matters.
+profile boinc flags=(attach_disconnected,mediate_deleted,complain) {
+  #include <abstractions/base>
+  # Resolving project hostnames, and the /etc/hosts, resolv.conf and nsswitch machinery behind it.
+  #include <abstractions/nameservice>
+
+  # No capability rule, deliberately: the trace showed the client using none. It runs as root and
+  # never calls setuid, chown or capset, so denying every capability costs it nothing.
+
+  # The operator forwards the four stop signals to the client, and the client suspends, resumes and
+  # stops the science apps it started. Written without a `peer=` on purpose -- naming either profile
+  # here would not survive Supervisor's rename, see the note at the top.
+  signal (send) set=(kill,term,int,hup,quit,cont,stop,usr1,usr2),
+  signal (receive),
+
+  # Project servers over HTTPS, the GUI RPC port on 31416, DNS, and the Docker socket.
+  network inet stream,
+  network inet6 stream,
+  network inet dgram,
+  network inet6 dgram,
+  network netlink raw,
+  network unix stream,
+
+  # Stat'd while resolving paths at startup, and granted by no abstraction.
+  / r,
+
+  # The operator: the entrypoint is `python3 /opt/operator/main.py`, and dict2xml comes from Debian.
+  # `mr` and not `r` on the interpreter's own tree: abstractions/base already covers `**.so*`, which
+  # is the extension modules, but not the .py files beside them, and Python cannot import a thing
+  # without those.
+  /usr/bin/python3* mrix,
+  /opt/operator/ r,
+  /opt/operator/** r,
+  /usr/lib/python3*/{,**} mr,
+  /usr/lib/python3/dist-packages/{,**} mr,
+  /usr/local/lib/python3*/dist-packages/{,**} mr,
+
+  # The client and the command-line tool the operator drives it with.
+  /usr/local/bin/boinc mrix,
+  /usr/local/bin/boinccmd mrix,
+
+  # The client shells out for its host probes: `sh -c "docker --version"` and friends, and
+  # `stat --file-system` to identify the filesystem its data directory sits on.
+  /{usr/,}bin/{sh,dash} mrix,
+  /usr/bin/stat mrix,
+
+  # The Docker probe, and only for the client. The socket is root on the host, so where it is *not*
+  # granted matters more than where it is: the `science` profile below does not get it.
+  /usr/bin/docker mrix,
+  /{var/,}run/docker.sock rw,
+  /root/.docker/{,**} r,
+
+  # The app's own data. Everything the client writes lands here and the trace found nothing written
+  # anywhere else, which is the single most useful thing this profile asserts.
+  /data/ r,
+  /data/** rw,
+
+  # The folder the user sees in File editor and Samba, for a hand-written preferences file. Mounted
+  # read-only by Supervisor, and read-only here too.
+  /config/ r,
+  /config/** r,
+
+  # Deciding whether the machine is busy, which is why this app asks for host_pid. Only /proc/*/stat
+  # was ever read -- not cmdline, not environ, not maps -- so this grants no view of what anything
+  # else on the host is actually running.
+  /proc/ r,
+  /proc/*/stat r,
+  owner /proc/*/maps r,
+  owner /proc/*/exe r,
+  /proc/{stat,meminfo,cpuinfo,filesystems,uptime,loadavg,apm} r,
+  /proc/sys/vm/overcommit_memory r,
+  /proc/acpi/{,**} r,
+
+  # Running on battery is a preference the user can set, so the client looks for one.
+  /sys/class/power_supply/{,**} r,
+  /sys/devices/{,**} r,
+  /sys/kernel/mm/transparent_hugepage/hpage_pmd_size r,
+
+  # The optional idle detection helper publishes here. It is not in the image and the client says so
+  # in the log; the rule is here so that a user who installs one on the host is not blocked by us.
+  /dev/shm/idle_detect_shmem r,
+
+  # GPUs, which is what `video: true` grants. Reasoned rather than measured -- see EVIDENCE above.
+  /dev/dri/ r,
+  /dev/dri/* rw,
+  /dev/nvidia* rw,
+  /dev/nvidiactl rw,
+
+  /dev/ptmx rw,
+  /dev/pts/* rw,
+  /dev/tty rw,
+
+  # Verifying project servers.
+  /etc/ssl/certs/{,**} r,
+  /etc/ssl/openssl.cnf r,
+  /etc/os-release r,
+
+  # THE POINT OF THIS FILE. Work units are executed out of projects/, with the slot directory as the
+  # working directory, so this is the transition that puts downloaded code in its own profile. Both
+  # paths appear because a wrapper app can be handed either.
+  /data/boinc/projects/** cx -> science,
+  /data/boinc/slots/** cx -> science,
+
+  # Code we did not write, from a project we do not control, computing on someone else's work unit.
+  # It gets its working directory, its input files, a GPU if the machine has one, and nothing else:
+  # no capability, no network, no /config, no /proc sweep of the host, and no Docker socket.
+  profile science flags=(attach_disconnected,mediate_deleted,complain) {
+    #include <abstractions/base>
+
+    # No capability rule and no network rule appear here, and both omissions are the point. A BOINC
+    # app is supposed to compute and nothing else -- the client does every network exchange on its
+    # behalf -- so an app reaching for a socket is worth seeing in the log.
+
+    # The client suspends and resumes work with signals; the app only ever receives them.
+    signal (receive),
+
+    / r,
+
+    # The working directory: input files linked in, output files, checkpoints, and the memory-mapped
+    # file the BOINC runtime uses to talk to the client. Writable and executable both, because a
+    # wrapper app unpacks what it runs -- broad on purpose, and still only inside one slot tree.
+    /data/boinc/slots/ r,
+    /data/boinc/slots/** mrwix,
+
+    # Where the executables actually live. Read and execute, never write: these files belong to the
+    # client, which verified their signatures before putting them there.
+    /data/boinc/projects/ r,
+    /data/boinc/projects/** mrix,
+
+    # Its own CPU time, which is how a BOINC app reports progress. `owner` keeps it to itself: the
+    # sweep of every process on the host stays with the client.
+    owner /proc/*/stat r,
+    owner /proc/*/statm r,
+    owner /proc/*/exe r,
+
+    # System libraries, which any dynamically linked binary needs to start at all. Read-only, and
+    # granting nothing that is not already on every filesystem it could see.
+    /{usr/,}lib{,32,64}/{,**} mr,
+    /usr/share/{,**} r,
+
+    # GPU work units. Same reasoning as the outer profile, and the same caveat: not measured here.
+    /dev/dri/ r,
+    /dev/dri/* rw,
+    /dev/nvidia* rw,
+    /dev/nvidiactl rw,
+  }
+}

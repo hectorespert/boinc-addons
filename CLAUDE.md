@@ -61,6 +61,13 @@ Three independent Home Assistant add-ons, each self-contained with its own `conf
   reaching the socket) and the upstream quirks that `boinc.py` works around. Keep local changes
   minimal and listed there; do not restyle it.
 
+All three ship an `apparmor.txt`, and **all three are still in `complain` mode** — AppArmor logs what
+it would have blocked and blocks nothing. The reasoning for every rule, the `strace` evidence behind
+it, and the exact steps to switch enforcement on live in the comment header of each profile; read
+that before changing a rule. Two things are easy to get wrong: a nested profile carries its own mode,
+so `boinctui` and `boinc` each need **two** `complain` flags removed, not one; and no rule may name a
+profile in a `peer=`, because Supervisor renames the outer profile to the app's slug on install.
+
 Add-ons are versioned and released independently: each has its own semver in `config.yaml`, and CI
 only builds/releases an add-on when files inside its directory change (see CI section below).
 
@@ -190,7 +197,9 @@ use `home-assistant/actions/helpers/find-addons`, which globs for top-level `con
 image name and architectures come from that file too. A new add-on directory therefore joins the
 pipeline with no workflow edits — except the `monitored_files` list above, which is matched as a
 *regex* against changed paths, so a new code directory has to be added there (and must not be a
-prefix of an unrelated path: `app` would also match `boinc/apparmor.txt.disable`).
+prefix of an unrelated path — `apparmor.txt` could not be added to the list until
+`boinc/apparmor.txt.disable` was deleted in `boinc` 3.11.0, because the pattern matched that too and
+would have dragged `boinc` into the release gate whenever another add-on's profile changed).
 
 `release.yaml` (push to `main`) additionally tags each changed add-on as `<addon>-vX.Y.Z`, cuts a
 GitHub Release with the matching section extracted from that add-on's `CHANGELOG.md`, and posts an

@@ -48,25 +48,49 @@ The bugs found in the 2026-08-08 review all shipped in `boinc` 3.8.0–3.9.0 —
 
 ## Security / permissions
 
-- [ ] **`apparmor: false` on `boinc`.** `boincui` and `boinctui` both ship real profiles now —
-  watching rather than enforcing, see Resolved — which leaves the one that is genuinely hard.
+`apparmor: false` is gone from all three add-ons: `boincui` 1.3.0, `boinctui` 2.5.0 and `boinc`
+3.11.0 each ship a profile — see Resolved. What is left is turning them on.
 
-  **`boinc`: the rating cannot move, so the profile has to be justified on blast radius alone.**
-  `rating_security` (`supervisor/apps/utils.py`) ends with `if app.access_docker_api or
-  app.with_full_access: rating = 1` — an assignment, not an adjustment, so it overrides everything
-  before it. This add-on requests `docker_api`, so it is pinned at 1/8 whether or not it has a
-  profile. Any argument for writing one here is about what the profile actually prevents, and the
-  number Home Assistant shows will not reward it.
+- [ ] **Switch the AppArmor profiles from `complain` to enforcing — all three.** Every one of the
+  three changelogs promises a later version that switches its profile on, so this is a commitment to
+  a user rather than an idea. **The work is deleting `complain` from the flags line** — but there
+  are **five** such lines, not three: `boinctui` and `boinc` are both nested profiles, and a nested
+  profile carries its own mode, so the inner one has to be flipped too. In both cases the inner
+  profile is the half that matters (`boinctui`'s terminal session; `boinc`'s downloaded science
+  apps).
 
-  **And what it prevents is unusually limited.** BOINC's whole purpose is to download third-party
-  binaries from projects and execute them out of `slots/`, so a profile cannot restrict *what runs*
-  — it has to permit executing arbitrary downloaded code, or the add-on does nothing. What it can
-  still do is bound that code's reach: keep it out of `/config`, off the host paths `host_pid`
-  exposes, and away from the Docker socket `docker_api` grants. Worth having, but a different claim
-  from the one "AppArmor enabled" usually implies.
+  **The gate:** `ha host logs -t kernel | grep 'apparmor="ALLOWED"'` comes back with nothing naming
+  the profile, on a host that has been running the app normally for a while — ideally more than one,
+  since the point of releasing in `complain` was to get evidence from machines that are not this
+  repo's devcontainer. Every line it does return names an operation and an exact path, which is
+  directly the rule to add.
 
-  Ties to the dead `boinc/apparmor.txt.disable` under Housekeeping — that file is template
-  boilerplate for an s6-overlay image this add-on is not, so it is a starting point for nothing.
+  **One gap is already known without waiting for a log, in `boincui`.** Its profile grants
+  `/opt/boincui/** r` and the interpreter itself, but nothing for the interpreter's own tree, and
+  `abstractions/base` covers only `**.so*` — the extension modules, not the `.py` files beside them.
+  Enforced as written, Python could not import its standard library and the app would not start.
+  `boinc/apparmor.txt` has the rule (`/usr/lib/python3*/{,**} mr,` and the two dist-packages paths,
+  `mr` rather than `r`); `boincui` needs the same three lines. Deliberately **not** folded into
+  `boinc` 3.11.0: `apparmor.txt` is now in `monitored_files`, so touching that file releases
+  `boincui`, and one release should do one thing. `boinctui` is unaffected — no Python in it.
+
+  **`boinc` needs the longest soak, and can be flipped separately.** Its profile is the only one
+  making a claim about code nobody here has read: the client executes binaries downloaded from
+  science projects, and the `science` sub-profile grants them a slot directory, their input files
+  and a GPU, with no network, no capability, no `/config` and no Docker socket. Two things only a
+  real installation can settle, both of which show up in that same log: whether any project the user
+  runs ships a container-packaged app (those need the Docker socket the sub-profile withholds), and
+  whether any science app reaches for a network socket (it should not — in BOINC's design the client
+  does all the talking). Until at least one project has run work units through it for a while, its
+  own `complain` flags should stay put even if the other two flip.
+
+  **The rating changes for two of the three when it flips: not at all.** `boincui` and `boinctui`
+  already report 8/8 today, because Supervisor rates an app on whether a profile of its name is
+  registered and never looks at the mode. `boinc` reports 1/8 today and will keep reporting 1/8
+  forever — `rating_security` (`supervisor/apps/utils.py`) ends with `if app.access_docker_api or
+  app.with_full_access: rating = 1`, an assignment rather than an adjustment, and this add-on
+  genuinely uses `docker_api` (the client probes it at startup with `docker run --rm hello-world`).
+  Worth knowing so nobody reads an unchanged number as the release having done nothing.
 
 ## Conformance with the official HA apps docs
 
@@ -279,22 +303,6 @@ The "build a graphical web UI" item that used to dominate this file was answered
 see Resolved for what was decided and why. What follows is what it did **not** settle, in rough order
 of cost.
 
-- [ ] **Switch the AppArmor profiles from `complain` to enforcing — `boincui` and `boinctui` both.**
-  `boincui` 1.3.0 and `boinctui` 2.5.0 ship them watching only, and both changelogs promise a later
-  version that switches them on, so this is a commitment to a user rather than an idea. **The work is
-  deleting `complain` from the flags line** — but in `boinctui/apparmor.txt` there are **two** such
-  lines, because a nested profile carries its own mode and the inner one is the half that matters.
-
-  **The gate:** `ha host logs -t kernel | grep 'apparmor="ALLOWED"'` comes back with nothing naming
-  the profile, on a host that has been running the app normally for a while — ideally more than one,
-  since the point of releasing in `complain` was to get evidence from machines that are not this
-  repo's devcontainer. Every line it does return names an operation and an exact path, which is
-  directly the rule to add.
-
-  Until it flips, the app reports 8/8 while confining nothing — see the 1.3.0 entry in Resolved for
-  why that is, and why the changelog says so out loud. **The rating will not change when it flips**,
-  which is worth knowing so nobody reads the unchanged number as the release having done nothing.
-
 - [ ] **Localise `boincui`'s page.** Only `translations/*.yaml` is translated today, and that covers
   configuration fields, not the page itself. If it is ever done, the activity control's wording
   should come from BOINC's own catalogue rather than a third phrasing — `locale/es/BOINC-Manager.po`
@@ -382,23 +390,8 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 
 ## Housekeeping
 
-- [ ] `boinc/apparmor.txt.disable` is unmodified add-on template boilerplate (references
-  `/etc/services.d`, `/etc/cont-init.d`, bashio, s6-overlay `/init`) — none of which this add-on
-  uses; its entrypoint is a plain `python3 /opt/operator/main.py`. It still carries the template's
-  `my_program` placeholders and its commented-out "here is how to build the list" instructions, so
-  nobody ever adapted it. **Doubly inert**: `apparmor: false`, *and* Supervisor looks for
-  `apparmor.txt`, so the `.disable` suffix means it was never read either way. Only `boinc` has one;
-  `boinctui` and `boincui` declare `apparmor: false` with no file at all, so deleting it would make
-  the three consistent.
-  Either rewrite it to match the real process tree or delete it so it does not mislead a future
-  contributor. **If deleting: `CLAUDE.md` cites this exact path** as the example of why
-  `monitored_files` is a regex that can over-match (`app` would also match
-  `boinc/apparmor.txt.disable`), so that example needs a different filename or the note needs
-  rewording.
-  **There is now a second reason to delete it**, and it is no longer only cosmetic: while it exists,
-  `apparmor.txt` cannot be added to `monitored_files` without a profile-only change to `boincui`
-  dragging `boinc` into the release gate — see the `boincui` 1.3.0 entry in Resolved. Deleting the
-  file unblocks that one-word CI fix.
+- The `boinc/apparmor.txt.disable` item is **closed**: the file was deleted in `boinc` 3.11.0, which
+  also unblocked adding `apparmor.txt` to `monitored_files` — see Resolved.
 - The Dockerfile labels item was **stale and is closed** — see *Confirmed correct* under
   Conformance. They already agree across all three add-ons.
 
@@ -833,6 +826,45 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     `boinc/apparmor.txt.disable` and demand a `boinc` version bump on release — the exact over-match
     CLAUDE.md warns about. There is no anchor that fixes it (`$` matches the end of the entire
     string, not of one path). Add it once that dead file is deleted; see Housekeeping.
+
+## Shipped in `boinc` 3.11.0
+
+- [x] **`boinc` ships an AppArmor profile, watching before it enforces** — the last of the three, and
+  the only one where the rating cannot reward it. `apparmor: false` is gone (replaced by a comment,
+  since the linter rejects redeclaring the `true` default), `boinc/apparmor.txt` is loaded by
+  Supervisor under the app's slug, and the whole argument lives in that file's comment header rather
+  than here.
+  - **Nested, and the inner profile is the entire point.** Confirmed from BOINC 8.2.15 source
+    (`client/app_start.cpp:1071-1150`): the client chdirs into `slots/N` and calls
+    `execv("../../projects/<project>/<binary>")`. The account-based sandbox branch beside it needs a
+    `switcher` helper to change user first; this image has none (`find / -name 'switcher*'` finds
+    nothing) and lacks the `boinc_master`/`boinc_project` users it wants, and the trace showed no
+    setuid, setgid or capset at all. So before this, a binary a project sent us ran as root in the
+    container with the Docker socket in reach. The `science` sub-profile now gets a slot directory, its input files and
+    a GPU, and grants **no capability, no network, no `/config` and no Docker socket**.
+  - **What the trace found** (`strace -ff -e trace=file,network,process,signal`, real image, real
+    client, `--pid=host --uts=host`): the set of programs executed is closed — python3, boinc,
+    `boinc --detect_gpus` (it re-execs itself so a bad driver cannot take it down), boinccmd,
+    `/bin/sh` ×6, docker ×3, stat. **4117 reads of `/proc/<pid>/stat`** and of nothing else under
+    `/proc/<pid>/` — that is `host_pid: true` earning its keep, and it grants no view of what host
+    processes are actually running. **Every write landed under `/data/boinc`**, not one anywhere
+    else. No setuid, setgid, chown, capset, mount or unshare, which is why the profile declares no
+    capability at all.
+  - **`docker_api` is real, not vestigial.** The client runs `docker --version`,
+    `docker compose version` and **`docker run --rm hello-world`** at startup to decide whether it
+    can take container-packaged work. The socket is granted to the client and withheld from
+    `science`, which turns "does any project actually ship such an app?" into a log line instead of
+    a guess.
+  - **The rating does not move and never will**, unlike the other two: `docker_api` pins it at 1/8.
+    The changelog says so rather than letting an unchanged number read as nothing having happened.
+  - **`boinc/apparmor.txt.disable` deleted.** It was s6-overlay template boilerplate for an image
+    this add-on is not, doubly inert, and a starting point for nothing.
+  - **`apparmor.txt` added to CI's `monitored_files`** (`pr.yaml`, `release.yaml`), which the
+    deletion above unblocked: the list is matched as an unanchored regex, so while the `.disable`
+    file existed the pattern matched it too and a profile-only change to *any* add-on would have
+    dragged `boinc` into the release gate. A profile change now releases its own add-on and only its
+    own. `CLAUDE.md`'s over-match example was rewritten around this, since it used to cite the
+    deleted path.
 
 ## Shipped as `boincui`, 0.1.0 → 1.0.0
 
