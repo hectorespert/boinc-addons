@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+The security profile added in 1.3.0 was missing part of its list, and as written it would have stopped the app from starting once a later version switches the profile on. Nothing changes today — the profile still only watches and stops nothing, and the app runs exactly as before. The correction is here so that switching it on later is a change you do not notice
+
 ## 1.3.0
 
 BOINC UI now comes with a security profile: the list of the only things it should ever need to do, which is read its own settings and talk to the machines you listed. For now the profile only watches and stops nothing, so the list can be proved right on real installations before a later version switches it on. The security rating on the Info page goes from 6 to 8 out of 8 as soon as the profile exists, so it runs ahead of the protection itself until then. Nothing changes in how the app works
