@@ -6,6 +6,11 @@ url: "https://github.com/hectorespert/boinc-addons/tree/main/boinctui"
 arch:
   - aarch64
   - amd64
+# Not for the documented reason ("the image has its own init system") — this one has none. ttyd is
+# PID 1 and reaps its own children: run.sh execs into it, and each session is
+# `bash -c "... exec boinctui"`, so the session process is a *direct* child of ttyd with no shell
+# left in between. Measured 2026-08-16 — ten sessions opened and closed left no zombie — so Docker's
+# init would add a process with nothing to collect.
 init: false
 ingress: true
 ingress_port: 7681
