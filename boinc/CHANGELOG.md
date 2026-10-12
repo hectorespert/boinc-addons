@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.13.0
+
+Update base from Debian 13.6 to Debian 13.7
+
 ## 3.12.0
 
 Added five options to control how much of your machine BOINC takes: a cap in gigabytes, a cap as a percentage of the disk, an amount of free space to always leave alone, and how many days of work to keep downloaded and waiting. The strictest disk limit you set is the one that applies. Keeping less work queued is also the way to make this app's backups smaller
