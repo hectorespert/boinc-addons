@@ -214,7 +214,7 @@ editing files outside a changed add-on's directory does not trigger its pipeline
 
 - Each add-on is versioned independently in its own `config.yaml`; keep `CHANGELOG.md` entries
   (`## X.Y.Z` headers) in sync since release notes are extracted from them automatically.
-- Add-on Dockerfiles build from `debian:13.5-slim`, install packages needed for the BOINC/ttyd
+- Add-on Dockerfiles build from `debian:13.7-slim`, install packages needed for the BOINC/ttyd
   binaries, and set the standard Home Assistant add-on `io.hass.*`/`org.opencontainers.image.*`
   labels using the `BUILD_*` args injected by the builder — follow the existing pattern rather than
   hand-rolling new labels.

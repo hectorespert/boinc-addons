@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+
+Update base from Debian 13.6 to Debian 13.7
+
 ## 1.3.1
 
 The security profile added in 1.3.0 was missing part of its list, and as written it would have stopped the app from starting once a later version switches the profile on. Nothing changes today — the profile still only watches and stops nothing, and the app runs exactly as before. The correction is here so that switching it on later is a change you do not notice
