@@ -1,0 +1,45 @@
+name: Debian base image
+
+# Dependabot cannot do this: the Dockerfiles take their base through `FROM $BUILD_FROM`, the
+# second copy lives in build.yaml, and nothing is released without a version bump and a
+# CHANGELOG entry. This opens the same PR a person would (see #119, #152).
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: debian-base
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Move to the latest Debian point release
+        id: bump
+        run: bash .github/scripts/bump-debian-base.sh
+
+      # A PR opened with GITHUB_TOKEN does not trigger pull_request workflows, so its CI would
+      # never run; the repository also does not allow Actions to open PRs at all. Hence a
+      # fine-grained token (Contents and Pull requests: read and write, this repository only).
+      - name: Open or update the pull request
+        if: steps.bump.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.DEBIAN_BASE_TOKEN }}
+          branch: automation/debian-base
+          delete-branch: true
+          commit-message: "chore: update base image to Debian ${{ steps.bump.outputs.to }}"
+          title: "chore: update base image to Debian ${{ steps.bump.outputs.to }}"
+          body: |
+            Moves `${{ steps.bump.outputs.apps }}` from `debian:${{ steps.bump.outputs.from }}-slim` to `debian:${{ steps.bump.outputs.to }}-slim`, in each `Dockerfile` and `build.yaml`, with a minor version bump and a one-line `CHANGELOG.md` entry per app.
+
+            Opened by the scheduled `debian-base.yaml` workflow. The PR checks build every image; before merging, consider running `smoke.sh all` locally and checking that the image still ships the Python version `operator.yaml` pins.
