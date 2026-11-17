@@ -33,11 +33,24 @@ discarded; it is kept in condensed form so the same ground is not re-covered, no
   the normal state, which is why nobody noticed"* — but that was reasoning about which preferences
   got **written**, never a measurement of which state the client is actually **in**.
 
-  **What to check.** Whether the client ever reports the in-use state at all (it logs
-  `Suspending computation - computer is in use` when it does); what `users_idle()` falls back to with
-  no session and no input devices; and whether `<idle_time_to_run>` changes anything. If one state
-  is unreachable, the honest fix is documentation — say which pair actually applies — not more
-  options.
+  **Measured 2026-11-16** (client 8.2.15, `boinc` 3.13.0 image under rootless Podman, with
+  `run_if_user_active=0` and `idle_time_to_run=1` so the state shows up in `--get_cc_status`). On
+  Linux, `user_idle_time()` has only two legacy sources left: the atime of `/dev/tty*`, `/dev/pty*`
+  and `/dev/pts/*`, plus XScreenSaver, which Debian's build does not link (`ldd` shows no
+  libX11/libXss), so in practice the container's own TTYs are the only signal. The atime of
+  `/dev/pts/ptmx` is the container's start time, so the client reports **in use for
+  `idle_time_to_run` minutes after every start** (default 3), then **not in use** permanently
+  (`Resuming network activity` 60 s after start). The only thing that flipped it back was
+  `podman exec -t`, which creates `/dev/pts/0`. Nothing on a HA host does that except a user
+  running `docker exec -it` into the app, so `max_ncpus` / `cpu_usage_limit` govern only that
+  start-up window and the `niu_` pair the rest of the time. The non-BOINC-load check
+  (`suspend if non-BOINC CPU load exceeds 25%`) is separate and still works.
+
+  `boinc` 3.14.0 exposes that load threshold as `suspend_cpu_usage`, for both states at once.
+
+  **What is left** is the documentation: say which pair actually applies. Not verified under Docker
+  on a real HA host, where `/dev/tty` is created by runc rather than bind-mounted as Podman does,
+  though no process in the container opens it either way.
 
   **The suggested remedy is probably wrong advice for this audience**, which is a second, smaller
   item: `idle_detect` is a helper for X11/Wayland desktops, and a Home Assistant OS user cannot
