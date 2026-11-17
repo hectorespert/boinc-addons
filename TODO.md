@@ -13,50 +13,6 @@ discarded; it is kept in condensed form so the same ground is not re-covered, no
 
 ## Bugs / correctness
 
-- [ ] **Does "computer is in use" mean anything at all in this container? Four shipped options
-  depend on it.** The client logs this once per start, right after `Initialization completed`:
-
-  > `Currently BOINC uses legacy idle detection methods that might not work properly on all systems.
-  > Please consider installing a modern idle detection utility that works on Wayland and X11:`
-  > <https://github.com/jamescowens/idle_detect>
-
-  **Why it matters here rather than being noise.** `max_ncpus` / `cpu_usage_limit` apply *while the
-  computer is in use*, and `max_ncpus_idle` / `cpu_usage_limit_idle` (the `niu_` preferences, added
-  in 3.9.0) apply while it is not. `boinc/DOCS.md` promises the user exactly that distinction. But
-  idle detection on Linux is built around a desktop session, and a Home Assistant host is headless —
-  there is no X11 or Wayland, and the container has no `/dev/input`. If the client therefore reports
-  "not in use" permanently, then the in-use pair is dead configuration and the docs describe a
-  behaviour nobody can observe; if it reports the opposite, the `niu_` pair is. Either way one half
-  of a documented feature does nothing.
-
-  The 3.9.0 entry in Resolved already brushed against this — *"On a headless HA host 'not in use' is
-  the normal state, which is why nobody noticed"* — but that was reasoning about which preferences
-  got **written**, never a measurement of which state the client is actually **in**.
-
-  **Measured 2026-11-16** (client 8.2.15, `boinc` 3.13.0 image under rootless Podman, with
-  `run_if_user_active=0` and `idle_time_to_run=1` so the state shows up in `--get_cc_status`). On
-  Linux, `user_idle_time()` has only two legacy sources left: the atime of `/dev/tty*`, `/dev/pty*`
-  and `/dev/pts/*`, plus XScreenSaver, which Debian's build does not link (`ldd` shows no
-  libX11/libXss), so in practice the container's own TTYs are the only signal. The atime of
-  `/dev/pts/ptmx` is the container's start time, so the client reports **in use for
-  `idle_time_to_run` minutes after every start** (default 3), then **not in use** permanently
-  (`Resuming network activity` 60 s after start). The only thing that flipped it back was
-  `podman exec -t`, which creates `/dev/pts/0`. Nothing on a HA host does that except a user
-  running `docker exec -it` into the app, so `max_ncpus` / `cpu_usage_limit` govern only that
-  start-up window and the `niu_` pair the rest of the time. The non-BOINC-load check
-  (`suspend if non-BOINC CPU load exceeds 25%`) is separate and still works.
-
-  `boinc` 3.14.0 exposes that load threshold as `suspend_cpu_usage`, for both states at once.
-
-  **What is left** is the documentation: say which pair actually applies. Not verified under Docker
-  on a real HA host, where `/dev/tty` is created by runc rather than bind-mounted as Podman does,
-  though no process in the container opens it either way.
-
-  **The suggested remedy is probably wrong advice for this audience**, which is a second, smaller
-  item: `idle_detect` is a helper for X11/Wayland desktops, and a Home Assistant OS user cannot
-  install anything on the host. The line lands in their **Log** tab telling them to do something
-  impossible, so it may deserve a note in `DOCS.md` saying it is harmless and why.
-
 The bugs found in the 2026-08-08 review all shipped in `boinc` 3.8.0–3.9.0 — see Resolved.
 
 ## Security / permissions
@@ -650,6 +606,40 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
   new code**: the `niu_` keys stayed in `MANAGED_PREFERENCES`, so a stale value the operator wrote
   itself falls into the removal branch that has existed since 3.8.1, while one set by the user from
   `boinctui` is untouched.
+
+## Shipped in `boinc` 3.14.0, and its documentation
+
+- [x] **"Computer is in use" means "the first few minutes after the app starts" in this container
+  (measured 2026-11-16).** The client logs, once per start, *"Currently BOINC uses legacy idle
+  detection methods … <https://github.com/jamescowens/idle_detect>"*, and `DOCS.md` described the
+  in-use / not-in-use CPU pairs as if a Home Assistant host had a user at a keyboard.
+
+  Measured against client 8.2.15 in the `boinc` 3.13.0 image under rootless Podman, with
+  `run_if_user_active=0` and `idle_time_to_run=1` so the state shows up in `--get_cc_status`. On
+  Linux, `user_idle_time()` has only two legacy sources left: the atime of `/dev/tty*`, `/dev/pty*`
+  and `/dev/pts/*`, plus XScreenSaver, which this build does not link (`ldd` shows no
+  libX11/libXss), so the container's own TTYs are the only signal. The atime of `/dev/pts/ptmx` is
+  the container's start time, so the client reports **in use for `idle_time_to_run` minutes after
+  every start** (default 3), then **not in use** permanently. Only `podman exec -t`, which creates
+  `/dev/pts/0`, flipped it back; on a HA host that means a user running `docker exec -it` into the
+  app. So `max_ncpus` / `cpu_usage_limit` govern that start-up window and, through BOINC's fallback,
+  everything else unless the `niu_` pair is set. Not verified under Docker on a real HA host, where
+  `/dev/tty` is created by runc rather than bind-mounted, though no process in the container opens
+  it either way.
+
+  What shipped: 3.14.0 exposes the one check that does work headless, the non-BOINC load threshold,
+  as `suspend_cpu_usage` (written to both states, since the in-use one is unobservable). Note that
+  8.2.15 counts only user+nice time in that check, so kernel-heavy load such as `yes > /dev/null`
+  or a backup's disk writes does not trigger it. `DOCS.md` and both translations now say which
+  pair applies in practice, replace the "Full Speed Only When the Computer Is Not in Use" example,
+  which described a mode that runs at full speed almost all the time, and tell the user the
+  `idle_detect` line is harmless — `idle_detect` is an X11/Wayland helper and nothing can be
+  installed on a Home Assistant OS host.
+
+  Still open as an idea, not a bug: tying "in use" to a Home Assistant entity by publishing
+  `/dev/shm/idle_detect_shmem` from the operator (two `int64`s: update time, last input time; the
+  client trusts it while the update is under 60 s old). Needs `homeassistant_api` and an AppArmor
+  write rule.
 
 ## Shipped in `boinc` 3.12.0
 

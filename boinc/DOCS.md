@@ -203,26 +203,43 @@ time, is ignored — BOINC computes all the time — and a warning explaining wh
 
 #### Resource Usage Options
 
+BOINC normally tells "in use" from "not in use" by watching the keyboard, the mouse and the
+desktop. A Home Assistant machine has none of those, so this app counts as **in use only for the
+first few minutes after it starts**, and as **not in use** the rest of the time. In practice:
+
+- `max_ncpus` and `cpu_usage_limit` are the limits BOINC works with, unless you also set the
+  "not in use" pair
+- `max_ncpus_idle` and `cpu_usage_limit_idle`, if set, replace them almost all the time
+- to make BOINC step aside while Home Assistant or another app is busy, use `suspend_cpu_usage`,
+  which watches the actual load instead
+
+Every time the app starts, its **Log** tab shows *"Currently BOINC uses legacy idle detection
+methods that might not work properly on all systems"*, suggesting a tool called `idle_detect`. You
+can ignore it: that tool is for desktop computers, there is nothing to install on Home Assistant,
+and the message does not affect computing.
+
 - **max_ncpus** (optional, range: 0-100)
-  - Maximum percentage of CPUs to use while the computer is in use
+  - Maximum percentage of CPUs to use
   - Value represents the percentage of available CPU cores
   - Example: `50` means use up to 50% of available cores
-  - Also applies while the computer is not in use, unless `max_ncpus_idle` is set below
+  - Replaced by `max_ncpus_idle` almost all the time, if you set that one
 
 - **cpu_usage_limit** (optional, range: 0-100)
-  - Maximum CPU usage percentage per core while the computer is in use
+  - Maximum CPU usage percentage per core
   - Value represents the percentage of time each CPU can be used
   - Example: `75` means each CPU can be used up to 75% of the time
-  - Also applies while the computer is not in use, unless `cpu_usage_limit_idle` is set below
+  - Replaced by `cpu_usage_limit_idle` almost all the time, if you set that one
 
 - **max_ncpus_idle** (optional, range: 0-100)
   - Maximum percentage of CPUs to use while the computer is **not** in use, instead of `max_ncpus`
-  - Leave unset to use the same limit in both cases
+  - On Home Assistant that is all the time except the first few minutes after the app starts
+  - Leave unset to use `max_ncpus` all the time
 
 - **cpu_usage_limit_idle** (optional, range: 0-100)
   - Maximum CPU usage percentage per core while the computer is **not** in use, instead of
     `cpu_usage_limit`
-  - Leave unset to use the same limit in both cases
+  - On Home Assistant that is all the time except the first few minutes after the app starts
+  - Leave unset to use `cpu_usage_limit` all the time
 
 - **suspend_cpu_usage** (optional, range: 0-100)
   - Pauses BOINC while everything else on the machine — Home Assistant, other apps — uses more
@@ -326,16 +343,16 @@ work_buf_min_days: 0
 work_buf_additional_days: 0
 ```
 
-#### Full Speed Only When the Computer Is Not in Use
+#### Stepping Aside While Home Assistant Is Busy
+
+Use every core, but pause as soon as everything else uses more than a tenth of the machine:
 
 ```yaml
 account_manager_url: "https://scienceunited.org"
 account_manager_username: "youremail@example.com"
 account_manager_password: "your_password"
-max_ncpus: 25
-cpu_usage_limit: 25
-max_ncpus_idle: 100
-cpu_usage_limit_idle: 100
+max_ncpus: 100
+suspend_cpu_usage: 10
 ```
 
 #### Remote Control Setup
