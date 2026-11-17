@@ -28,16 +28,16 @@ configuration:
     description: "Configure the hour when BOINC stops computing. Must be set together with Start Hour; setting only one of them, or setting both to the same time, is ignored"
   max_ncpus:
     name: Max CPUs Percentage
-    description: "Maximum percentage of CPUs to use while the computer is in use. Also applies while it is not in use, unless overridden below"
+    description: "Maximum percentage of CPUs to use. Replaced by its Not In Use version if you set it, since this machine counts as not in use almost all the time"
   cpu_usage_limit:
     name: Max CPU Usage Percentage
-    description: "Maximum percentage of time each CPU can be used while the computer is in use. Also applies while it is not in use, unless overridden below"
+    description: "Maximum percentage of time each CPU can be used. Replaced by its Not In Use version if you set it, since this machine counts as not in use almost all the time"
   max_ncpus_idle:
     name: Max CPUs Percentage (Not In Use)
-    description: "Maximum percentage of CPUs to use while the computer is not in use, instead of Max CPUs Percentage"
+    description: "Replaces Max CPUs Percentage at all times except the first few minutes after the app starts, the only time a Home Assistant machine counts as in use"
   cpu_usage_limit_idle:
     name: Max CPU Usage Percentage (Not In Use)
-    description: "Maximum percentage of time each CPU can be used while the computer is not in use, instead of Max CPU Usage Percentage"
+    description: "Replaces Max CPU Usage Percentage at all times except the first few minutes after the app starts, the only time a Home Assistant machine counts as in use"
   suspend_cpu_usage:
     name: Pause When Other Load Exceeds (Percentage)
     description: "Pause BOINC while everything else on this machine uses more than this percentage of its total CPU. Leave empty for BOINC's default of 25%; 0 never pauses"
