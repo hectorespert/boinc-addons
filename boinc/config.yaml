@@ -1,5 +1,5 @@
 name: BOINC
-version: "3.13.0"
+version: "3.14.0"
 slug: boinc
 description: Downloads scientific computing jobs and runs them
 url: "https://github.com/hectorespert/boinc-addons/tree/main/boinc"
@@ -41,6 +41,7 @@ schema:
   cpu_usage_limit: "float(0,100)?"
   max_ncpus_idle: "float(0,100)?"
   cpu_usage_limit_idle: "float(0,100)?"
+  suspend_cpu_usage: "float(0,100)?"
   # The disk limits have no upper bound worth inventing -- a host can have any amount of storage --
   # so only the lower one is declared. Zero is deliberately allowed on the first two: BOINC reads it
   # as "no limit" rather than "allow nothing".

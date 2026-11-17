@@ -6,14 +6,16 @@ import xml.etree.ElementTree as ElementTree
 ROOT_ELEMENT = 'global_preferences'
 
 # The preferences this operator owns, in the order they are written: the computing schedule pair,
-# then the in-use CPU limits, then their not-in-use ("niu_") counterparts, then the disk limits and
-# the work buffer -- the same order BOINC Manager uses in its own preferences dialog. Everything
+# then the in-use CPU limits, then their not-in-use ("niu_") counterparts, then the non-BOINC load
+# threshold for both states, then the disk limits and the work buffer -- the same order BOINC
+# Manager uses in its own preferences dialog. Everything
 # else in global_prefs_override.xml belongs to whoever put it there (boinctui, a remote BOINC
 # Manager) and is preserved untouched.
 MANAGED_PREFERENCES = (
     'start_hour', 'end_hour',
     'max_ncpus_pct', 'cpu_usage_limit',
     'niu_max_ncpus_pct', 'niu_cpu_usage_limit',
+    'suspend_cpu_usage', 'niu_suspend_cpu_usage',
     'disk_max_used_gb', 'disk_max_used_pct', 'disk_min_free_gb',
     'work_buf_min_days', 'work_buf_additional_days',
 )
@@ -74,6 +76,20 @@ def build_managed_preferences(data: dict) -> dict:
     max_cpu_usage_idle = data.get('cpu_usage_limit_idle')
     if max_cpu_usage_idle is not None:
         preferences['niu_cpu_usage_limit'] = max_cpu_usage_idle
+
+    # Suspend computing while processes other than BOINC's own use more than this percentage of the
+    # whole host's CPU (client/app.cpp, non_boinc_cpu_usage, read from /proc/stat). The 8.2 client
+    # counts only user and nice time there, so load spent in the kernel -- a backup writing to disk,
+    # or `yes > /dev/null` when testing this -- does not trigger it; burn CPU in user space instead.
+    # One option sets
+    # both states on purpose: inside this container the client is "not in use" almost all the time
+    # (see TODO.md), so a separate idle value would be one nobody can observe. Writing the niu_ key
+    # too also keeps a niu_suspend_cpu_usage left over from a BOINC Manager save from overriding
+    # the option. Zero is meaningful and disables the check, so it is written like any other value.
+    suspend_cpu_usage = data.get('suspend_cpu_usage')
+    if suspend_cpu_usage is not None:
+        preferences['suspend_cpu_usage'] = suspend_cpu_usage
+        preferences['niu_suspend_cpu_usage'] = suspend_cpu_usage
 
     # The three disk limits are independent and the client applies the *least* of them
     # (CLIENT_STATE::allowed_disk_usage, client/cs_prefs.cpp), so setting one does not disable

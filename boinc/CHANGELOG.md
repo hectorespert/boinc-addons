@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.14.0
+
+Added `suspend_cpu_usage` to choose when BOINC steps aside for the rest of your machine. BOINC already paused whenever everything else used more than a quarter of the total CPU, and that threshold can now be raised, lowered, or set to 0 so it never pauses for this reason. Leaving it empty keeps the old behaviour
+
 ## 3.13.0
 
 Update base from Debian 13.6 to Debian 13.7

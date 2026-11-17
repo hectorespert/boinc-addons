@@ -38,6 +38,9 @@ configuration:
   cpu_usage_limit_idle:
     name: Porcentaje Máximo de Uso de CPU (Sin Usar)
     description: "Porcentaje máximo de tiempo que puede usarse cada CPU mientras el equipo no está en uso, en lugar de Porcentaje Máximo de Uso de CPU"
+  suspend_cpu_usage:
+    name: Pausar con Otra Carga Superior a (Porcentaje)
+    description: "Pausa BOINC mientras el resto del equipo use más de este porcentaje de su CPU total. Vacío mantiene el valor por defecto de BOINC, el 25%; 0 no pausa nunca"
   disk_max_used_gb:
     name: Espacio Máximo en Disco (GB)
     description: "No usar nunca más de estos gigabytes para datos científicos. Vacío deja sin poner este límite; de los tres límites se aplica el más estricto"

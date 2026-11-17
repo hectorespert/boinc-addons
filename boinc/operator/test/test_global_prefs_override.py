@@ -101,6 +101,55 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
         self.assertEqual(self.read_preferences(self.global_prefs_override),
                          '<global_preferences>\n  <niu_max_ncpus_pct>10</niu_max_ncpus_pct>\n  <niu_cpu_usage_limit>20.0</niu_cpu_usage_limit>\n</global_preferences>')
 
+    def test_should_write_the_load_threshold_for_both_states(self):
+        link_global_prefs_override(self.data_dir, self.config_dir, {'suspend_cpu_usage': 50.0})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n'
+                         '  <suspend_cpu_usage>50.0</suspend_cpu_usage>\n'
+                         '  <niu_suspend_cpu_usage>50.0</niu_suspend_cpu_usage>\n'
+                         '</global_preferences>')
+
+    def test_should_write_a_zero_load_threshold_because_boinc_reads_it_as_never_suspend(self):
+        # The client only checks the load when the threshold is truthy
+        # (CLIENT_STATE::check_suspend_processing), so 0 turns the check off, while leaving the
+        # option out removes both tags and restores BOINC's own default of 25%.
+        link_global_prefs_override(self.data_dir, self.config_dir, {'suspend_cpu_usage': 0})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n'
+                         '  <suspend_cpu_usage>0</suspend_cpu_usage>\n'
+                         '  <niu_suspend_cpu_usage>0</niu_suspend_cpu_usage>\n'
+                         '</global_preferences>')
+
+    def test_should_override_a_not_in_use_load_threshold_set_from_boinc_manager(self):
+        # A BOINC Manager save writes niu_suspend_cpu_usage, which would otherwise win over the
+        # option for the not-in-use state -- the one this container is in almost all the time.
+        self.write_preferences(self.global_prefs_override,
+                               '<global_preferences>\n  <niu_suspend_cpu_usage>50</niu_suspend_cpu_usage>\n</global_preferences>')
+
+        link_global_prefs_override(self.data_dir, self.config_dir, {'suspend_cpu_usage': 10})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n'
+                         '  <niu_suspend_cpu_usage>10</niu_suspend_cpu_usage>\n'
+                         '  <suspend_cpu_usage>10</suspend_cpu_usage>\n'
+                         '</global_preferences>')
+
+    def test_should_remove_the_load_threshold_it_wrote_when_its_option_is_gone(self):
+        self.write_managed_state({'suspend_cpu_usage': 10, 'niu_suspend_cpu_usage': 10})
+        self.write_preferences(self.global_prefs_override,
+                               '<global_preferences>\n'
+                               '  <suspend_cpu_usage>10</suspend_cpu_usage>\n'
+                               '  <niu_suspend_cpu_usage>10</niu_suspend_cpu_usage>\n'
+                               '</global_preferences>')
+
+        link_global_prefs_override(self.data_dir, self.config_dir, {})
+
+        self.assertEqual(self.read_preferences(self.global_prefs_override),
+                         '<global_preferences>\n</global_preferences>')
+        self.assertEqual(self.read_managed_state(), {})
+
     def test_should_create_global_prefs_override_with_disk_configurations(self):
         link_global_prefs_override(self.data_dir, self.config_dir, {
             'disk_max_used_gb': 20.0,
@@ -169,6 +218,7 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
             'cpu_usage_limit': 75.0,
             'max_ncpus_idle': 10,
             'cpu_usage_limit_idle': 20.0,
+            'suspend_cpu_usage': 30.0,
             'disk_max_used_gb': 20.0,
             'disk_max_used_pct': 50.0,
             'disk_min_free_gb': 5.0,
@@ -186,6 +236,8 @@ class GlobalPreferencesOverrideTestCase(unittest.TestCase):
                          '  <cpu_usage_limit>75.0</cpu_usage_limit>\n'
                          '  <niu_max_ncpus_pct>10</niu_max_ncpus_pct>\n'
                          '  <niu_cpu_usage_limit>20.0</niu_cpu_usage_limit>\n'
+                         '  <suspend_cpu_usage>30.0</suspend_cpu_usage>\n'
+                         '  <niu_suspend_cpu_usage>30.0</niu_suspend_cpu_usage>\n'
                          '  <disk_max_used_gb>20.0</disk_max_used_gb>\n'
                          '  <disk_max_used_pct>50.0</disk_max_used_pct>\n'
                          '  <disk_min_free_gb>5.0</disk_min_free_gb>\n'

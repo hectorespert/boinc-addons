@@ -224,6 +224,15 @@ time, is ignored — BOINC computes all the time — and a warning explaining wh
     `cpu_usage_limit`
   - Leave unset to use the same limit in both cases
 
+- **suspend_cpu_usage** (optional, range: 0-100)
+  - Pauses BOINC while everything else on the machine — Home Assistant, other apps — uses more
+    than this percentage of its total CPU, and resumes it once the load drops again
+  - The percentage is of all cores together: on a 4-core machine, `25` means one whole core busy
+    with something else
+  - BOINC pauses completely rather than slowing down; to slow it down, use the limits above
+  - Leave unset to keep BOINC's default of `25`; set `0` to never pause for this reason
+  - While paused, boincui shows that the processor is busy with something else
+
 #### Disk Space Options
 
 Three separate limits. They do not replace each other — BOINC applies whichever one is strictest at
@@ -362,12 +371,12 @@ File editor and Samba apps.
 
 When that file is present, the app uses it as-is and every option below is ignored: `start_hour`,
 `end_hour`, `max_ncpus`, `cpu_usage_limit`, `max_ncpus_idle`, `cpu_usage_limit_idle`,
-`disk_max_used_gb`, `disk_max_used_pct`, `disk_min_free_gb`, `work_buf_min_days` and
+`suspend_cpu_usage`, `disk_max_used_gb`, `disk_max_used_pct`, `disk_min_free_gb`, `work_buf_min_days` and
 `work_buf_additional_days`.
 
-Otherwise, the app only manages those eleven settings. Anything else you set from boinctui or a
+Otherwise, the app only manages those twelve settings. Anything else you set from boinctui or a
 remote BOINC Manager — memory, network, and the rest — is preserved across restarts and updates.
-Setting one of the eleven options applies it, and removing it from the options clears it again,
+Setting one of the twelve options applies it, and removing it from the options clears it again,
 without touching preferences you set yourself elsewhere.
 
 One thing to know if you already set the disk limits or the work buffer from boinctui or BOINC
