@@ -28,16 +28,19 @@ configuration:
     description: "Hora en que BOINC deja de computar. Debe configurarse junto con Hora de Inicio; si solo se pone una, o si ambas son iguales, se ignora"
   max_ncpus:
     name: Porcentaje Máximo de CPUs
-    description: "Porcentaje máximo de CPUs a utilizar mientras el equipo está en uso. También se aplica cuando no está en uso, salvo que se indique lo contrario más abajo"
+    description: "Porcentaje máximo de CPUs a utilizar. Si pones el de Sin Usar, ese lo sustituye, porque este equipo cuenta como sin usar casi todo el tiempo"
   cpu_usage_limit:
     name: Porcentaje Máximo de Uso de CPU
-    description: "Porcentaje máximo de tiempo de uso de cada CPU mientras el equipo está en uso. También se aplica cuando no está en uso, salvo que se indique lo contrario más abajo"
+    description: "Porcentaje máximo de tiempo de uso de cada CPU. Si pones el de Sin Usar, ese lo sustituye, porque este equipo cuenta como sin usar casi todo el tiempo"
   max_ncpus_idle:
     name: Porcentaje Máximo de CPUs (Sin Usar)
-    description: "Porcentaje máximo de CPUs a utilizar mientras el equipo no está en uso, en lugar de Porcentaje Máximo de CPUs"
+    description: "Sustituye a Porcentaje Máximo de CPUs siempre, salvo los primeros minutos tras arrancar el app, el único momento en que Home Assistant cuenta como en uso"
   cpu_usage_limit_idle:
     name: Porcentaje Máximo de Uso de CPU (Sin Usar)
-    description: "Porcentaje máximo de tiempo que puede usarse cada CPU mientras el equipo no está en uso, en lugar de Porcentaje Máximo de Uso de CPU"
+    description: "Sustituye a Porcentaje Máximo de Uso de CPU siempre, salvo los primeros minutos tras arrancar el app, el único momento en que Home Assistant cuenta como en uso"
+  suspend_cpu_usage:
+    name: Pausar con Otra Carga Superior a (Porcentaje)
+    description: "Pausa BOINC mientras el resto del equipo use más de este porcentaje de su CPU total. Vacío mantiene el valor por defecto de BOINC, el 25%; 0 no pausa nunca"
   disk_max_used_gb:
     name: Espacio Máximo en Disco (GB)
     description: "No usar nunca más de estos gigabytes para datos científicos. Vacío deja sin poner este límite; de los tres límites se aplica el más estricto"
