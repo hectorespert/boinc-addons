@@ -256,31 +256,6 @@ of cost.
   suspended for an hour from BOINC Manager could say so instead of just "paused". Needs a duration
   formatter; `format_due` only handles deadlines.
 
-- [ ] **Publish a maintained fork of `pyboinc` to PyPI.** Deferred deliberately; `boincui` vendors it
-  instead (see `boincui/server/pyboinc/VENDOR.md`). What is already established, so it is not
-  re-derived:
-  - Upstream is dormant: last commit 2022-10-16, **PR #4 — from the author of the HACS integration —
-    open since 2023-05-22**, issue #5 unanswered since 2023-09. Two forks already exist.
-  - MIT permits it, keeping the copyright and licence. The name `pyboinc` is **free on PyPI** (its
-    `setup.py` declares `name='PyBOINC'`), as are `aioboinc`, `boinc-rpc` and `boinc-gui-rpc`.
-  - Its `setup.py` **already declares `license='MIT'` and the OSI classifier** — exactly the metadata
-    `boinc-client` lacks, which would otherwise fail Home Assistant's licence check and need an entry
-    in `script/licenses.py`'s `EXCEPTIONS`.
-  - Work: `setup.py` → `pyproject.toml`, a real version (it is `0.0.1`), a meaningful
-    `python_requires`, GitHub Actions instead of the dead `.travis.yml`, and PyPI Trusted Publishing
-    (OIDC) so there is no long-lived token. Plus folding in the fixes that already exist but are
-    stranded upstream: SpuelMett's `str(duration)`, PR #1's Windows buffer fix, PR #2's typo, our
-    `close()` and the `"\n"` normalisation.
-  - **The write path is broken upstream and in both forks**, which is the strongest reason yet to
-    publish a fixed one. All three `set_*_mode()` methods pass the duration where a tag name belongs,
-    so they raise `TypeError` before sending anything; `Igor-Misic` left it, and SpuelMett's
-    `str(duration)` stops the crash while silently dropping the duration, turning a timed change into
-    a permanent one. `boincui` carries the real fix (`ET.SubElement(req, Tag.DURATION)`), verified
-    against a running client — it is a three-line PR to upstream whenever the fork happens.
-  - **This is what a Home Assistant core integration would require**, since core only accepts
-    dependencies pinned as `<package>==<version>` from PyPI (`script/hassfest/requirements.py`).
-  - Cost: a public package to maintain. Courtesy first: offer upstream to take over maintenance.
-
 - [ ] **Discover the BOINC add-on's hostname through the Supervisor API**, instead of making the user
   copy it from the Info page into `boincui`'s configuration. It would remove the worst half of the
   cross-add-on setup friction, but requires granting `hassio_api`, i.e. widening this add-on's
@@ -295,7 +270,7 @@ of cost.
 
 - [ ] **Act on individual tasks and projects.** `boincui` can set a machine's activity mode and
   nothing else. The next rungs, in BOINC's own vocabulary: per-project suspend / resume / update /
-  no new work, and abort task. Each is one more `pyboinc` call and one more confirmation question —
+  no new work, and abort task. Each is one more `aioboinc` call and one more confirmation question —
   aborting a task destroys days of work, so it is not a bare button like the mode control is.
 
 - [ ] **Can an ingress panel be restricted to admin users?** Unverified, and it decides how much
@@ -949,13 +924,42 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     was never run: writing the page cost less than auditing a third-party SPA for baked-in absolute
     asset paths.
   - **`boinccmd` was rejected as a backend, as predicted** — one process spawn per call against
-    human-readable text. `boincui` speaks GUI RPC over TCP 31416 through vendored `pyboinc`, which
+    human-readable text. `boincui` speaks GUI RPC over TCP 31416 through `nielstron/pyboinc`, which
     also settles the separate "pick a library rather than writing one" item: `boinc-client`
-    (synchronous, no licence metadata) lost to `nielstron/pyboinc` (MIT, asyncio, already used by
-    SpuelMett's integration), vendored rather than depended on because it was never published to
-    PyPI. See `boincui/server/pyboinc/VENDOR.md` and the open item on publishing a fork.
+    (synchronous, no licence metadata) lost to it (MIT, asyncio, already used by SpuelMett's
+    integration). Vendored at first because it was never published to PyPI; replaced in `boincui`
+    1.4.1 by our published fork `aioboinc` — see "Shipped in `boincui` 1.4.1".
   - **Host + credential storage went to add-on options**, the declarative fork: visible, backed up,
     validated by Supervisor, and one writer instead of two. A list of dicts cannot be optional, hence
+## Shipped in `boincui` 1.4.1
+
+- [x] **`pyboinc` is published as a maintained fork, `aioboinc`, and `boincui` depends on it instead
+  of vendoring it.** [`aioboinc` 0.1.0](https://pypi.org/project/aioboinc/) is upstream at its last
+  commit (`f8a31de`, 2022-10-16) renamed to its install name, with both of `boincui`'s local patches
+  (`close()`, and the `set_*_mode()` duration fix) plus the reply check no longer being an `assert`
+  that `python -O` would drop. Licence metadata (`License-Expression: MIT`) is what a future Home
+  Assistant core integration needs, since core only accepts `<package>==<version>` from PyPI.
+  - **Diffed against the vendored copy before switching**: apart from the rename, typing and style,
+    the only behavioural changes are the two patches already carried, the `assert` (it raised the
+    same `ConnectionError` before, so `boinc.py`'s error mapping is unchanged) and a `__hash__` on
+    `Project`, which `boincui` does not use. The 71 tests pass against it, inside the built image too.
+  - **Installed into a venv, not with `--break-system-packages`.** `python3 -m venv
+    --system-site-packages --without-pip /opt/boincui/venv` keeps flask/waitress from apt and needs
+    no `python3-venv`; Debian's pip installs into it with `--python` and is purged in the same `RUN`
+    as the apt packages, so the image still has 5 filesystem layers and grows by ~3 MB. No pip is
+    left in the image, and the system `python3` cannot import `aioboinc`.
+  - **AppArmor needed no new rule, measured with `strace`** on a `--exit-immediately` run of the
+    new image against the same on `main`: one `execve` (the venv's `bin/python3`, a symlink AppArmor
+    resolves to `/usr/bin/python3*`), everything new under `/opt/boincui/**`, and no path outside
+    `/opt` that `main` did not already touch. Only the comments changed.
+  - Dependabot now watches `boincui/server/requirements.txt`, and the CI test job installs from it,
+    so the tests run against the pinned version rather than whatever pip picks.
+  - The original item listed offering upstream to take over maintenance as a courtesy; whether that
+    happened is not recorded here. `aioboinc`'s `Upstream` project URL points at `nielstron/pyboinc`.
+  - Not verified on this change: an activity change against a real BOINC client. The wire format is
+    asserted by `test_should_send_exactly_the_request_the_client_expects`, and the library code
+    that builds it is unchanged from the vendored copy, which was verified that way.
+
     `options: clients: []`.
   - **Partial failure is handled by construction**, not by a retry policy: a background refresher
     polls on its own thread and views only read its snapshot, so a machine that is switched off costs

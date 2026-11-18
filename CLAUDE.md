@@ -50,16 +50,17 @@ Three independent Home Assistant add-ons, each self-contained with its own `conf
      time does not depend on how many hosts are configured. An *action* is the one exception — it
      runs its exchange inside the request, with a shorter deadline than the poll gets, because a
      button press with no confirmation is worse than a slow one.
-  3. **`boinc.py` is the only place that may import `pyboinc`.** It converts the library's asyncio
+  3. **`boinc.py` is the only place that may import `aioboinc`.** It converts the library's asyncio
      API and its quirks into plain dicts and `BoincError` subclasses, so nothing above it knows the
      library exists.
 
-- **`boincui/server/pyboinc/`** is vendored third-party code (MIT), not ours — it has never been
-  published to PyPI, so there is no version to depend on. `VENDOR.md` in that directory records the
-  upstream commit, the local patches (an added `close()`, since upstream never closes its socket, and
-  a fix to the three `set_*_mode()` methods, whose entire write path raised `TypeError` before
-  reaching the socket) and the upstream quirks that `boinc.py` works around. Keep local changes
-  minimal and listed there; do not restyle it.
+- **`aioboinc`** is the GUI RPC library, pinned in `boincui/server/requirements.txt`. It is
+  [our maintained fork](https://github.com/hectorespert/aioboinc) of `nielstron/pyboinc`, which was
+  never published to PyPI; until 1.4.1 `boincui` vendored that instead. Fixes to the protocol layer
+  belong there, released to PyPI, not patched here. The image installs it with pip into a venv at
+  `/opt/boincui/venv` that also sees Debian's site-packages, so flask and waitress still come from
+  apt, and pip is purged in the same layer. Dependabot watches `requirements.txt`, and CI's test job
+  installs from it too, so the tests run against the version the image ships.
 
 All three ship an `apparmor.txt`, and **all three are still in `complain` mode** — AppArmor logs what
 it would have blocked and blocks nothing. The reasoning for every rule, the `strace` evidence behind
@@ -126,9 +127,10 @@ cd boincui/server
 python -m unittest discover -s test -t test
 ```
 
-Dependencies: `flask` and `waitress` (`pip install flask waitress`, in a venv rather than
-system-wide). The image installs them from Debian as `python3-flask`/`python3-waitress`; the tests
-just need them importable. CI runs this as a second job in `operator.yaml`.
+Dependencies: `flask`, `waitress` and `aioboinc` (`pip install flask waitress -r requirements.txt`,
+in a venv rather than system-wide). The image installs the first two from Debian as
+`python3-flask`/`python3-waitress`; the tests just need them importable. CI runs this as a second
+job in `operator.yaml`.
 
 ### Python version
 
@@ -138,11 +140,12 @@ meant the tests never executed on the version being published. That is not theor
 `threading.Thread._stop` shadowing bug in `boincui` passed on one version and failed on another.
 When Debian moves, move `operator.yaml` with it.
 
-To run a suite on exactly the version that ships, mount it into the built image:
+To run a suite on exactly the version that ships, mount it into the built image (for `boincui`,
+through its venv's interpreter, which is the one that can import `aioboinc`):
 
 ```bash
 docker run --rm -v "$PWD/boincui/server:/src" -w /src \
-  --entrypoint python3 boincui-addon-test:local -m unittest discover -s test -t test
+  --entrypoint /opt/boincui/venv/bin/python3 boincui-addon-test:local -m unittest discover -s test -t test
 ```
 
 ### Build/run an add-on image locally

@@ -7,8 +7,9 @@
 # `<repository>_boincui` depending on where the app was installed from.
 #
 # Unlike most Home Assistant apps this one has no s6-overlay or bashio layer to accommodate: the
-# container's entrypoint is `python3 /opt/boincui/main.py`, so the interpreter is PID 1 and this
-# outer profile is the confinement itself rather than a permissive wrapper around a nested one.
+# container's entrypoint is `/opt/boincui/venv/bin/python3 /opt/boincui/main.py`, so the interpreter
+# is PID 1 and this outer profile is the confinement itself rather than a permissive wrapper around
+# a nested one.
 # That is why there is no `file,` or `capability,` blanket rule here -- those grant everything, and
 # nothing in this app needs them.
 #
@@ -63,7 +64,8 @@ profile boincui flags=(attach_disconnected,mediate_deleted,complain) {
 
   # The interpreter. This is deliberately the only executable in the image the profile will run:
   # with no other `x` rule, a flaw in the page or a hostile reply from a BOINC client cannot reach
-  # a shell, which is the strongest thing this profile buys.
+  # a shell, which is the strongest thing this profile buys. The entrypoint names the venv's
+  # `bin/python3`, which is a symlink to `/usr/bin/python3`, and AppArmor matches the resolved path.
   /usr/bin/python3* mrix,
 
   # Python stats the root directory once while working out its own paths at startup, and no
@@ -71,8 +73,10 @@ profile boincui flags=(attach_disconnected,mediate_deleted,complain) {
   # under it still has to be matched by a rule below.
   / r,
 
-  # The app's own code and its templates. Read-only -- it never writes to them, and with
-  # PYTHONDONTWRITEBYTECODE set in the Dockerfile it never tries to leave a __pycache__ here either.
+  # The app's own code, its templates, and the venv holding aioboinc from PyPI (`pyvenv.cfg` and
+  # `site-packages`, pure Python, so nothing there needs `m`). Read-only -- it never writes to them,
+  # and with PYTHONDONTWRITEBYTECODE set in the Dockerfile it never tries to leave a __pycache__ here
+  # either.
   /opt/ r,
   /opt/boincui/ r,
   /opt/boincui/** r,
