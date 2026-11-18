@@ -273,12 +273,6 @@ of cost.
   no new work, and abort task. Each is one more `aioboinc` call and one more confirmation question —
   aborting a task destroys days of work, so it is not a bare button like the mode control is.
 
-- [ ] **Can an ingress panel be restricted to admin users?** Unverified, and it decides how much
-  power `boincui` may concentrate: BOINC's GUI RPC has one password per client and no roles, so the
-  panel already grants total control of every configured machine to whoever opens it. If HA cannot
-  restrict it, that is a documentation duty at minimum. Check `SCHEMA_APP_USER` and the ingress
-  session API in Supervisor.
-
 - [ ] **Version skew across BOINC clients.** Different client versions expose different RPC fields;
   `boinc.py` reads what it needs and would `KeyError` or silently blank on an older one. Nothing has
   gone wrong yet because every client tested was current. Decide the policy — a declared minimum
@@ -326,6 +320,32 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 # Resolved — kept so it is not re-litigated
 
 ## Discarded after investigation
+
+- [x] **An ingress panel is already admin-only, and `boincui` and `boinctui` already are
+  (investigated 2026-11-17, from source, not yet on a live host).** The question was whether HA can
+  keep non-admin users out of `boincui`, which gives total control of every configured machine.
+  - **It is `panel_admin`, and it defaults to `true`** (`supervisor/apps/validate.py:492`, the
+    add-on config schema, so it is set by the add-on author and not by the user). Neither add-on
+    declares it, and the linter rejects redeclaring a default, so there is nothing to add.
+  - **Before Supervisor 2026.10.2 it only hid the sidebar entry.** The proxy checked only that the
+    session cookie was valid, so a non-admin could open any ingress app by URL. Supervisor PR
+    [#7308](https://github.com/home-assistant/supervisor/pull/7308) (merged 2026-10-13, first
+    shipped in **2026.10.2**, 2026-10-14) resolves the session's user and returns 403 for non-admins
+    when `panel_admin` is set (`supervisor/api/ingress.py`, in `handler`). Core has sent the user ID
+    on session creation since 2023.9.0, so the fix works with any Core version. Core 2026.11.0 adds a
+    matching check before it hands out ingress info (`_async_check_ingress_access` in
+    `hassio/websocket_api.py`).
+  - **Who is still exposed:** installations running Supervisor older than 2026.10.2. Supervisor
+    updates itself, so that is only installs where updates are blocked. Known limitation from the
+    PR: a user demoted from admin keeps a live session until it expires, they open a new one, or
+    Supervisor restarts.
+  - **Consequence for "Act on individual tasks and projects":** the panel is reachable only by
+    people who can already reach every app's configuration, including the GUI RPC passwords. Adding
+    actions there does not hand anyone new power. Abort still needs a confirmation, but to protect
+    against mistakes, not against an attacker.
+  - Supervisor 2026.10.x also forwards the user's groups to the app as `X-Remote-User-*` headers
+    (#7398), so per-user checks inside `boincui` are possible. They are not needed while
+    `panel_admin` covers it.
 
 - [x] **`init: false` is right in all three, for a reason the HA docs do not list (measured
   2026-08-16).** The item asked why it was set, since the documented justification — the image ships
