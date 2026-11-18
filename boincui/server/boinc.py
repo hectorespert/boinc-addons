@@ -1,14 +1,14 @@
 """The only place that talks to a BOINC client.
 
-Everything above this module works with plain dicts and never sees that the vendored library is
+Everything above this module works with plain dicts and never sees that aioboinc is
 asyncio-based, so the views and the refresher stay synchronous.
 """
 
 import asyncio
 import logging
 
-from pyboinc import init_rpc_client
-from pyboinc.rpc_client import Mode
+from aioboinc import init_rpc_client
+from aioboinc.rpc_client import Mode
 from status import describe_activity, describe_mode, describe_processor
 
 DEFAULT_PORT = 31416

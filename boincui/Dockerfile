@@ -14,23 +14,29 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 # Set shell
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# aioboinc comes from PyPI because Debian does not package it. It goes into a venv that also sees
+# Debian's site-packages, so flask and waitress still come from apt and the system Python is left
+# alone. pip is only needed for the install and is purged in the same layer.
+COPY server/requirements.txt /tmp/requirements.txt
 # hadolint ignore=DL3008
 RUN apt-get update && \
     apt-get install --no-install-recommends -y \
     python3 \
     python3-flask \
+    python3-pip \
     python3-waitress && \
+    python3 -m venv --system-site-packages --without-pip /opt/boincui/venv && \
+    python3 -m pip --python /opt/boincui/venv/bin/python3 install --no-cache-dir -r /tmp/requirements.txt && \
+    apt-get purge -y --auto-remove python3-pip && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/requirements.txt
 
 # Copy server
 COPY server/*.py /opt/boincui/
 COPY server/templates/ /opt/boincui/templates/
-# Vendored third-party library, see server/pyboinc/VENDOR.md
-COPY server/pyboinc/ /opt/boincui/pyboinc/
 
 # Entrypoint & CMD
-ENTRYPOINT [ "python3", "/opt/boincui/main.py", "--options", "/data/options.json" ]
+ENTRYPOINT [ "/opt/boincui/venv/bin/python3", "/opt/boincui/main.py", "--options", "/data/options.json" ]
 
 # Build arguments
 ARG BUILD_DATE

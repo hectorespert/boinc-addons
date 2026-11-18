@@ -308,7 +308,7 @@ class TestSingleClient(unittest.TestCase):
         self.assertEqual([], state['projects'])
 
     def test_should_close_the_connection_it_opened(self):
-        # Upstream never closes the socket; this is what the vendored close() patch is for.
+        # Upstream pyboinc never closed the socket; aioboinc added close() for this.
         with FakeBoincClient() as server:
             self.read_one(server)
             threading.Event().wait(0.5)
@@ -382,7 +382,7 @@ class TestActivityMode(unittest.TestCase):
     """Changing a machine's activity mode -- the only thing this app writes."""
 
     def test_should_send_exactly_the_request_the_client_expects(self):
-        # The vendored library passed the duration as an element *name*, so this request never
+        # Upstream pyboinc passed the duration as an element *name*, so this request never
         # reached the wire at all. boinctui builds the same message by hand (src/srvdata.cpp:445),
         # and a real client was verified to accept this one and change mode.
         with FakeBoincClient() as server:
