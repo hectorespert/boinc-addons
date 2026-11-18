@@ -911,26 +911,6 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
   - Kept out of `boinc` 3.11.0 on purpose: `apparmor.txt` had just joined `monitored_files`, so
     touching that file releases its add-on, and one release should do one thing.
 
-## Shipped as `boincui`, 0.1.0 → 1.0.0
-
-- [x] **"Graphical web UI" — built, and most of its design questions are now answered rather than
-  open.** The item used to be the largest in this file; what it planned, `boincui` does. Kept
-  condensed because the reasoning still guides the remaining items above, and the full argument with
-  its evidence lives in `boincui/DEVELOPMENT.md`:
-  - **Ingress compatibility decided build-over-wrap.** Served under `/api/hassio_ingress/<token>/`
-    with a token generated at install time and never passed on, so every emitted URL — `href`,
-    `action` *and* `Location` — must be relative. Server-rendered Flask, no SPA, no `url_for`;
-    `test_app.py` and `smoke.sh` both assert it. The "evaluate an existing web UI first" experiment
-    was never run: writing the page cost less than auditing a third-party SPA for baked-in absolute
-    asset paths.
-  - **`boinccmd` was rejected as a backend, as predicted** — one process spawn per call against
-    human-readable text. `boincui` speaks GUI RPC over TCP 31416 through `nielstron/pyboinc`, which
-    also settles the separate "pick a library rather than writing one" item: `boinc-client`
-    (synchronous, no licence metadata) lost to it (MIT, asyncio, already used by SpuelMett's
-    integration). Vendored at first because it was never published to PyPI; replaced in `boincui`
-    1.4.1 by our published fork `aioboinc` — see "Shipped in `boincui` 1.4.1".
-  - **Host + credential storage went to add-on options**, the declarative fork: visible, backed up,
-    validated by Supervisor, and one writer instead of two. A list of dicts cannot be optional, hence
 ## Shipped in `boincui` 1.4.1
 
 - [x] **`pyboinc` is published as a maintained fork, `aioboinc`, and `boincui` depends on it instead
@@ -960,6 +940,26 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
     asserted by `test_should_send_exactly_the_request_the_client_expects`, and the library code
     that builds it is unchanged from the vendored copy, which was verified that way.
 
+## Shipped as `boincui`, 0.1.0 → 1.0.0
+
+- [x] **"Graphical web UI" — built, and most of its design questions are now answered rather than
+  open.** The item used to be the largest in this file; what it planned, `boincui` does. Kept
+  condensed because the reasoning still guides the remaining items above, and the full argument with
+  its evidence lives in `boincui/DEVELOPMENT.md`:
+  - **Ingress compatibility decided build-over-wrap.** Served under `/api/hassio_ingress/<token>/`
+    with a token generated at install time and never passed on, so every emitted URL — `href`,
+    `action` *and* `Location` — must be relative. Server-rendered Flask, no SPA, no `url_for`;
+    `test_app.py` and `smoke.sh` both assert it. The "evaluate an existing web UI first" experiment
+    was never run: writing the page cost less than auditing a third-party SPA for baked-in absolute
+    asset paths.
+  - **`boinccmd` was rejected as a backend, as predicted** — one process spawn per call against
+    human-readable text. `boincui` speaks GUI RPC over TCP 31416 through `nielstron/pyboinc`, which
+    also settles the separate "pick a library rather than writing one" item: `boinc-client`
+    (synchronous, no licence metadata) lost to it (MIT, asyncio, already used by SpuelMett's
+    integration). Vendored at first because it was never published to PyPI; replaced in `boincui`
+    1.4.1 by our published fork `aioboinc` — see "Shipped in `boincui` 1.4.1".
+  - **Host + credential storage went to add-on options**, the declarative fork: visible, backed up,
+    validated by Supervisor, and one writer instead of two. A list of dicts cannot be optional, hence
     `options: clients: []`.
   - **Partial failure is handled by construction**, not by a retry policy: a background refresher
     polls on its own thread and views only read its snapshot, so a machine that is switched off costs
