@@ -35,7 +35,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flask waitress
+        pip install flask waitress -r boincui/server/requirements.txt
     - name: Run tests
       working-directory: boincui/server
       run: |
