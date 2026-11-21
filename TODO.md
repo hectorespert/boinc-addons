@@ -260,6 +260,13 @@ of cost.
   copy it from the Info page into `boincui`'s configuration. It would remove the worst half of the
   cross-add-on setup friction, but requires granting `hassio_api`, i.e. widening this add-on's
   permissions. Needs its own analysis before anyone reaches for it.
+  - **The permission is cheaper than this entry first assumed** (read from Supervisor `main`
+    2026-11-20, not measured). `/addons/<slug>/info` is not in the token-only `api_bypass` list,
+    which covers `/addons/self/...` only, so `hassio_api: true` is needed — but the `default` role
+    already allows any `/.+/info` (`supervisor/api/middleware/security.py:124-128`), so no
+    `hassio_role` is, and `rating_security` only subtracts for `manager` and `admin`
+    (`supervisor/apps/utils.py:76-79`). The rating stays 8/8; the cost is one more permission
+    listed on the app's page.
 
 - [ ] **Cross-host aggregation — one table of every task across every machine**, sortable by
   deadline, with bulk actions. This is the one thing neither `boinctui` nor SpuelMett's integration
@@ -320,6 +327,48 @@ None open. The `projects:` list shipped in 3.10.0 — see Resolved.
 # Resolved — kept so it is not re-litigated
 
 ## Discarded after investigation
+
+- [x] **Showing the computer's model (`product_name`) in `boincui` — shelved, not rejected
+  (decided 2026-11-19).** It is free to read: `get_host_info`, which the poll already makes, carries
+  it. What stopped it is that almost nothing sends it (BOINC master, read from source, not measured):
+  - **macOS** sends Apple's identifier (`Mac14,6`) from `sysctl hw.model`
+    (`client/hostinfo_unix.cpp:1116`); **Linux ARM** sends the SoC (`BCM2835`), and only when the
+    kernel prints a `Hardware` line in `/proc/cpuinfo` (`:546-558`), which arm64 kernels normally do
+    not, so a Home Assistant on a 64-bit Pi most likely sends nothing; **Android** sends the device
+    model through `set_host_info`; **Windows and Linux x86** never set it.
+  - **Overriding it from the `boinc` app was looked at and left out of scope.** `boinccmd
+    --set_host_info <name>` sets it, but outside Android the client does not restore it from
+    `client_state.xml` (`#ifdef ANDROID`, `lib/hostinfo.cpp:120-124`), so the operator would have to
+    re-apply it on every start; and it goes to every project in each scheduler request
+    (`client/cs_scheduler.cpp:197`), which shows it on the host's public page. Auto-detecting it
+    from `/proc/device-tree/model` probably fails in the container — that path resolves under
+    `/sys/firmware`, which Docker masks — unmeasured. The x86 counterpart would be
+    `/sys/devices/virtual/dmi/id/{sys_vendor,product_name}`, minus vendor filler such as
+    `To Be Filled By O.E.M.`.
+  - **The client has no command-line flag or `cc_config.xml` option for it.** `<device_name>` in
+    `cc_config.xml` exists and does persist (`client/hostinfo_network.cpp:99`), but it overrides
+    `domain_name`, the host's network name on project pages, not the model — a separate, cheap
+    candidate for the `boinc` operator, which already writes `cc_config.xml`. A persistent override
+    would be an upstream change: a `<product_name>` `cc_config.xml` option alongside `device_name`,
+    applied after `get_host_info(true)` (`client/client_state.cpp:706`) so macOS and ARM detection
+    do not overwrite it. A command-line flag alone would be lost on a runtime `--read_cc_config`,
+    which resets `cc_config` (`client/log_flags.cpp:594`). Better still upstream: detect it on Linux
+    from DMI / device tree, which helps every Linux host. It would reach this repo with the first
+    BOINC release that has it, since `boinc/Dockerfile` installs BOINC's own `.deb`.
+  - **What Home Assistant knows, and what it costs to ask.** HA does not read the hardware itself:
+    Supervisor takes `board` from the OS's CPE name via systemd-hostnamed
+    (`supervisor/os/manager.py:274`; `supervised` outside HAOS) and per-board integrations map it to
+    a name (`raspberry_pi/hardware.py`: `rpi4-64` → "Raspberry Pi 4"); `generic-x86-64` maps to
+    nothing. An app can get the same family of value **with no permission at all**: `/info` is in
+    `api_bypass` and returns `machine` (`raspberrypi4-64`, `green`, `generic-x86-64`).
+    `/os/info`'s `board` needs `hassio_api: true` at the `default` role, which leaves the rating
+    alone. Either way it needs our own name table and says nothing useful on a PC, so it is a
+    fallback behind DMI / device tree, not a replacement. Unverified: that `SUPERVISOR_TOKEN` reaches
+    an app that does not declare `hassio_api`.
+  - **The design, if it comes back:** prepend it to the existing processor line rather than add a
+    line (`Mac14,6 · Apple M2 Pro · 12 cores`); omit it when absent, blank, or equal to the
+    machine's configured name; show it verbatim, no identifier table; each part an `inline-block`
+    so the line wraps at the separators, checked at 390px like the processor line was.
 
 - [x] **An ingress panel is already admin-only, and `boincui` and `boinctui` already are
   (investigated 2026-11-17, from source, not yet on a live host).** The question was whether HA can
