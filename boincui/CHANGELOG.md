@@ -2,7 +2,7 @@
 
 ## 1.4.2
 
-Updates the library BOINC UI uses to talk to your BOINC machines to its latest version, which reads more of what they report correctly. Nothing changes in how the app works or in what you need to configure
+Project names and other text with accents or other non-English letters now show as your BOINC machines send them, instead of garbled: "Biología" no longer appears as "BiologÃ­a". This comes from updating the library BOINC UI uses to talk to your machines. Nothing changes in what you need to configure
 
 ## 1.4.1
 

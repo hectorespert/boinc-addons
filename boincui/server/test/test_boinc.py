@@ -84,7 +84,8 @@ class FakeBoincClient:
     """A GUI RPC server that speaks just enough of the protocol to exercise our side of it.
 
     The handshake mirrors BOINC's own (lib/gui_rpc_client.cpp): <auth1/> is answered with a nonce,
-    and <auth2> is accepted only when it carries md5(nonce + password).
+    and <auth2> is accepted only when it carries md5(nonce + password). Replies are UTF-8, which is
+    what a real client writes.
     """
 
     def __init__(self, password=PASSWORD, tasks=None, projects=PROJECTS, status=None,
@@ -154,7 +155,7 @@ class FakeBoincClient:
             return
         try:
             while True:
-                request = (await reader.readuntil(END)).decode('ISO-8859-1')
+                request = (await reader.readuntil(END)).decode('UTF-8')
                 self.requests.append(request)
                 if '<auth1' in request:
                     reply = f'<boinc_gui_rpc_reply>\n<nonce>{nonce}</nonce>\n</boinc_gui_rpc_reply>'
@@ -179,7 +180,7 @@ class FakeBoincClient:
                     reply = '<boinc_gui_rpc_reply>\n<success/>\n</boinc_gui_rpc_reply>'
                 else:
                     reply = '<boinc_gui_rpc_reply>\n<unauthorized/>\n</boinc_gui_rpc_reply>'
-                writer.write(reply.encode('ISO-8859-1') + END)
+                writer.write(reply.encode('UTF-8') + END)
                 await writer.drain()
         except (asyncio.IncompleteReadError, ConnectionResetError, asyncio.CancelledError):
             pass
@@ -249,6 +250,15 @@ class TestSingleClient(unittest.TestCase):
 
         self.assertEqual('https://example.org/', running[0]['project'])
         self.assertIsInstance(running[0]['project'], str)
+
+    def test_should_read_a_project_name_that_is_not_ascii(self):
+        # Read as ISO-8859-1 until aioboinc 0.10.0, this came out as "BiologÃ­a".
+        projects = PROJECTS.replace('Example Project', 'Biología')
+        with FakeBoincClient(projects=projects) as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual('Biología', state['running'][0]['project'])
+        self.assertEqual(['Biología'], [project['name'] for project in state['projects']])
 
     def test_should_describe_why_a_client_is_paused(self):
         with FakeBoincClient(status=cc_status(suspend_reason=1024)) as server:
