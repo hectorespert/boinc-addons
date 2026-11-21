@@ -7,7 +7,7 @@ asyncio-based, so the views and the refresher stay synchronous.
 import asyncio
 import logging
 
-from aioboinc import init_rpc_client
+from aioboinc import BOINCAuthError, BOINCConnectionError, init_rpc_client
 from aioboinc.rpc_client import Mode
 from status import describe_activity, describe_mode, describe_processor
 
@@ -60,12 +60,9 @@ ERROR_KINDS = {
 def _as_list(value):
     """Normalise a reply that should have been a list.
 
-    The library returns the string "\\n" instead of an empty list when a request has no items --
-    a quirk the only other consumer works around at each call site. Doing it once here keeps the
-    rest of the code able to assume a list.
-
     Project replies come back as library objects rather than dicts; they are flattened here so that
-    nothing above this module has to know the library exists.
+    nothing above this module has to know the library exists. Anything that is not a list at all is
+    read as empty, so the rest of the code can assume one.
     """
     if not isinstance(value, list):
         return []
@@ -108,7 +105,7 @@ def _summarise(results: list, projects: list) -> dict:
             queued += 1
 
     # Sorted by deadline, soonest first; anything without one goes last rather than breaking the
-    # comparison. Deadlines are naive datetimes -- never compare them with an aware one.
+    # comparison. Deadlines are aware datetimes in UTC -- never compare them with a naive one.
     running.sort(key=lambda task: (task['deadline'] is None, task['deadline']))
 
     return {
@@ -132,24 +129,25 @@ async def _open(host: str, port: int, password: str):
     off, which is a different problem with a different fix.
     """
     try:
-        return await init_rpc_client(host, password, port)
-    except (TimeoutError, OSError) as error:
+        # The deadline is ours, set by `_safely` around the whole exchange. The library's own, per
+        # reply, is switched off so that a host which stops answering half way is always told apart
+        # by that one deadline, never by whichever of the two happens to run out first.
+        return await init_rpc_client(host, password, port, timeout=None)
+    except BOINCConnectionError as error:
         raise CannotConnect(f'Could not reach a BOINC client at {host}:{port}') from error
 
 
 async def _authenticate(client, host: str, port: int) -> None:
-    # init_rpc_client connects but does not authenticate, and the query methods do not check
-    # authorisation: against an unauthorised session they return parsed nonsense rather than
-    # failing. Checking the return value here is what turns a wrong password into an error the page
-    # can explain instead of a silently empty screen.
+    # init_rpc_client connects but does not authenticate. Doing it before anything else means a wrong
+    # password is reported as such, rather than as whichever query happened to be refused first.
     try:
-        authorized = await client.authorize()
-    except (asyncio.IncompleteReadError, EOFError, OSError) as error:
+        await client.authorize()
+    except BOINCAuthError as error:
+        raise AuthenticationFailed('The BOINC client rejected the password') from error
+    except BOINCConnectionError as error:
         raise ConnectionRejected(
             f'The BOINC client at {host}:{port} closed the connection without answering'
         ) from error
-    if not authorized:
-        raise AuthenticationFailed('The BOINC client rejected the password')
 
 
 async def _read_state(client) -> dict:
@@ -181,13 +179,14 @@ async def _apply_mode(host: str, port: int, password: str, mode: str) -> dict:
     client = await _open(host, port, password)
     try:
         await _authenticate(client, host, port)
-        # A false return means the client answered <unauthorized/>, the only refusal the library
-        # reports this way. It should not happen after the authentication above succeeded, so if it
-        # ever does the message needs to say what was actually refused rather than invent a cause.
-        if not await client.set_run_mode(MODES[mode], PERMANENT):
+        # A refusal should not happen after the authentication above succeeded, so if it ever does
+        # the message needs to say what was actually refused rather than invent a cause.
+        try:
+            await client.set_run_mode(MODES[mode], PERMANENT)
+        except BOINCAuthError as error:
             raise AuthenticationFailed(
                 'The BOINC client treated the change as unauthorised'
-            )
+            ) from error
         # Read back over the same connection, so the page shows the new mode immediately rather
         # than looking unchanged until the next poll. The mode is already updated by the time this
         # returns; the suspend reason may not be, because the client recomputes that on its own
@@ -211,8 +210,8 @@ async def _safely(client: dict, action, timeout: int) -> dict:
     except (TimeoutError, OSError) as error:
         return {'error': CannotConnect(f'Could not reach a BOINC client at {host}:{port}')}
     except Exception as error:
-        # The library raises bare exceptions and assertion-style errors on malformed replies, so
-        # anything unexpected still has to reach the page as a message rather than kill the poll.
+        # Such as BOINCCommandError, when the client answers with an error: anything unexpected
+        # still has to reach the page as a message rather than kill the poll.
         logging.debug(f'Unexpected failure talking to {host}:{port}: {error!r}')
         return {'error': BoincError(f'Unexpected reply from the BOINC client at {host}:{port}')}
 

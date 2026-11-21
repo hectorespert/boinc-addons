@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.2
+
+Updates the library BOINC UI uses to talk to your BOINC machines to its latest version, which reads more of what they report correctly. Nothing changes in how the app works or in what you need to configure
+
 ## 1.4.1
 
 The part of the app that talks to your BOINC machines is now a separate, maintained library instead of a copy kept inside the app, so fixes to it can reach BOINC UI and other projects alike. Nothing changes in how the app works or in what you need to configure

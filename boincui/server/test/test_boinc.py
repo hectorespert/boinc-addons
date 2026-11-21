@@ -3,6 +3,7 @@ import socket
 import sys
 import threading
 import unittest
+from datetime import timedelta
 from hashlib import md5
 from pathlib import Path
 
@@ -235,6 +236,13 @@ class TestSingleClient(unittest.TestCase):
 
         self.assertEqual(['sooner', 'later', 'undated'], [task['name'] for task in running])
 
+    def test_should_give_deadlines_in_utc(self):
+        # The page subtracts an aware "now" from each deadline, so a naive one would take it down.
+        with FakeBoincClient() as server:
+            deadline = self.read_one(server)['state']['running'][0]['deadline']
+
+        self.assertEqual(timedelta(0), deadline.utcoffset())
+
     def test_should_fall_back_to_the_url_when_the_project_has_no_name(self):
         with FakeBoincClient(projects=NO_PROJECTS) as server:
             running = self.read_one(server)['state']['running']
@@ -283,8 +291,7 @@ class TestSingleClient(unittest.TestCase):
         self.assertEqual('ARM · 14\u00a0cores', state['processor'])
 
     def test_should_leave_out_the_processor_when_the_client_does_not_describe_it(self):
-        # An empty reply comes back as the string "\n", not a dict, and is not an error: the page
-        # simply has no processor line to show.
+        # An empty reply is not an error: the page simply has no processor line to show.
         with FakeBoincClient(host_info=NO_HOST_INFO) as server:
             machine = self.read_one(server)
 
@@ -292,15 +299,13 @@ class TestSingleClient(unittest.TestCase):
         self.assertIsNone(machine['state']['processor'])
 
     def test_should_report_a_rejected_password_rather_than_empty_data(self):
-        # The library does not check authorisation on its query methods, so without our explicit
-        # check a wrong password would look like a client with nothing to do.
+        # A wrong password must read as one, not as a client with nothing to do.
         with FakeBoincClient() as server:
             machine = self.read_one(server, password='wrong password')
 
         self.assertEqual('auth_failed', machine['error_kind'])
 
-    def test_should_treat_the_no_tasks_sentinel_as_an_empty_list(self):
-        # With no results the library returns the string "\n" instead of a list.
+    def test_should_read_a_client_with_no_tasks_and_no_projects(self):
         with FakeBoincClient(tasks=NO_TASKS, projects=NO_PROJECTS) as server:
             state = self.read_one(server)['state']
 
