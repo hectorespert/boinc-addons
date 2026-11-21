@@ -1,7 +1,7 @@
 import sys
 import threading
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin
@@ -42,7 +42,7 @@ def task(name='task_one', project='Example Project', fraction_done=0.25, deadlin
         'name': name,
         'project': project,
         'fraction_done': fraction_done,
-        'deadline': deadline if deadline is not None else datetime.now() + timedelta(days=2),
+        'deadline': deadline if deadline is not None else datetime.now(timezone.utc) + timedelta(days=2),
     }
 
 
@@ -250,7 +250,7 @@ class TestFormatDue(unittest.TestCase):
     def test_should_describe_a_deadline_in_readable_units(self):
         # Each delta carries a small margin because format_due reads the clock itself: the unit is
         # truncated, never rounded up, so a deadline is never described as further away than it is.
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         for delta, expected in (
             (timedelta(days=3, minutes=1), 'in 3 days'),
             (timedelta(days=1, hours=2), 'in 1 day'),
@@ -264,16 +264,16 @@ class TestFormatDue(unittest.TestCase):
 
     def test_should_never_overstate_the_time_left(self):
         # Truncating up would tell someone they have three days when they have two and a bit.
-        self.assertEqual('in 2 days', format_due(datetime.now() + timedelta(days=2, hours=23)))
+        self.assertEqual('in 2 days', format_due(datetime.now(timezone.utc) + timedelta(days=2, hours=23)))
 
     def test_should_cope_with_a_task_that_has_no_deadline(self):
         self.assertEqual('—', format_due(None))
 
     def test_should_not_mix_naive_and_aware_datetimes(self):
-        # Deadlines arrive naive; comparing them against an aware "now" raises TypeError, which
-        # would take the whole page down rather than one cell.
+        # Deadlines arrive aware, in UTC; comparing them against a naive "now" raises TypeError,
+        # which would take the whole page down rather than one cell.
         try:
-            format_due(datetime.now() + timedelta(days=1))
+            format_due(datetime.now(timezone.utc) + timedelta(days=1))
         except TypeError as error:
             self.fail(f'format_due compared incompatible datetimes: {error}')
 

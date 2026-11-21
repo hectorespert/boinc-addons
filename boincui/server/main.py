@@ -47,14 +47,14 @@ logging.debug('Watching ' + (', '.join(
 
 stop_requested = threading.Event()
 
-def signal_handler(number, frame):
-    logging.debug(f'Caught signal {number}')
-    stop_requested.set()
-
-signal.signal(signal.SIGHUP, signal_handler)
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGQUIT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
+# Blocked here, before any thread starts, and collected with sigwait() below instead of handled. A
+# Python handler runs on top of whatever the main thread was doing, and the one this replaced logged
+# from there: when the signal landed while that thread was itself writing a log line, Python 3.14
+# refused the nested write to stderr with RuntimeError, the handler never set the stop flag, and the
+# app ignored every signal after that. Every thread started below inherits the mask, so none of them
+# takes the signal instead.
+STOP_SIGNALS = {signal.SIGHUP, signal.SIGINT, signal.SIGQUIT, signal.SIGTERM}
+signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
 
 if args.exit_immediately:
     logging.warning('Exiting immediately instead of waiting to be stopped')
@@ -69,11 +69,13 @@ else:
 
     server = waitress.create_server(app, host='0.0.0.0', port=INGRESS_PORT)
     threading.Thread(target=server.run, daemon=True).start()
-    # Logged only once the server is listening and the handlers above are registered, so it doubles
-    # as a synchronization point for tests that need to connect, or to signal this process and know
-    # the signal will actually be handled.
+    # Logged only once the server is listening and the signals above are blocked, so it doubles as a
+    # synchronization point for tests that need to connect, or to signal this process and know the
+    # signal will actually be acted on: one sent before sigwait() is reached waits for it.
     logging.info(f'BOINC UI started on port {INGRESS_PORT}')
-    stop_requested.wait()
+    number = signal.sigwait(STOP_SIGNALS)
+    logging.debug(f'Caught signal {number}')
+    stop_requested.set()
     # Closes the listening socket deterministically, so the stop below means the port is really gone
     # rather than merely that this thread stopped waiting.
     server.close()

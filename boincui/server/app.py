@@ -108,9 +108,9 @@ def format_due(deadline: datetime | None) -> str:
     if deadline is None:
         return '—'
 
-    # Deadlines arrive as naive datetimes in local time, because that is what the library produces.
-    # `now` is deliberately naive too: mixing an aware datetime in here raises TypeError.
-    seconds = (deadline - datetime.now()).total_seconds()
+    # Deadlines arrive as aware datetimes in UTC, because that is what the library produces. `now`
+    # has to be aware too: mixing a naive datetime in here raises TypeError.
+    seconds = (deadline - datetime.now(timezone.utc)).total_seconds()
     if seconds <= 0:
         return 'overdue'
     for size, unit in ((86400, 'day'), (3600, 'hour'), (60, 'minute')):
