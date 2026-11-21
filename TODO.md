@@ -280,10 +280,23 @@ of cost.
   no new work, and abort task. Each is one more `aioboinc` call and one more confirmation question —
   aborting a task destroys days of work, so it is not a bare button like the mode control is.
 
-- [ ] **Version skew across BOINC clients.** Different client versions expose different RPC fields;
-  `boinc.py` reads what it needs and would `KeyError` or silently blank on an older one. Nothing has
-  gone wrong yet because every client tested was current. Decide the policy — a declared minimum
-  version, or defensive reads — before someone points it at an old machine.
+- [ ] **Version skew across BOINC clients: the policy is defensive reads, never tested against an old
+  client.** Different client versions expose different RPC fields. Decided by how the code already
+  works rather than declared (2026-11-21): no minimum version, and a missing field costs a line on
+  the page, never the machine's section.
+  - **What guarantees it.** `boinc.py` and `status.py` read every field with `.get()`, so a missing
+    one is `None`, not a `KeyError`. Since `aioboinc` 0.12.0 a flag BOINC sends only when set
+    (`ready_to_report`, `suspended_via_gui`…) is `False` when absent and an occasional value is
+    `None`, and a `Project` always has every attribute, which is what `vars(project)` in
+    `_read_state` relies on; so an old client that never sends a flag reads the same as a current
+    one with it unset. A reply the library does not recognise raises (since 0.9.0), and `_safely`
+    turns it into *Unexpected reply* for that machine alone.
+  - **What it costs.** The blanks are still silent: a client too old to send something gets no
+    processor or GPU line, or *Unknown* activity, with nothing saying the client is the reason.
+  - **What is left.** Run the suite's scenarios against a real old client (an old BOINC `.deb` in a
+    container is enough) to find the oldest version that works, and whether anything older fails
+    outright — authentication or the reply framing — rather than just leaving blanks. Then decide
+    whether the page should say when a client is too old.
 
 - [ ] **Confirm the Docker NAT behaviour on a real Home Assistant host.** Add-on ↔ add-on traffic
   stays on HA's Docker network and the target sees the container hostname; traffic to a LAN machine
