@@ -308,6 +308,47 @@ class TestSingleClient(unittest.TestCase):
         self.assertIsNone(machine['error'])
         self.assertIsNone(machine['state']['processor'])
 
+    def test_should_describe_the_gpus_boinc_can_use(self):
+        # Shaped as a real client writes them: one element per kind, named after its best card, with
+        # how many of that kind it found.
+        info = host_info_reply(
+            '<p_ncpus>12</p_ncpus>',
+            '<coprocs>',
+            '<coproc_cuda>\n<count>2</count>\n<name>NVIDIA GeForce RTX 3060</name>\n'
+            '<available_ram>12884901888.000000</available_ram>\n</coproc_cuda>',
+            '<coproc_intel_gpu>\n<count>1</count>\n<name>Intel(R) UHD Graphics 630</name>\n'
+            '</coproc_intel_gpu>',
+            '</coprocs>',
+        )
+        with FakeBoincClient(host_info=info) as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual(
+            'GPU: 2\u00a0×\u00a0NVIDIA GeForce RTX 3060 · Intel(R) UHD Graphics 630', state['gpus'])
+
+    def test_should_name_a_gpu_by_its_kind_when_boinc_gives_no_name(self):
+        info = host_info_reply('<coprocs>', '<coproc_ati>\n<count>1</count>\n</coproc_ati>', '</coprocs>')
+        with FakeBoincClient(host_info=info) as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual('GPU: AMD GPU', state['gpus'])
+
+    def test_should_not_call_a_coprocessor_that_is_not_a_gpu_one(self):
+        info = host_info_reply(
+            '<coprocs>', '<coproc>\n<type>miner_asic</type>\n<count>1</count>\n</coproc>', '</coprocs>')
+        with FakeBoincClient(host_info=info) as server:
+            state = self.read_one(server)['state']
+
+        self.assertIsNone(state['gpus'])
+
+    def test_should_leave_out_the_gpus_when_boinc_found_none(self):
+        # The commonest case of all, a Raspberry Pi or a server: the processor line alone.
+        for info in (HOST_INFO, host_info_reply('<p_ncpus>4</p_ncpus>', '<coprocs>\n</coprocs>'), NO_HOST_INFO):
+            with self.subTest(info=info), FakeBoincClient(host_info=info) as server:
+                state = self.read_one(server)['state']
+
+            self.assertIsNone(state['gpus'])
+
     def test_should_report_a_rejected_password_rather_than_empty_data(self):
         # A wrong password must read as one, not as a client with nothing to do.
         with FakeBoincClient() as server:

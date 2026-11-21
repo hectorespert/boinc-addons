@@ -48,6 +48,11 @@ computer has, not how many BOINC is allowed to use, so a machine limited to part
 runs fewer tasks than it has cores. A machine that does not report its processor simply has no such
 line.
 
+Below it, a line starting with **GPU** names the graphics cards BOINC found on that machine and can
+compute on, with how many when there are several of the same kind. If a machine has a graphics card
+and this line does not show it, BOINC cannot see the card, and projects will not send that machine
+GPU work. Machines with no usable GPU, which is most of them, have no such line.
+
 The table lists only the tasks running at that moment, which is normally one per processor core. A
 line above it counts the rest: **waiting** are downloaded and queued, **finished** are done and
 waiting to be sent back. To see the full queue, use the **boinctui** app.

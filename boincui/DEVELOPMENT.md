@@ -225,14 +225,14 @@ Two declarations look redundant and are not. `max-width` alongside the flex basi
 contributes its full 8rem to the table's minimum width and the page scrolls sideways on a phone.
 `min-width: 2rem`: it is the floor the bar shrinks to before the line gives up and wraps.
 
-## A machine says which processor it is, and nothing else about its hardware
+## A machine says which processor and GPUs it has, and nothing else about its hardware
 
 The name of a machine is whatever its owner typed — *attic pc* says nothing about what it is. One
 line under it, from `get_host_info`, does: the processor and its core count. It also explains the
 numbers below it, since the running tasks are normally one per core.
 
-**Everything else `host_info` offers was left out on purpose.** Memory, disk, OS version, GPUs and
-the benchmark figures are a hardware sheet, and BOINC Manager already has a whole *Computer info*
+**Everything else `host_info` offers was left out on purpose.** Memory, disk, OS version and the
+benchmark figures are a hardware sheet, and BOINC Manager already has a whole *Computer info*
 panel for that. This page is read at a glance; a second machine has to fit on the screen beside the
 first one.
 
@@ -285,6 +285,30 @@ activity change keeps its processor line, because an action re-reads state throu
 A client that says nothing usable — or answers this request with `<unauthorized/>`, which the library
 turns into `True` rather than a dict — gets no line rather than a heading with nothing under it. It
 is not an error worth a message on a status page.
+
+### GPUs were left out at first, and are in since 1.5.0
+
+The first version of this line listed GPUs with the rest of the hardware sheet. They came back for a
+reason the others do not have: **a GPU is something BOINC computes on**, so it changes what the page
+below it means. GPU tasks run on top of the one-per-core CPU tasks, which makes a machine with *12
+cores* legitimately run fourteen; and the commonest question about a GPU, why its projects get no
+work, usually has the answer *BOINC does not see it*. The `coprocs` of `host_info` are exactly the
+GPUs the client detected and will use, not every card in the box, so their absence answers that too.
+They became cheap with `aioboinc` 0.12.0, which files them by kind (`NVIDIA`, `ATI`, `intel_gpu`,
+`apple_gpu`) instead of a list to search.
+
+- **A second line, not more of the first.** A full Intel model and two GPU names on one line is a
+  paragraph on a phone. Both sit in the same `<p>`, so the heading block keeps its spacing whichever
+  of the two is missing.
+- **Labelled `GPU:`.** The processor line needs no label, a GPU's name sometimes does: Apple
+  Silicon names its GPU after the chip, the same as the processor.
+- **One entry per kind, as BOINC reports it**: the best card of that kind, with how many it found
+  (`2 × NVIDIA GeForce RTX 3060`). A machine with two different NVIDIA cards therefore shows one
+  name and a count of two, which is what every other BOINC tool says about it too. The `×` is joined
+  by non-breaking spaces, for the same reason as the core count.
+- **Only GPUs.** BOINC also reports other coprocessors (a `<coproc>` with its own `<type>`, used for
+  mining ASICs); they are left out rather than called a GPU. A kind with no name is called by its
+  vendor (*AMD GPU*), and a machine with no GPU has no line, which is most of them.
 
 ## Only running tasks are listed
 

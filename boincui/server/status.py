@@ -115,6 +115,50 @@ def describe_processor(host_info) -> str | None:
     return ' · '.join(parts) or None
 
 
+# The GPUs BOINC can compute on, by the name the library files each kind under, and what to call one
+# that came without a name. Any other coprocessor -- a mining ASIC, say -- is not a GPU and is left
+# out rather than labelled as one.
+GPU_KINDS = {
+    'NVIDIA': 'NVIDIA GPU',
+    'ATI': 'AMD GPU',
+    'intel_gpu': 'Intel GPU',
+    'apple_gpu': 'Apple GPU',
+}
+
+
+def describe_gpus(host_info) -> str | None:
+    """The GPUs BOINC can use, in one line, e.g. "GPU: 2 × NVIDIA GeForce RTX 3060".
+
+    These are the ones the client detected and will hand work to, not every graphics card in the
+    machine: a GPU missing here is one BOINC cannot see, which is exactly what someone wondering why
+    their GPU projects get no work needs to know. BOINC reports one entry per kind, named after the
+    best card of that kind, with how many it found. Returns None when there are none, so the page
+    leaves the line out.
+
+    The label is part of the line because a GPU's name does not always say it is one: an Apple
+    Silicon GPU is named after the chip, the same as the processor above it.
+    """
+    if not isinstance(host_info, dict) or not isinstance(host_info.get('coprocs'), dict):
+        return None
+
+    parts = []
+    for kind, gpu in host_info['coprocs'].items():
+        if kind not in GPU_KINDS or not isinstance(gpu, dict):
+            continue
+        count = gpu.get('count')
+        # Excluding `True` for the same reason as the core count above.
+        if not isinstance(count, int) or isinstance(count, bool):
+            count = 1
+        if count < 1:
+            continue
+        name = str(gpu.get('name') or '').strip() or GPU_KINDS[kind]
+        # Non-breaking either side of the ×, so a phone never leaves "2 ×" at the end of one line
+        # and the card on the next.
+        parts.append(name if count == 1 else f'{count}\N{NO-BREAK SPACE}×\N{NO-BREAK SPACE}{name}')
+
+    return f'GPU: {" · ".join(parts)}' if parts else None
+
+
 def describe_mode(cc_status: dict | None) -> str | None:
     """Which activity mode the buttons should show as selected.
 

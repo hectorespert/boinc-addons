@@ -19,7 +19,7 @@ URL_ATTRIBUTES = ('href', 'src', 'action', 'formaction')
 
 def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=0,
             projects=(('Example Project', 'https://example.org/'),), activity='Computing',
-            mode='auto', processor=None):
+            mode='auto', processor=None, gpus=None):
     return {
         'name': name,
         'host': 'pc.local',
@@ -29,6 +29,7 @@ def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=
             'activity': activity,
             'mode': mode,
             'processor': processor,
+            'gpus': gpus,
             'running': list(running),
             'queued': queued,
             'ready_to_report': ready,
@@ -186,6 +187,17 @@ class TestStates(unittest.TestCase):
 
         self.assertNotIn('class="muted processor"', page)
         self.assertIn('Computing', page)
+
+    def test_should_show_the_gpus_on_a_line_of_their_own_under_the_processor(self):
+        page = self.page_for(snapshot_of(machine(
+            processor='AMD Ryzen 5 · 12 cores', gpus='GPU: NVIDIA GeForce RTX 3060')))
+
+        self.assertIn('AMD Ryzen 5 · 12 cores<br>GPU: NVIDIA GeForce RTX 3060', page)
+
+    def test_should_show_the_gpus_when_the_processor_is_missing(self):
+        page = self.page_for(snapshot_of(machine(processor=None, gpus='GPU: Apple GPU')))
+
+        self.assertIn('<p class="muted processor">GPU: Apple GPU</p>', page)
 
     def test_should_report_each_failure_kind_against_its_own_machine(self):
         for kind, expected in (

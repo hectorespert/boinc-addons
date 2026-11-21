@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.4.2
+## 1.5.0
 
-Project names and other text with accents or other non-English letters now show as your BOINC machines send them, instead of garbled: "Biología" no longer appears as "BiologÃ­a". This comes from updating the library BOINC UI uses to talk to your machines. Nothing changes in what you need to configure
+Each machine now names the graphics cards BOINC can compute on, on a line of its own under the processor. A card you know is there but that does not appear is one BOINC cannot see, which is why that machine gets no GPU work. Project names with accents or other non-English letters also show as your machines send them, instead of garbled: "Biología" no longer appears as "BiologÃ­a"
 
 ## 1.4.1
 

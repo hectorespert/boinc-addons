@@ -8,7 +8,7 @@ import asyncio
 import logging
 
 from aioboinc import ActiveTaskState, BOINCAuthError, BOINCConnectionError, Mode, init_rpc_client
-from status import describe_activity, describe_mode, describe_processor
+from status import describe_activity, describe_gpus, describe_mode, describe_processor
 
 DEFAULT_PORT = 31416
 # BOINC's own client gives up well before this; the point is only that a host which accepts the
@@ -148,6 +148,7 @@ async def _read_state(client) -> dict:
         'activity': describe_activity(cc_status),
         'mode': describe_mode(cc_status),
         'processor': describe_processor(host_info),
+        'gpus': describe_gpus(host_info),
         **_summarise(results, projects),
     }
 
