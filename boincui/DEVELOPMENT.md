@@ -310,9 +310,12 @@ line reads *12 cores* whole. The line still wraps; it now wraps somewhere that r
 machine that was switched off when the app started describes itself as soon as it answers, and an
 activity change keeps its processor line, because an action re-reads state through the same function.
 
-A client that says nothing usable — or answers this request with `<unauthorized/>`, which the library
-turns into `True` rather than a dict — gets no line rather than a heading with nothing under it. It
-is not an error worth a message on a status page.
+A client that says nothing usable gets no line rather than a heading with nothing under it. It is
+not an error worth a message on a status page. Two library quirks that used to reach this code are
+gone: an empty reply was its whitespace as a string until `aioboinc` 0.12.1, which returns `{}`, and
+`<unauthorized/>` was `True` until 0.9.0, which raises `BOINCAuthError` instead. That one cannot
+happen here anyway, since `_read_state` runs only after `authorize()` succeeded; if it ever did, the
+machine would show the generic *Unexpected reply*, not a missing line.
 
 ### GPUs were left out at first, and are in since 1.5.0
 
