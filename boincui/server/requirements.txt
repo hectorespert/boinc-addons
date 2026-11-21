@@ -1,1 +1,1 @@
-aioboinc==0.8.0
+aioboinc==0.9.0

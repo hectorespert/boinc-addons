@@ -7,8 +7,7 @@ asyncio-based, so the views and the refresher stay synchronous.
 import asyncio
 import logging
 
-from aioboinc import BOINCAuthError, BOINCConnectionError, init_rpc_client
-from aioboinc.rpc_client import Mode
+from aioboinc import ActiveTaskState, BOINCAuthError, BOINCConnectionError, Mode, init_rpc_client
 from status import describe_activity, describe_mode, describe_processor
 
 DEFAULT_PORT = 31416
@@ -24,9 +23,6 @@ MODES = {'always': Mode.ALWAYS, 'auto': Mode.AUTO, 'never': Mode.NEVER}
 # A duration of zero makes the change permanent: it survives a restart of the BOINC client, rather
 # than reverting on its own after a while (`RUN_MODE::set`, client/client_types.cpp:1414).
 PERMANENT = 0
-
-# `active_task_state` when a task is actually executing (lib/common_defs.h: PROCESS_EXECUTING).
-PROCESS_EXECUTING = 1
 
 
 class BoincError(Exception):
@@ -90,7 +86,7 @@ def _summarise(results: list, projects: list) -> dict:
     for result in results:
         url = _url(result.get('project_url'))
         active = result.get('active_task') or {}
-        if active.get('active_task_state') == PROCESS_EXECUTING:
+        if active.get('active_task_state') == ActiveTaskState.EXECUTING:
             running.append({
                 # Kept for the row's `title`: BOINC's own identifiers say nothing to a reader, but
                 # they are what you would search for in boinctui.
@@ -167,17 +163,14 @@ async def _read_state(client) -> dict:
 
 
 async def _collect(host: str, port: int, password: str) -> dict:
-    client = await _open(host, port, password)
-    try:
+    # Entering keeps the connection `_open` made; leaving closes it, whatever was raised.
+    async with await _open(host, port, password) as client:
         await _authenticate(client, host, port)
         return await _read_state(client)
-    finally:
-        await client.close()
 
 
 async def _apply_mode(host: str, port: int, password: str, mode: str) -> dict:
-    client = await _open(host, port, password)
-    try:
+    async with await _open(host, port, password) as client:
         await _authenticate(client, host, port)
         # A refusal should not happen after the authentication above succeeded, so if it ever does
         # the message needs to say what was actually refused rather than invent a cause.
@@ -192,8 +185,6 @@ async def _apply_mode(host: str, port: int, password: str, mode: str) -> dict:
         # returns; the suspend reason may not be, because the client recomputes that on its own
         # cycle -- verified against a running client.
         return await _read_state(client)
-    finally:
-        await client.close()
 
 
 async def _safely(client: dict, action, timeout: int) -> dict:
