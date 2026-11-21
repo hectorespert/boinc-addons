@@ -53,18 +53,6 @@ ERROR_KINDS = {
 }
 
 
-def _as_list(value):
-    """Normalise a reply that should have been a list.
-
-    Project replies come back as library objects rather than dicts; they are flattened here so that
-    nothing above this module has to know the library exists. Anything that is not a list at all is
-    read as empty, so the rest of the code can assume one.
-    """
-    if not isinstance(value, list):
-        return []
-    return [item if isinstance(item, dict) else vars(item) for item in value]
-
-
 def _url(value) -> str:
     """A project URL as text.
 
@@ -152,8 +140,10 @@ async def _read_state(client) -> dict:
     # was switched off when the app started still describes itself as soon as it answers. It is also
     # why acting on a machine keeps its processor line: an action re-reads the state through here.
     host_info = await client.get_host_info()
-    projects = _as_list(await client.get_project_status())
-    results = _as_list(await client.get_results())
+    # Projects come back as library objects rather than dicts; they are flattened here so that
+    # nothing above this module has to know the library exists.
+    projects = [vars(project) for project in await client.get_project_status()]
+    results = await client.get_results()
     return {
         'activity': describe_activity(cc_status),
         'mode': describe_mode(cc_status),
