@@ -66,6 +66,11 @@
   th, td { text-align: left; padding: 0.3rem 0.6rem 0.3rem 0; vertical-align: baseline; }
   th { font-weight: 600; border-bottom: 1px solid currentColor; font-size: 0.85rem; }
   td.due { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  /* Under the deadline rather than a column of its own: a fourth column made the table 395px wide
+     and the page scroll sideways at 390px, and squeezed every progress bar onto two lines even in a
+     desktop column -- measured with Playwright. Here it costs no width, the deadline being the wider
+     of the two, and a phone row is already two lines tall because its percentage wraps. */
+  .left { display: block; font-size: 0.85rem; opacity: 0.7; }
   /* The bar and its percentage are one reading, so they stay on one line and the bar gives up width
      first -- it can lose most of its length and still say roughly how far along the task is, while a
      percentage pushed onto a second line reads as belonging to the row below.
@@ -233,7 +238,11 @@ computing.</p>
             </span>
             {% else %}—{% endif %}
           </td>
-          <td class="due">{{ task.deadline | due }}</td>
+          <td class="due">
+            {{- task.deadline | due -}}
+            {%- set left = task.remaining | remaining %}
+            {%- if left %}<span class="left" title="BOINC's estimate of the computing time this task still needs">{{ left }} left</span>{% endif -%}
+          </td>
         </tr>
         {% endfor %}
       </tbody>

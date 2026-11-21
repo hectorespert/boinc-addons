@@ -1,6 +1,6 @@
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from flask import Flask, redirect, render_template, request
 
@@ -120,10 +120,39 @@ def format_due(deadline: datetime | None) -> str:
     return 'in under a minute'
 
 
+def format_remaining(remaining: timedelta | None) -> str | None:
+    """BOINC's estimate of the computing a task still needs, e.g. "3h 20m", or None if it has none.
+
+    Deliberately not worded like the deadline above it ("in 2 days"): one is how much work is left,
+    the other when it is due, and "in 3 hours" under "in 2 days" invites reading both as dates. Two
+    units at most, and only hours from ten hours on, because an estimate that long is not precise to
+    the minute -- and because "23h 59m left" was the one string wider than the deadline above it,
+    enough to push a desktop column's progress percentage onto a second line.
+    """
+    if remaining is None:
+        return None
+    seconds = int(remaining.total_seconds())
+    # Zero is what BOINC reports once a task has outrun its estimate, which says nothing about how
+    # much is actually left -- printing "0m left" would promise it is about to finish.
+    if seconds <= 0:
+        return None
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes = seconds // 60
+    if days:
+        return f'{days}d {hours}h'
+    if hours >= 10:
+        return f'{hours}h'
+    if hours:
+        return f'{hours}h {minutes}m'
+    return f'{minutes}m' if minutes else '<1m'
+
+
 def create_app(snapshot: Snapshot | None = None) -> Flask:
     app = Flask(__name__)
     app.config['SNAPSHOT'] = snapshot if snapshot is not None else Snapshot()
     app.jinja_env.filters['due'] = format_due
+    app.jinja_env.filters['remaining'] = format_remaining
 
     @app.route('/')
     def index():

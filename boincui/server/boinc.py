@@ -82,6 +82,9 @@ def _summarise(results: list, projects: list) -> dict:
                 'project': names.get(url) or url,
                 'fraction_done': active.get('fraction_done'),
                 'deadline': result.get('report_deadline'),
+                # BOINC's own estimate, the one BOINC Manager shows as "Remaining (estimated)". It is
+                # computing time still needed, not a time of day: a machine that pauses finishes later.
+                'remaining': result.get('estimated_cpu_time_remaining'),
             })
         elif result.get('ready_to_report'):
             ready += 1

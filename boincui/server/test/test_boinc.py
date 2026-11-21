@@ -22,11 +22,13 @@ def results_reply(*results: str) -> str:
     return '<boinc_gui_rpc_reply>\n<results>\n' + '\n'.join(results) + '\n</results>\n</boinc_gui_rpc_reply>'
 
 
-def running_task(name='task_one', url='https://example.org/', done='0.25', deadline='4102444800'):
+def running_task(name='task_one', url='https://example.org/', done='0.25', deadline='4102444800',
+                 remaining='12000.000000'):
     return f"""<result>
 <name>{name}</name>
 <project_url>{url}</project_url>
 <report_deadline>{deadline}</report_deadline>
+<estimated_cpu_time_remaining>{remaining}</estimated_cpu_time_remaining>
 <active_task>
 <active_task_state>1</active_task_state>
 <fraction_done>{done}</fraction_done>
@@ -307,6 +309,12 @@ class TestSingleClient(unittest.TestCase):
 
         self.assertIsNone(machine['error'])
         self.assertIsNone(machine['state']['processor'])
+
+    def test_should_give_the_time_a_running_task_still_needs(self):
+        with FakeBoincClient() as server:
+            task = self.read_one(server)['state']['running'][0]
+
+        self.assertEqual(timedelta(seconds=12000), task['remaining'])
 
     def test_should_describe_the_gpus_boinc_can_use(self):
         # Shaped as a real client writes them: one element per kind, named after its best card, with

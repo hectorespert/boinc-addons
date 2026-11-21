@@ -2,7 +2,7 @@
 
 ## 1.5.0
 
-Each machine now names the graphics cards BOINC can compute on, on a line of its own under the processor. A card you know is there but that does not appear is one BOINC cannot see, which is why that machine gets no GPU work. Project names with accents or other non-English letters also show as your machines send them, instead of garbled: "Biología" no longer appears as "BiologÃ­a"
+Each machine now names the graphics cards BOINC can compute on, under the processor; a card you know is there but that does not appear is one BOINC cannot see. Each running task now says how much computing it still needs, under its due date, as BOINC estimates it. Project names with accents or other non-English letters also show as your machines send them, instead of garbled: "Biología" no longer appears as "BiologÃ­a"
 
 ## 1.4.1
 

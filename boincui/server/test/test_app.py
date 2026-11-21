@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import app as app_module  # noqa: E402
-from app import Refresher, Snapshot, clients_from, create_app, format_due  # noqa: E402
+from app import Refresher, Snapshot, clients_from, create_app, format_due, format_remaining  # noqa: E402
 
 # An URL that is fine to emit absolutely: it leaves the panel on purpose, or does not navigate.
 EXTERNAL_PREFIXES = ('http://', 'https://', 'mailto:', '#')
@@ -38,11 +38,12 @@ def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=
     }
 
 
-def task(name='task_one', project='Example Project', fraction_done=0.25, deadline=None):
+def task(name='task_one', project='Example Project', fraction_done=0.25, deadline=None, remaining=None):
     return {
         'name': name,
         'project': project,
         'fraction_done': fraction_done,
+        'remaining': remaining,
         'deadline': deadline if deadline is not None else datetime.now(timezone.utc) + timedelta(days=2),
     }
 
@@ -288,6 +289,41 @@ class TestFormatDue(unittest.TestCase):
             format_due(datetime.now(timezone.utc) + timedelta(days=1))
         except TypeError as error:
             self.fail(f'format_due compared incompatible datetimes: {error}')
+
+
+class TestFormatRemaining(unittest.TestCase):
+
+    def test_should_give_at_most_two_units_and_only_hours_from_ten_hours_on(self):
+        for delta, expected in (
+            (timedelta(days=2, hours=4, minutes=30), '2d 4h'),
+            (timedelta(hours=23, minutes=59), '23h'),
+            (timedelta(hours=9, minutes=59), '9h 59m'),
+            (timedelta(hours=3, minutes=20, seconds=59), '3h 20m'),
+            (timedelta(hours=1), '1h 0m'),
+            (timedelta(minutes=45), '45m'),
+            (timedelta(seconds=30), '<1m'),
+        ):
+            with self.subTest(delta=delta):
+                self.assertEqual(expected, format_remaining(delta))
+
+    def test_should_not_promise_a_task_is_about_to_finish_when_it_outran_its_estimate(self):
+        self.assertIsNone(format_remaining(timedelta(0)))
+
+    def test_should_say_nothing_when_boinc_gave_no_estimate(self):
+        self.assertIsNone(format_remaining(None))
+
+    def test_should_show_the_time_left_under_the_deadline(self):
+        page = client_for(snapshot_of(machine(running=[
+            task(remaining=timedelta(hours=3, minutes=20), deadline=datetime.now(timezone.utc) + timedelta(days=2, hours=1)),
+        ]))).get('/').get_data(as_text=True)
+
+        self.assertIn('in 2 days<span class="left"', page)
+        self.assertIn('>3h 20m left</span>', page)
+
+    def test_should_leave_out_the_time_left_when_there_is_no_estimate(self):
+        page = client_for(snapshot_of(machine(running=[task(remaining=timedelta(0))]))).get('/').get_data(as_text=True)
+
+        self.assertNotIn('class="left"', page)
 
 
 class TestClientsFrom(unittest.TestCase):

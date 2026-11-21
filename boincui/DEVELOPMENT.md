@@ -225,6 +225,34 @@ Two declarations look redundant and are not. `max-width` alongside the flex basi
 contributes its full 8rem to the table's minimum width and the page scrolls sideways on a phone.
 `min-width: 2rem`: it is the floor the bar shrinks to before the line gives up and wraps.
 
+## A task's time left sits under its deadline, not in a column of its own
+
+Since 1.5.0 each running task says how much computing it still needs, from the
+`estimated_cpu_time_remaining` that `get_results()` already returns — BOINC Manager's *Remaining
+(estimated)*. Despite the name it is not a time of day: a machine that pauses finishes later than it
+says, and the estimate is poor early in a task whose app the machine has not run before.
+
+**A fourth column was built first and measured with Playwright, and it does not fit a phone.** The
+table came out 395px wide at a 390px viewport, so the page scrolled sideways; and in a desktop
+column, where the bar and percentage used to share a line, every row's percentage wrapped. Under the
+deadline it needs no width of its own, and on a phone it fills a second line the row already has,
+because the percentage wraps below its bar there anyway. Measured, against the same rows without it:
+
+| viewport | without | fourth column | under the deadline |
+|---|---|---|---|
+| 390px | fits, 14px spare | table 395px, page scrolls | fits, 14px spare |
+| 1440px, 3 machines | one line per row | every percentage wraps | two lines per row |
+
+- **Worded unlike the deadline.** `9h 59m left` under `in 3 days`: one is an amount of work, the
+  other a date, and *in 3 hours* under *in 3 days* reads as two dates.
+- **Two units at most, and only hours from ten hours on** (`23h left`). An estimate that long is not
+  precise to the minute, and `23h 59m left` was the one string wider than a deadline, measured at
+  78px against 64px for *in 3 days* — enough to wrap a desktop column's percentage on its own. The
+  widest it can be now, `9h 59m left` at 70px, is narrower than deadlines the page already shows
+  (*in 23 hours*, 80px).
+- **Nothing when BOINC reports zero.** That is what it sends once a task has outrun its estimate, and
+  *0m left* would promise the task is about to finish. A task with no estimate also shows no line.
+
 ## A machine says which processor and GPUs it has, and nothing else about its hardware
 
 The name of a machine is whatever its owner typed — *attic pc* says nothing about what it is. One

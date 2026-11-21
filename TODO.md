@@ -245,6 +245,16 @@ The "build a graphical web UI" item that used to dominate this file was answered
 see Resolved for what was decided and why. What follows is what it did **not** settle, in rough order
 of cost.
 
+- [ ] **The task table scrolls sideways on a 360px phone, and did before 1.5.0.** Measured with
+  Playwright on the same example rows: the page is 4px too wide at 360px before the time-left line
+  and 10px with it; 390px fits either way, with 14px to spare. The floor is the columns' minimum
+  widths — the project name's longest word, the progress bar's 8rem flex basis (`progress` wraps its
+  percentage before it shrinks, see `boincui/DEVELOPMENT.md`) and the deadline, which is `nowrap` and
+  reaches 97px at *in 59 minutes*, 33px more than the example's *in 3 days*, so a deadline that
+  close most likely overflows a 390px phone too (inferred from the widths, not measured). Candidates:
+  let `td.due` wrap between *in* and the rest, or shrink the bar's basis only below a container
+  width. Measure at 360 and 390 with long project names and *in 59 minutes* before choosing.
+
 - [ ] **Localise `boincui`'s page.** Only `translations/*.yaml` is translated today, and that covers
   configuration fields, not the page itself. If it is ever done, the activity control's wording
   should come from BOINC's own catalogue rather than a third phrasing — `locale/es/BOINC-Manager.po`

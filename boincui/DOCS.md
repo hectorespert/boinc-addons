@@ -57,8 +57,12 @@ The table lists only the tasks running at that moment, which is normally one per
 line above it counts the rest: **waiting** are downloaded and queued, **finished** are done and
 waiting to be sent back. To see the full queue, use the **boinctui** app.
 
-Each row shows the project, how far along the task is and when it is due. Hovering over a row shows
-BOINC's own name for the task, which is what you would search for in boinctui.
+Each row shows the project, how far along the task is and when it is due. Under the due date is how
+much computing the task still needs, such as **1h 38m left**: it is BOINC's own estimate, the same
+one BOINC Manager shows, so it is rough at the start of a task and only counts time spent computing.
+A machine that pauses finishes later than it says. A task that has run past its estimate shows no
+time left. Hovering over a row shows BOINC's own name for the task, which is what you would search
+for in boinctui.
 
 ## Starting and stopping a machine
 
