@@ -78,20 +78,13 @@ def describe_activity(cc_status: dict | None) -> str:
     return 'Computing'
 
 
-def describe_processor(host_info) -> str | None:
+def describe_processor(host_info: dict) -> str | None:
     """The machine's processor in one line, e.g. "ARM · 14 cores".
 
     Returns None when the client described nothing usable, so the page can leave the line out
-    instead of printing a heading with no information under it.
-
-    `host_info` is whatever the library made of the reply, which is not always a dict: a
-    self-closing tag becomes `True` and an empty one a bare string. A client that will not answer
-    this request is not an error worth reporting on a status page, so it takes the same path as one
-    that answers without saying anything.
+    instead of printing a heading with no information under it. An empty reply is `{}` (since
+    aioboinc 0.12.1, which used to hand back its whitespace instead) and takes that path too.
     """
-    if not isinstance(host_info, dict):
-        return None
-
     model = _CPUID_SUFFIX.sub('', str(host_info.get('p_model') or '')).strip()
     # The vendor is a fallback rather than a second part of the line: it holds the CPUID string
     # ("GenuineIntel", "AuthenticAMD", "ARM"), and a model already begins with the readable form of
@@ -104,8 +97,8 @@ def describe_processor(host_info) -> str | None:
     parts = [model] if model else []
 
     cores = host_info.get('p_ncpus')
-    # `True` is what the library makes of a self-closing tag, and it counts as an int here: without
-    # excluding it, a client that sends `<p_ncpus/>` would be reported as having one core.
+    # Only a real number counts: an empty `<p_ncpus/>` comes back as '', and `True`, which would pass
+    # as an int and read as one core, is excluded too.
     if isinstance(cores, int) and not isinstance(cores, bool) and cores > 0:
         # A non-breaking space, because a long model name wraps this line on a phone and the count is
         # where it broke: "Intel(R) Core(TM) i7-8700 CPU @ 3.20GHz · 12" / "cores". The line may
@@ -113,6 +106,48 @@ def describe_processor(host_info) -> str | None:
         parts.append(f'{cores}\N{NO-BREAK SPACE}core{"s" if cores > 1 else ""}')
 
     return ' · '.join(parts) or None
+
+
+# The GPUs BOINC can compute on, by the name the library files each kind under, and what to call one
+# that came without a name. Any other coprocessor -- a mining ASIC, say -- is not a GPU and is left
+# out rather than labelled as one.
+GPU_KINDS = {
+    'NVIDIA': 'NVIDIA GPU',
+    'ATI': 'AMD GPU',
+    'intel_gpu': 'Intel GPU',
+    'apple_gpu': 'Apple GPU',
+}
+
+
+def describe_gpus(host_info: dict) -> str | None:
+    """The GPUs BOINC can use, in one line, e.g. "GPU: 2 × NVIDIA GeForce RTX 3060".
+
+    These are the ones the client detected and will hand work to, not every graphics card in the
+    machine: a GPU missing here is one BOINC cannot see, which is exactly what someone wondering why
+    their GPU projects get no work needs to know. BOINC reports one entry per kind, named after the
+    best card of that kind, with how many it found. Returns None when there are none, so the page
+    leaves the line out.
+
+    The label is part of the line because a GPU's name does not always say it is one: an Apple
+    Silicon GPU is named after the chip, the same as the processor above it.
+    """
+    parts = []
+    for kind, gpu in (host_info.get('coprocs') or {}).items():
+        # An empty element inside the reply still comes back as its text, unlike the reply itself.
+        if kind not in GPU_KINDS or not isinstance(gpu, dict):
+            continue
+        count = gpu.get('count')
+        # A real number only, for the same reason as the core count above.
+        if not isinstance(count, int) or isinstance(count, bool):
+            count = 1
+        if count < 1:
+            continue
+        name = str(gpu.get('name') or '').strip() or GPU_KINDS[kind]
+        # Non-breaking either side of the ×, so a phone never leaves "2 ×" at the end of one line
+        # and the card on the next.
+        parts.append(name if count == 1 else f'{count}\N{NO-BREAK SPACE}×\N{NO-BREAK SPACE}{name}')
+
+    return f'GPU: {" · ".join(parts)}' if parts else None
 
 
 def describe_mode(cc_status: dict | None) -> str | None:

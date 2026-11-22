@@ -225,14 +225,42 @@ Two declarations look redundant and are not. `max-width` alongside the flex basi
 contributes its full 8rem to the table's minimum width and the page scrolls sideways on a phone.
 `min-width: 2rem`: it is the floor the bar shrinks to before the line gives up and wraps.
 
-## A machine says which processor it is, and nothing else about its hardware
+## A task's time left sits under its deadline, not in a column of its own
+
+Since 1.5.0 each running task says how much computing it still needs, from the
+`estimated_cpu_time_remaining` that `get_results()` already returns — BOINC Manager's *Remaining
+(estimated)*. Despite the name it is not a time of day: a machine that pauses finishes later than it
+says, and the estimate is poor early in a task whose app the machine has not run before.
+
+**A fourth column was built first and measured with Playwright, and it does not fit a phone.** The
+table came out 395px wide at a 390px viewport, so the page scrolled sideways; and in a desktop
+column, where the bar and percentage used to share a line, every row's percentage wrapped. Under the
+deadline it needs no width of its own, and on a phone it fills a second line the row already has,
+because the percentage wraps below its bar there anyway. Measured, against the same rows without it:
+
+| viewport | without | fourth column | under the deadline |
+|---|---|---|---|
+| 390px | fits, 14px spare | table 395px, page scrolls | fits, 14px spare |
+| 1440px, 3 machines | one line per row | every percentage wraps | two lines per row |
+
+- **Worded unlike the deadline.** `9h 59m left` under `in 3 days`: one is an amount of work, the
+  other a date, and *in 3 hours* under *in 3 days* reads as two dates.
+- **Two units at most, and only hours from ten hours on** (`23h left`). An estimate that long is not
+  precise to the minute, and `23h 59m left` was the one string wider than a deadline, measured at
+  78px against 64px for *in 3 days* — enough to wrap a desktop column's percentage on its own. The
+  widest it can be now, `9h 59m left` at 70px, is narrower than deadlines the page already shows
+  (*in 23 hours*, 80px).
+- **Nothing when BOINC reports zero.** That is what it sends once a task has outrun its estimate, and
+  *0m left* would promise the task is about to finish. A task with no estimate also shows no line.
+
+## A machine says which processor and GPUs it has, and nothing else about its hardware
 
 The name of a machine is whatever its owner typed — *attic pc* says nothing about what it is. One
 line under it, from `get_host_info`, does: the processor and its core count. It also explains the
 numbers below it, since the running tasks are normally one per core.
 
-**Everything else `host_info` offers was left out on purpose.** Memory, disk, OS version, GPUs and
-the benchmark figures are a hardware sheet, and BOINC Manager already has a whole *Computer info*
+**Everything else `host_info` offers was left out on purpose.** Memory, disk, OS version and the
+benchmark figures are a hardware sheet, and BOINC Manager already has a whole *Computer info*
 panel for that. This page is read at a glance; a second machine has to fit on the screen beside the
 first one.
 
@@ -282,9 +310,36 @@ line reads *12 cores* whole. The line still wraps; it now wraps somewhere that r
 machine that was switched off when the app started describes itself as soon as it answers, and an
 activity change keeps its processor line, because an action re-reads state through the same function.
 
-A client that says nothing usable — or answers this request with `<unauthorized/>`, which the library
-turns into `True` rather than a dict — gets no line rather than a heading with nothing under it. It
-is not an error worth a message on a status page.
+A client that says nothing usable gets no line rather than a heading with nothing under it. It is
+not an error worth a message on a status page. Two library quirks that used to reach this code are
+gone: an empty reply was its whitespace as a string until `aioboinc` 0.12.1, which returns `{}`, and
+`<unauthorized/>` was `True` until 0.9.0, which raises `BOINCAuthError` instead. That one cannot
+happen here anyway, since `_read_state` runs only after `authorize()` succeeded; if it ever did, the
+machine would show the generic *Unexpected reply*, not a missing line.
+
+### GPUs were left out at first, and are in since 1.5.0
+
+The first version of this line listed GPUs with the rest of the hardware sheet. They came back for a
+reason the others do not have: **a GPU is something BOINC computes on**, so it changes what the page
+below it means. GPU tasks run on top of the one-per-core CPU tasks, which makes a machine with *12
+cores* legitimately run fourteen; and the commonest question about a GPU, why its projects get no
+work, usually has the answer *BOINC does not see it*. The `coprocs` of `host_info` are exactly the
+GPUs the client detected and will use, not every card in the box, so their absence answers that too.
+They became cheap with `aioboinc` 0.12.0, which files them by kind (`NVIDIA`, `ATI`, `intel_gpu`,
+`apple_gpu`) instead of a list to search.
+
+- **A second line, not more of the first.** A full Intel model and two GPU names on one line is a
+  paragraph on a phone. Both sit in the same `<p>`, so the heading block keeps its spacing whichever
+  of the two is missing.
+- **Labelled `GPU:`.** The processor line needs no label, a GPU's name sometimes does: Apple
+  Silicon names its GPU after the chip, the same as the processor.
+- **One entry per kind, as BOINC reports it**: the best card of that kind, with how many it found
+  (`2 × NVIDIA GeForce RTX 3060`). A machine with two different NVIDIA cards therefore shows one
+  name and a count of two, which is what every other BOINC tool says about it too. The `×` is joined
+  by non-breaking spaces, for the same reason as the core count.
+- **Only GPUs.** BOINC also reports other coprocessors (a `<coproc>` with its own `<type>`, used for
+  mining ASICs); they are left out rather than called a GPU. A kind with no name is called by its
+  vendor (*AMD GPU*), and a machine with no GPU has no line, which is most of them.
 
 ## Only running tasks are listed
 

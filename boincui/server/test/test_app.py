@@ -1,7 +1,7 @@
 import sys
 import threading
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urljoin
@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import app as app_module  # noqa: E402
-from app import Refresher, Snapshot, clients_from, create_app, format_due  # noqa: E402
+from app import Refresher, Snapshot, clients_from, create_app, format_due, format_remaining  # noqa: E402
 
 # An URL that is fine to emit absolutely: it leaves the panel on purpose, or does not navigate.
 EXTERNAL_PREFIXES = ('http://', 'https://', 'mailto:', '#')
@@ -19,7 +19,7 @@ URL_ATTRIBUTES = ('href', 'src', 'action', 'formaction')
 
 def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=0,
             projects=(('Example Project', 'https://example.org/'),), activity='Computing',
-            mode='auto', processor=None):
+            mode='auto', processor=None, gpus=None):
     return {
         'name': name,
         'host': 'pc.local',
@@ -29,6 +29,7 @@ def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=
             'activity': activity,
             'mode': mode,
             'processor': processor,
+            'gpus': gpus,
             'running': list(running),
             'queued': queued,
             'ready_to_report': ready,
@@ -37,12 +38,13 @@ def machine(name='pc', error=None, error_kind=None, running=(), queued=0, ready=
     }
 
 
-def task(name='task_one', project='Example Project', fraction_done=0.25, deadline=None):
+def task(name='task_one', project='Example Project', fraction_done=0.25, deadline=None, remaining=None):
     return {
         'name': name,
         'project': project,
         'fraction_done': fraction_done,
-        'deadline': deadline if deadline is not None else datetime.now() + timedelta(days=2),
+        'remaining': remaining,
+        'deadline': deadline if deadline is not None else datetime.now(timezone.utc) + timedelta(days=2),
     }
 
 
@@ -187,6 +189,17 @@ class TestStates(unittest.TestCase):
         self.assertNotIn('class="muted processor"', page)
         self.assertIn('Computing', page)
 
+    def test_should_show_the_gpus_on_a_line_of_their_own_under_the_processor(self):
+        page = self.page_for(snapshot_of(machine(
+            processor='AMD Ryzen 5 · 12 cores', gpus='GPU: NVIDIA GeForce RTX 3060')))
+
+        self.assertIn('AMD Ryzen 5 · 12 cores<br>GPU: NVIDIA GeForce RTX 3060', page)
+
+    def test_should_show_the_gpus_when_the_processor_is_missing(self):
+        page = self.page_for(snapshot_of(machine(processor=None, gpus='GPU: Apple GPU')))
+
+        self.assertIn('<p class="muted processor">GPU: Apple GPU</p>', page)
+
     def test_should_report_each_failure_kind_against_its_own_machine(self):
         for kind, expected in (
             ('cannot_connect', 'Cannot be reached'),
@@ -250,7 +263,7 @@ class TestFormatDue(unittest.TestCase):
     def test_should_describe_a_deadline_in_readable_units(self):
         # Each delta carries a small margin because format_due reads the clock itself: the unit is
         # truncated, never rounded up, so a deadline is never described as further away than it is.
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         for delta, expected in (
             (timedelta(days=3, minutes=1), 'in 3 days'),
             (timedelta(days=1, hours=2), 'in 1 day'),
@@ -264,18 +277,53 @@ class TestFormatDue(unittest.TestCase):
 
     def test_should_never_overstate_the_time_left(self):
         # Truncating up would tell someone they have three days when they have two and a bit.
-        self.assertEqual('in 2 days', format_due(datetime.now() + timedelta(days=2, hours=23)))
+        self.assertEqual('in 2 days', format_due(datetime.now(timezone.utc) + timedelta(days=2, hours=23)))
 
     def test_should_cope_with_a_task_that_has_no_deadline(self):
         self.assertEqual('—', format_due(None))
 
     def test_should_not_mix_naive_and_aware_datetimes(self):
-        # Deadlines arrive naive; comparing them against an aware "now" raises TypeError, which
-        # would take the whole page down rather than one cell.
+        # Deadlines arrive aware, in UTC; comparing them against a naive "now" raises TypeError,
+        # which would take the whole page down rather than one cell.
         try:
-            format_due(datetime.now() + timedelta(days=1))
+            format_due(datetime.now(timezone.utc) + timedelta(days=1))
         except TypeError as error:
             self.fail(f'format_due compared incompatible datetimes: {error}')
+
+
+class TestFormatRemaining(unittest.TestCase):
+
+    def test_should_give_at_most_two_units_and_only_hours_from_ten_hours_on(self):
+        for delta, expected in (
+            (timedelta(days=2, hours=4, minutes=30), '2d 4h'),
+            (timedelta(hours=23, minutes=59), '23h'),
+            (timedelta(hours=9, minutes=59), '9h 59m'),
+            (timedelta(hours=3, minutes=20, seconds=59), '3h 20m'),
+            (timedelta(hours=1), '1h 0m'),
+            (timedelta(minutes=45), '45m'),
+            (timedelta(seconds=30), '<1m'),
+        ):
+            with self.subTest(delta=delta):
+                self.assertEqual(expected, format_remaining(delta))
+
+    def test_should_not_promise_a_task_is_about_to_finish_when_it_outran_its_estimate(self):
+        self.assertIsNone(format_remaining(timedelta(0)))
+
+    def test_should_say_nothing_when_boinc_gave_no_estimate(self):
+        self.assertIsNone(format_remaining(None))
+
+    def test_should_show_the_time_left_under_the_deadline(self):
+        page = client_for(snapshot_of(machine(running=[
+            task(remaining=timedelta(hours=3, minutes=20), deadline=datetime.now(timezone.utc) + timedelta(days=2, hours=1)),
+        ]))).get('/').get_data(as_text=True)
+
+        self.assertIn('in 2 days<span class="left"', page)
+        self.assertIn('>3h 20m left</span>', page)
+
+    def test_should_leave_out_the_time_left_when_there_is_no_estimate(self):
+        page = client_for(snapshot_of(machine(running=[task(remaining=timedelta(0))]))).get('/').get_data(as_text=True)
+
+        self.assertNotIn('class="left"', page)
 
 
 class TestClientsFrom(unittest.TestCase):

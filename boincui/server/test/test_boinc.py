@@ -3,6 +3,7 @@ import socket
 import sys
 import threading
 import unittest
+from datetime import timedelta
 from hashlib import md5
 from pathlib import Path
 
@@ -21,11 +22,13 @@ def results_reply(*results: str) -> str:
     return '<boinc_gui_rpc_reply>\n<results>\n' + '\n'.join(results) + '\n</results>\n</boinc_gui_rpc_reply>'
 
 
-def running_task(name='task_one', url='https://example.org/', done='0.25', deadline='4102444800'):
+def running_task(name='task_one', url='https://example.org/', done='0.25', deadline='4102444800',
+                 remaining='12000.000000'):
     return f"""<result>
 <name>{name}</name>
 <project_url>{url}</project_url>
 <report_deadline>{deadline}</report_deadline>
+<estimated_cpu_time_remaining>{remaining}</estimated_cpu_time_remaining>
 <active_task>
 <active_task_state>1</active_task_state>
 <fraction_done>{done}</fraction_done>
@@ -83,7 +86,8 @@ class FakeBoincClient:
     """A GUI RPC server that speaks just enough of the protocol to exercise our side of it.
 
     The handshake mirrors BOINC's own (lib/gui_rpc_client.cpp): <auth1/> is answered with a nonce,
-    and <auth2> is accepted only when it carries md5(nonce + password).
+    and <auth2> is accepted only when it carries md5(nonce + password). Replies are UTF-8, which is
+    what a real client writes.
     """
 
     def __init__(self, password=PASSWORD, tasks=None, projects=PROJECTS, status=None,
@@ -153,7 +157,7 @@ class FakeBoincClient:
             return
         try:
             while True:
-                request = (await reader.readuntil(END)).decode('ISO-8859-1')
+                request = (await reader.readuntil(END)).decode('UTF-8')
                 self.requests.append(request)
                 if '<auth1' in request:
                     reply = f'<boinc_gui_rpc_reply>\n<nonce>{nonce}</nonce>\n</boinc_gui_rpc_reply>'
@@ -178,7 +182,7 @@ class FakeBoincClient:
                     reply = '<boinc_gui_rpc_reply>\n<success/>\n</boinc_gui_rpc_reply>'
                 else:
                     reply = '<boinc_gui_rpc_reply>\n<unauthorized/>\n</boinc_gui_rpc_reply>'
-                writer.write(reply.encode('ISO-8859-1') + END)
+                writer.write(reply.encode('UTF-8') + END)
                 await writer.drain()
         except (asyncio.IncompleteReadError, ConnectionResetError, asyncio.CancelledError):
             pass
@@ -235,12 +239,28 @@ class TestSingleClient(unittest.TestCase):
 
         self.assertEqual(['sooner', 'later', 'undated'], [task['name'] for task in running])
 
+    def test_should_give_deadlines_in_utc(self):
+        # The page subtracts an aware "now" from each deadline, so a naive one would take it down.
+        with FakeBoincClient() as server:
+            deadline = self.read_one(server)['state']['running'][0]['deadline']
+
+        self.assertEqual(timedelta(0), deadline.utcoffset())
+
     def test_should_fall_back_to_the_url_when_the_project_has_no_name(self):
         with FakeBoincClient(projects=NO_PROJECTS) as server:
             running = self.read_one(server)['state']['running']
 
         self.assertEqual('https://example.org/', running[0]['project'])
         self.assertIsInstance(running[0]['project'], str)
+
+    def test_should_read_a_project_name_that_is_not_ascii(self):
+        # Read as ISO-8859-1 until aioboinc 0.10.0, this came out as "BiologÃ­a".
+        projects = PROJECTS.replace('Example Project', 'Biología')
+        with FakeBoincClient(projects=projects) as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual('Biología', state['running'][0]['project'])
+        self.assertEqual(['Biología'], [project['name'] for project in state['projects']])
 
     def test_should_describe_why_a_client_is_paused(self):
         with FakeBoincClient(status=cc_status(suspend_reason=1024)) as server:
@@ -283,24 +303,68 @@ class TestSingleClient(unittest.TestCase):
         self.assertEqual('ARM · 14\u00a0cores', state['processor'])
 
     def test_should_leave_out_the_processor_when_the_client_does_not_describe_it(self):
-        # An empty reply comes back as the string "\n", not a dict, and is not an error: the page
-        # simply has no processor line to show.
+        # An empty reply is not an error: the page simply has no processor line to show.
         with FakeBoincClient(host_info=NO_HOST_INFO) as server:
             machine = self.read_one(server)
 
         self.assertIsNone(machine['error'])
         self.assertIsNone(machine['state']['processor'])
 
+    def test_should_give_the_time_a_running_task_still_needs(self):
+        with FakeBoincClient() as server:
+            task = self.read_one(server)['state']['running'][0]
+
+        self.assertEqual(timedelta(seconds=12000), task['remaining'])
+
+    def test_should_describe_the_gpus_boinc_can_use(self):
+        # Shaped as a real client writes them: one element per kind, named after its best card, with
+        # how many of that kind it found.
+        info = host_info_reply(
+            '<p_ncpus>12</p_ncpus>',
+            '<coprocs>',
+            '<coproc_cuda>\n<count>2</count>\n<name>NVIDIA GeForce RTX 3060</name>\n'
+            '<available_ram>12884901888.000000</available_ram>\n</coproc_cuda>',
+            '<coproc_intel_gpu>\n<count>1</count>\n<name>Intel(R) UHD Graphics 630</name>\n'
+            '</coproc_intel_gpu>',
+            '</coprocs>',
+        )
+        with FakeBoincClient(host_info=info) as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual(
+            'GPU: 2\u00a0×\u00a0NVIDIA GeForce RTX 3060 · Intel(R) UHD Graphics 630', state['gpus'])
+
+    def test_should_name_a_gpu_by_its_kind_when_boinc_gives_no_name(self):
+        info = host_info_reply('<coprocs>', '<coproc_ati>\n<count>1</count>\n</coproc_ati>', '</coprocs>')
+        with FakeBoincClient(host_info=info) as server:
+            state = self.read_one(server)['state']
+
+        self.assertEqual('GPU: AMD GPU', state['gpus'])
+
+    def test_should_not_call_a_coprocessor_that_is_not_a_gpu_one(self):
+        info = host_info_reply(
+            '<coprocs>', '<coproc>\n<type>miner_asic</type>\n<count>1</count>\n</coproc>', '</coprocs>')
+        with FakeBoincClient(host_info=info) as server:
+            state = self.read_one(server)['state']
+
+        self.assertIsNone(state['gpus'])
+
+    def test_should_leave_out_the_gpus_when_boinc_found_none(self):
+        # The commonest case of all, a Raspberry Pi or a server: the processor line alone.
+        for info in (HOST_INFO, host_info_reply('<p_ncpus>4</p_ncpus>', '<coprocs>\n</coprocs>'), NO_HOST_INFO):
+            with self.subTest(info=info), FakeBoincClient(host_info=info) as server:
+                state = self.read_one(server)['state']
+
+            self.assertIsNone(state['gpus'])
+
     def test_should_report_a_rejected_password_rather_than_empty_data(self):
-        # The library does not check authorisation on its query methods, so without our explicit
-        # check a wrong password would look like a client with nothing to do.
+        # A wrong password must read as one, not as a client with nothing to do.
         with FakeBoincClient() as server:
             machine = self.read_one(server, password='wrong password')
 
         self.assertEqual('auth_failed', machine['error_kind'])
 
-    def test_should_treat_the_no_tasks_sentinel_as_an_empty_list(self):
-        # With no results the library returns the string "\n" instead of a list.
+    def test_should_read_a_client_with_no_tasks_and_no_projects(self):
         with FakeBoincClient(tasks=NO_TASKS, projects=NO_PROJECTS) as server:
             state = self.read_one(server)['state']
 

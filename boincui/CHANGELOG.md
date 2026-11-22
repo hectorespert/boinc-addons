@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.0
+
+Each machine now names the graphics cards BOINC can compute on, under the processor; a card you know is there but that does not appear is one BOINC cannot see. Each running task now says how much computing it still needs, under its due date, as BOINC estimates it. Project names with accents or other non-English letters also show as your machines send them, instead of garbled: "Biología" no longer appears as "BiologÃ­a"
+
 ## 1.4.1
 
 The part of the app that talks to your BOINC machines is now a separate, maintained library instead of a copy kept inside the app, so fixes to it can reach BOINC UI and other projects alike. Nothing changes in how the app works or in what you need to configure
